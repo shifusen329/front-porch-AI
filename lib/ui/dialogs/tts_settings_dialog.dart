@@ -20,9 +20,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/elevenlabs_tts_engine.dart';
+import 'package:front_porch_ai/services/tts/openai_voice_list.dart';
 import 'package:front_porch_ai/ui/dialogs/tts_settings/tts_settings.dart';
 import 'package:front_porch_ai/ui/dialogs/voice_browser_dialog.dart';
-import 'package:front_porch_ai/ui/theme/app_colors.dart';
+import 'package:front_porch_ai/ui/theme/theme.dart';
 
 /// Dialog for configuring TTS settings with multi-engine support.
 class TtsSettingsDialog extends StatefulWidget {
@@ -38,7 +39,9 @@ class _TtsSettingsDialogState extends State<TtsSettingsDialog> {
   final _apiKeyController = TextEditingController();
   final _baseUrlController = TextEditingController();
   final _modelController = TextEditingController();
+  final _voiceIdController = TextEditingController();
   bool _obscureApiKey = true;
+  bool _listingVoices = false;
 
   @override
   void initState() {
@@ -48,6 +51,18 @@ class _TtsSettingsDialogState extends State<TtsSettingsDialog> {
     _apiKeyController.text = storage.ttsSettings.openaiTtsApiKey;
     _baseUrlController.text = storage.ttsSettings.openaiTtsBaseUrl;
     _modelController.text = storage.ttsSettings.openaiTtsModel;
+    // A custom server's voices can change between visits; read them again.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final settings = storage.ttsSettings;
+      if (mounted &&
+          settings.ttsEngine == 'openai' &&
+          isCustomOpenAiTtsUrl(settings.openaiTtsBaseUrl)) {
+        _listEndpointVoices(
+          Provider.of<TtsService>(context, listen: false),
+          quiet: true,
+        );
+      }
+    });
   }
 
   @override
@@ -55,6 +70,7 @@ class _TtsSettingsDialogState extends State<TtsSettingsDialog> {
     _apiKeyController.dispose();
     _baseUrlController.dispose();
     _modelController.dispose();
+    _voiceIdController.dispose();
     super.dispose();
   }
 
@@ -103,6 +119,38 @@ class _TtsSettingsDialogState extends State<TtsSettingsDialog> {
         );
       }
     }
+  }
+
+  /// Reads the voices the OpenAI-compatible server publishes. [quiet] skips
+  /// the result note, for the read made when the dialog opens.
+  Future<void> _listEndpointVoices(TtsService tts, {bool quiet = false}) async {
+    if (_listingVoices) return;
+    setState(() => _listingVoices = true);
+    final List<TtsVoiceInfo>? voices;
+    try {
+      voices = await tts.listEndpointVoices();
+    } finally {
+      if (mounted) setState(() => _listingVoices = false);
+    }
+    if (quiet || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          voices == null
+              ? 'The server sent no voice list. Type the voice id it uses '
+                    'below.'
+              : 'Found ${voices.length} '
+                    '${voices.length == 1 ? 'voice' : 'voices'} on the server.',
+          style: voices == null
+              ? null
+              : const TextStyle(color: StatusColors.onFill),
+        ),
+        backgroundColor: voices == null
+            ? null
+            : StatusColors.successFillOf(context),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
@@ -235,8 +283,11 @@ class _TtsSettingsDialogState extends State<TtsSettingsDialog> {
                             apiKeyController: _apiKeyController,
                             modelController: _modelController,
                             baseUrlController: _baseUrlController,
+                            voiceIdController: _voiceIdController,
                             obscureApiKey: _obscureApiKey,
                             onToggleObscure: _toggleObscureApiKey,
+                            listingVoices: _listingVoices,
+                            onListVoices: () => _listEndpointVoices(tts),
                           ),
                         if (engineId == 'elevenlabs')
                           ElevenLabsTtsSettings(

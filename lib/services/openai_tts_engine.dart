@@ -16,9 +16,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:front_porch_ai/services/tts/openai_voice_list.dart';
 import 'package:front_porch_ai/services/tts_engine.dart';
 import 'package:front_porch_ai/services/tts_voice_info.dart';
 
@@ -34,9 +37,67 @@ class OpenAiTtsEngine implements TtsEngine {
   OpenAiTtsEngine({
     this.apiKey = '',
     this.model = 'tts-1',
-    this.baseUrl = 'https://api.openai.com/v1',
+    this.baseUrl = kOpenAiTtsBaseUrl,
   });
   static int _fileCounter = 0;
+
+  /// The voices a custom endpoint published (see [fetchVoices]) and the
+  /// endpoint they belong to. Another endpoint gets the built-in names.
+  List<TtsVoiceInfo> _listed = const [];
+  String _listedFor = '';
+
+  /// The saved list [restoreListedVoices] last read, so an unchanged one is
+  /// not decoded again on every use.
+  String _restoredFrom = '';
+
+  /// The published voices in their saved form; '' when there are none.
+  String get savedVoiceList =>
+      _listed.isEmpty ? '' : encodeOpenAiVoiceList(_listedFor, _listed);
+
+  /// Takes back a list saved from [savedVoiceList].
+  void restoreListedVoices(String saved) {
+    if (saved == _restoredFrom) return;
+    _restoredFrom = saved;
+    final decoded = decodeOpenAiVoiceList(saved);
+    _listed = decoded?.voices ?? const [];
+    _listedFor = decoded?.url ?? '';
+  }
+
+  /// Asks a custom endpoint for its voices (`GET {baseUrl}/audio/voices`).
+  /// Returns them, or null when [baseUrl] is OpenAI's own, the endpoint
+  /// publishes no list, or it cannot be reached. The last good list stays in
+  /// use on a failure.
+  Future<List<TtsVoiceInfo>?> fetchVoices() async {
+    final url = baseUrl;
+    if (!isCustomOpenAiTtsUrl(url)) return null;
+    final uri = openAiVoiceListUri(url);
+    try {
+      final response = await http
+          .get(
+            uri,
+            headers: {if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey'},
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        print('OpenAI TTS voices: ${response.statusCode} from $uri');
+        return null;
+      }
+      final voices = parseOpenAiVoiceList(
+        jsonDecode(utf8.decode(response.bodyBytes)),
+      );
+      if (voices.isEmpty) {
+        print('OpenAI TTS voices: $uri listed no voices');
+        return null;
+      }
+      _listed = voices;
+      _listedFor = url;
+      _restoredFrom = savedVoiceList;
+      return voices;
+    } catch (e) {
+      print('OpenAI TTS voices error from $uri: $e');
+      return null;
+    }
+  }
 
   @override
   String get engineName => 'OpenAI TTS';
@@ -106,8 +167,13 @@ class OpenAiTtsEngine implements TtsEngine {
     return '"${text.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n').replaceAll('\r', '\\r')}"';
   }
 
+  /// OpenAI's own endpoint gets its documented voices. Any other server gets
+  /// only what it published: it may not know OpenAI's names at all.
   @override
-  List<TtsVoiceInfo> get availableVoices => _voices;
+  List<TtsVoiceInfo> get availableVoices {
+    if (!isCustomOpenAiTtsUrl(baseUrl)) return _voices;
+    return sameOpenAiEndpoint(_listedFor, baseUrl) ? _listed : const [];
+  }
 
   static const _voices = [
     TtsVoiceInfo(

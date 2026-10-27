@@ -18,6 +18,7 @@
 
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/services/voice_manager.dart';
@@ -25,6 +26,7 @@ import 'package:front_porch_ai/services/tts_engine.dart';
 import 'package:front_porch_ai/services/kokoro_engine.dart';
 import 'package:front_porch_ai/services/openai_tts_engine.dart';
 import 'package:front_porch_ai/services/elevenlabs_tts_engine.dart';
+import 'package:front_porch_ai/services/tts/openai_voice_list.dart';
 import 'package:front_porch_ai/services/tts/sherpa_piper_engine.dart';
 import 'package:front_porch_ai/services/tts_voice_info.dart';
 import 'package:front_porch_ai/services/tts_playback/tts_playback.dart';
@@ -106,6 +108,9 @@ class TtsService extends ChangeNotifier {
         _openaiEngine.apiKey = _storageService.ttsSettings.openaiTtsApiKey;
         _openaiEngine.model = _storageService.ttsSettings.openaiTtsModel;
         _openaiEngine.baseUrl = _storageService.ttsSettings.openaiTtsBaseUrl;
+        _openaiEngine.restoreListedVoices(
+          _storageService.ttsSettings.openaiTtsVoiceList,
+        );
         return _openaiEngine;
       case 'elevenlabs':
         _elevenlabsEngine.apiKey = _storageService.ttsSettings.elevenlabsApiKey;
@@ -130,16 +135,25 @@ class TtsService extends ChangeNotifier {
   /// This is the source of truth used by UI pickers.
   List<TtsVoiceInfo> _currentAvailableVoices = const [];
 
-  /// Engine id [_currentAvailableVoices] was built for — engine switches
+  /// What [_currentAvailableVoices] was built for — engine switches
   /// invalidate the cache here so no switch site has to remember to refresh.
-  String _voicesCacheEngine = '';
+  String _voicesCacheKey = '';
+
+  /// The engine, plus the endpoint for an OpenAI-compatible server: each
+  /// server publishes its own voices.
+  String get _voicesKey {
+    final settings = _storageService.ttsSettings;
+    return settings.ttsEngine == 'openai'
+        ? 'openai ${settings.openaiTtsBaseUrl.trim()}'
+        : settings.ttsEngine;
+  }
 
   /// Available voices for the currently selected TTS engine.
   ///
   /// When the engine is 'piper', this returns real installed voices
   /// (including manually added custom voices) instead of falling back to Kokoro.
   List<TtsVoiceInfo> get activeVoices {
-    if (_voicesCacheEngine != _storageService.ttsSettings.ttsEngine) {
+    if (_voicesCacheKey != _voicesKey) {
       // Stale cache from the previously selected engine (the voice dropdown
       // used to keep showing Piper voices after switching to Kokoro). Serve
       // the new engine's built-ins immediately and refresh asynchronously
@@ -167,7 +181,7 @@ class TtsService extends ChangeNotifier {
   /// Particularly important for Piper, where voices can be added manually
   /// (custom .onnx files) or via the Voice Browser.
   Future<void> refreshAvailableVoices() async {
-    _voicesCacheEngine = _storageService.ttsSettings.ttsEngine;
+    _voicesCacheKey = _voicesKey;
     if (_isPiperEngine) {
       try {
         _currentAvailableVoices = await _voiceManager
@@ -180,6 +194,58 @@ class TtsService extends ChangeNotifier {
       _currentAvailableVoices = activeEngine.availableVoices;
     }
     _notify();
+    _askNewEndpoint();
+  }
+
+  /// The OpenAI-compatible endpoint whose voices were last asked for, so a
+  /// rebuild does not ask again.
+  String _askedEndpoint = '';
+  Timer? _askTimer;
+
+  /// Asks a custom server for its voices at startup and whenever its address
+  /// changes. Typing an address changes it on every keystroke, so this waits
+  /// for the address to settle first.
+  void _askNewEndpoint() {
+    if (_endpointToAsk() == null) return;
+    _askTimer?.cancel();
+    _askTimer = Timer(const Duration(milliseconds: 800), () {
+      if (!_disposed && _endpointToAsk() != null) {
+        unawaited(listEndpointVoices());
+      }
+    });
+  }
+
+  String? _endpointToAsk() {
+    final settings = _storageService.ttsSettings;
+    final url = settings.openaiTtsBaseUrl.trim();
+    return settings.ttsEngine == 'openai' &&
+            isCustomOpenAiTtsUrl(url) &&
+            url != _askedEndpoint
+        ? url
+        : null;
+  }
+
+  /// The [listEndpointVoices] call in flight, so a double tap asks once.
+  Future<List<TtsVoiceInfo>?>? _listing;
+
+  /// Asks the OpenAI-compatible server in Settings for the voices it
+  /// publishes and keeps them, saved so the pickers still show them after a
+  /// restart. Returns the voices, or null when the server published none or
+  /// could not be reached.
+  Future<List<TtsVoiceInfo>?> listEndpointVoices() =>
+      _listing ??= _listEndpointVoices().whenComplete(() => _listing = null);
+
+  Future<List<TtsVoiceInfo>?> _listEndpointVoices() async {
+    if (activeEngine != _openaiEngine) return null;
+    _askedEndpoint = _openaiEngine.baseUrl.trim();
+    final voices = await _openaiEngine.fetchVoices();
+    if (voices != null) {
+      await _storageService.ttsSettings.setOpenaiTtsVoiceList(
+        _openaiEngine.savedVoiceList,
+      );
+    }
+    await refreshAvailableVoices();
+    return voices;
   }
 
   /// Manually download / ensure the model for the active engine is ready.
@@ -230,6 +296,7 @@ class TtsService extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _askTimer?.cancel();
     stop();
     _cache.clear();
     releaseLocalEngine();

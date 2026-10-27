@@ -17,6 +17,7 @@
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
 import 'dart:io';
+
 import 'settings_base.dart';
 
 /// TTS engine, voice, speed, API keys, concurrency and related settings.
@@ -32,6 +33,7 @@ class TtsSettings with SettingsBase {
   String _openaiTtsApiKey = '';
   String _openaiTtsModel = 'tts-1'; // 'tts-1' or 'tts-1-hd'
   String _openaiTtsBaseUrl = 'https://api.openai.com/v1';
+  String _openaiTtsVoiceList = '';
   String _elevenlabsApiKey = '';
   String _elevenlabsModel = 'eleven_flash_v2_5';
   double _elevenlabsStability = 0.5;
@@ -53,6 +55,10 @@ class TtsSettings with SettingsBase {
   String get openaiTtsApiKey => _openaiTtsApiKey;
   String get openaiTtsModel => _openaiTtsModel;
   String get openaiTtsBaseUrl => _openaiTtsBaseUrl;
+
+  /// The voices the OpenAI-compatible server last published, in
+  /// `OpenAiTtsEngine.savedVoiceList` form; '' when none were read.
+  String get openaiTtsVoiceList => _openaiTtsVoiceList;
   String get elevenlabsApiKey => _elevenlabsApiKey;
   String get elevenlabsModel => _elevenlabsModel;
   double get elevenlabsStability => _elevenlabsStability;
@@ -83,6 +89,7 @@ class TtsSettings with SettingsBase {
     _openaiTtsBaseUrl =
         prefs?.getString(k('openai_tts_base_url')) ??
         'https://api.openai.com/v1';
+    _openaiTtsVoiceList = prefs?.getString(k('openai_tts_voice_list')) ?? '';
     _elevenlabsApiKey = prefs?.getString(k('elevenlabs_api_key')) ?? '';
     _elevenlabsModel =
         prefs?.getString(k('elevenlabs_model')) ?? 'eleven_flash_v2_5';
@@ -144,6 +151,12 @@ class TtsSettings with SettingsBase {
   Future<void> setOpenaiTtsBaseUrl(String value) async {
     _openaiTtsBaseUrl = value;
     await prefs?.setString(k('openai_tts_base_url'), value);
+    notify();
+  }
+
+  Future<void> setOpenaiTtsVoiceList(String value) async {
+    _openaiTtsVoiceList = value;
+    await prefs?.setString(k('openai_tts_voice_list'), value);
     notify();
   }
 

@@ -29,6 +29,7 @@ class WebVoiceRoutes {
   WebVoiceRoutes(this._facade, Router router) {
     router.get('/api/voice/status', _status);
     router.post('/api/voice/settings', _settings);
+    router.post('/api/voice/list-voices', _listVoices);
     router.post('/api/tts/speak', _speak);
     router.post('/api/stt/transcribe', _transcribe);
   }
@@ -46,6 +47,9 @@ class WebVoiceRoutes {
     }
     return JsonResponse.ok(await _facade.apply(body));
   }
+
+  Future<shelf.Response> _listVoices(shelf.Request r) async =>
+      JsonResponse.ok(await _facade.listVoices());
 
   Future<shelf.Response> _speak(shelf.Request r) async {
     Map<String, dynamic> body;

@@ -22,6 +22,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import 'package:front_porch_ai/services/services.dart';
+import 'package:front_porch_ai/services/tts/openai_voice_list.dart';
 
 /// Audio bytes plus the MIME type to serve them with.
 typedef AudioPayload = ({Uint8List bytes, String contentType});
@@ -58,7 +59,19 @@ class VoiceFacade {
           },
         )
         .toList(),
+    // Additive (2026-10-27): an OpenAI-compatible server can publish its
+    // own voices, and the web Settings card offers to read them again.
+    'listsVoices':
+        _storage.ttsSettings.ttsEngine == 'openai' &&
+        isCustomOpenAiTtsUrl(_storage.ttsSettings.openaiTtsBaseUrl),
   };
+
+  /// Reads the voices the OpenAI-compatible server publishes, as the
+  /// desktop's Refresh does. `found` is how many it sent, or null for none.
+  Future<Map<String, dynamic>> listVoices() async {
+    final voices = await _tts.listEndpointVoices();
+    return {...status(), 'found': voices?.length};
+  }
 
   /// Persist the Voice & Media enable flags from the web Settings page so a
   /// remote/phone user can turn TTS/STT on without opening the desktop tab.

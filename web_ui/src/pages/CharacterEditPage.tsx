@@ -57,6 +57,7 @@ interface VoiceStatus {
   ttsEnabled?: boolean;
   globalVoice?: string;
   voices?: { id: string; name: string; gender?: string }[];
+  listsVoices?: boolean;
 }
 
 const FIELDS: { key: keyof CharDetail; label: string; rows: number }[] = [
@@ -296,7 +297,9 @@ export function CharacterEditPage() {
       <h3 className="section-label">Voice</h3>
       {voiceStatus === null || (voiceStatus.voices ?? []).length === 0 ? (
         <p className="muted small">
-          Enable text-to-speech on the desktop app to assign this character a voice.
+          {voiceStatus?.listsVoices
+            ? 'Your text-to-speech server has listed no voices yet. Refresh them under Settings → Voice & Media.'
+            : 'Enable text-to-speech on the desktop app to assign this character a voice.'}
         </p>
       ) : (
         <>
