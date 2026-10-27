@@ -9,8 +9,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
+import { ExpressionModelSettings, type ExpressionModelStatus } from './ExpressionModelSettings';
 
-interface VoiceStatus {
+interface VoiceStatus extends ExpressionModelStatus {
   ttsEnabled: boolean;
   sttEnabled?: boolean;
   sttAvailable: boolean;
@@ -19,6 +20,8 @@ interface VoiceStatus {
   listsVoices?: boolean;
   /** Set only on a list-voices answer: how many voices the server sent. */
   found?: number | null;
+  expressionEnabled?: boolean;
+  expressionMode?: string;
 }
 
 export function VoiceMediaSettings() {
@@ -101,6 +104,9 @@ export function VoiceMediaSettings() {
           Speech-to-text is on, but the host has not finished loading a
           recogniser yet. Try the mic again in a moment.
         </p>
+      )}
+      {v.expressionEnabled && v.expressionMode === 'onnx' && (
+        <ExpressionModelSettings status={v} onSaved={setV} />
       )}
       {v.listsVoices && (
         <>

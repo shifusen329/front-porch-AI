@@ -78,20 +78,29 @@ class OnnxEmotionEngine {
 
   /// Classifies [text]; returns `(label, confidence, top3)` sorted by score,
   /// with confidences rounded to 4 decimals like the sidecar's output.
+  /// [configPath] is the model's config.json, whose id2label names its
+  /// outputs; without one the outputs are read as [labels].
   /// Throws on any failure — the caller owns the sidecar fallback.
   static Future<List<(String, double)>> classify({
     required String modelPath,
     required String vocabPath,
+    String? configPath,
     required String text,
   }) {
-    return Isolate.run(() => _classifyInIsolate(modelPath, vocabPath, text));
+    return Isolate.run(
+      () => _classifyInIsolate(modelPath, vocabPath, configPath, text),
+    );
   }
 
   static List<(String, double)> _classifyInIsolate(
     String modelPath,
     String vocabPath,
+    String? configPath,
     String text,
   ) {
+    final names = configPath == null
+        ? labels
+        : labelsFromConfig(File(configPath).readAsStringSync()) ?? labels;
     final tokenizer = WordPieceTokenizer(loadVocab(File(vocabPath)));
     final ids = tokenizer.encode(text);
 
@@ -115,7 +124,7 @@ class OnnxEmotionEngine {
       outs = session.run(ro, {'input_ids': idsT, 'attention_mask': maskT});
       final nested = outs[0]!.value as List;
       final logits = [for (final v in nested[0] as List) (v as num).toDouble()];
-      return topScores(logits);
+      return topScores(logits, names: names);
     } finally {
       if (outs != null) {
         for (final v in outs) {
@@ -130,16 +139,40 @@ class OnnxEmotionEngine {
     }
   }
 
+  /// The output names in a model's config.json (`id2label`, in id order),
+  /// or null when it has none or they do not run 0..n-1.
+  static List<String>? labelsFromConfig(String configJson) {
+    try {
+      final root = jsonDecode(configJson);
+      final map = root is Map ? root['id2label'] : null;
+      if (map is! Map || map.isEmpty) return null;
+      final names = List<String?>.filled(map.length, null);
+      for (final MapEntry(:key, :value) in map.entries) {
+        final id = int.tryParse('$key');
+        if (id == null || id < 0 || id >= names.length) return null;
+        names[id] = '$value'.trim().toLowerCase();
+      }
+      if (names.any((n) => n == null || n.isEmpty)) return null;
+      return names.cast<String>();
+    } on FormatException {
+      return null;
+    }
+  }
+
   /// Softmax over [logits] → all labels sorted by descending score,
   /// 4-decimal confidences (parity with the sidecar's `round(_, 4)`).
-  static List<(String, double)> topScores(List<double> logits) {
+  /// [names] names each output, in order.
+  static List<(String, double)> topScores(
+    List<double> logits, {
+    List<String> names = labels,
+  }) {
     final maxL = logits.reduce(math.max);
     final exps = [for (final v in logits) math.exp(v - maxL)];
     final sum = exps.reduce((a, b) => a + b);
     final scored = <(String, double)>[
       for (var i = 0; i < logits.length; i++)
         (
-          i < labels.length ? labels[i] : 'neutral',
+          i < names.length ? names[i] : 'neutral',
           ((exps[i] / sum) * 10000).roundToDouble() / 10000,
         ),
     ];

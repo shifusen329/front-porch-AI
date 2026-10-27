@@ -64,6 +64,13 @@ class VoiceFacade {
     'listsVoices':
         _storage.ttsSettings.ttsEngine == 'openai' &&
         isCustomOpenAiTtsUrl(_storage.ttsSettings.openaiTtsBaseUrl),
+    // Additive (2026-10-27): the Local ONNX expression classifier's model,
+    // and the labels it gives once downloaded (null before).
+    'expressionEnabled': _storage.expressionSettings.expressionEnabled,
+    'expressionMode': _storage.expressionSettings.expressionClassificationMode,
+    'expressionModel': _storage.expressionSettings.expressionOnnxModel,
+    'expressionModelDefault': kDefaultExpressionModel,
+    'expressionModelLabels': _storage.expressionSettings.expressionModelLabels,
   };
 
   /// Reads the voices the OpenAI-compatible server publishes, as the
@@ -74,8 +81,16 @@ class VoiceFacade {
   }
 
   /// Persist the Voice & Media enable flags from the web Settings page so a
-  /// remote/phone user can turn TTS/STT on without opening the desktop tab.
+  /// remote/phone user can turn TTS/STT on without opening the desktop tab,
+  /// and the expression classifier's model (`expressionModel`: an
+  /// `owner/name` id, a huggingface.co link, or '' for the default). Throws
+  /// [ArgumentError] when that names no model.
   Future<Map<String, dynamic>> apply(Map<String, dynamic> body) async {
+    // First, so a model that is refused leaves the flags untouched too.
+    final model = body['expressionModel'];
+    if (model is String) {
+      await _storage.expressionSettings.setExpressionOnnxModel(model);
+    }
     final tts = body['ttsEnabled'];
     if (tts is bool) await _storage.ttsSettings.setTtsEnabled(tts);
     final stt = body['sttEnabled'];

@@ -17,6 +17,7 @@
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
 export 'call_system_prompt_field.dart';
+export 'expression_model_field.dart';
 export 'expression_section.dart';
 export 'stt_section.dart';
 export 'voice_call_settings.dart';

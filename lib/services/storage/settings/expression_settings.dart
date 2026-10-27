@@ -18,7 +18,9 @@
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:front_porch_ai/services/expression/expression.dart';
 import 'package:front_porch_ai/services/image_prompt/image_prompt.dart';
+import 'package:front_porch_ai/utils/utils.dart';
 
 import 'settings_base.dart';
 
@@ -49,6 +51,10 @@ class ExpressionSettings with SettingsBase {
   String _expressionFallback = 'neutral'; // 'neutral', 'prime', 'none', 'emoji'
   bool _expressionEmojiBurst = false;
   double _expressionEmojiBurstSize = 28.0; // particle base font size (12–60)
+  String _expressionOnnxModel = kDefaultExpressionModel;
+
+  /// Each downloaded classifier model's labels, by model id.
+  Map<String, List<String>> _modelLabels = {};
 
   bool get expressionEnabled => _expressionEnabled;
   String get expressionClassificationMode => _expressionClassificationMode;
@@ -57,6 +63,20 @@ class ExpressionSettings with SettingsBase {
   String get expressionFallback => _expressionFallback;
   bool get expressionEmojiBurst => _expressionEmojiBurst;
   double get expressionEmojiBurstSize => _expressionEmojiBurstSize;
+
+  /// The Hugging Face model (`owner/name`) the ONNX classifier runs.
+  String get expressionOnnxModel => _expressionOnnxModel;
+
+  /// The labels the ONNX model in use gives, once it is on disk; null before.
+  List<String>? get expressionModelLabels => _modelLabels[_expressionOnnxModel];
+
+  /// Every label an expression image can carry: the standard set, then any
+  /// the ONNX model in use adds (a fine-tune with labels of its own).
+  List<String> get expressionLabels => [
+    ...EmotionLabels.all,
+    for (final label in expressionModelLabels ?? const <String>[])
+      if (!EmotionLabels.all.contains(label)) label,
+  ];
 
   void load() {
     _promptRules = ExpressionPromptRules();
@@ -84,6 +104,23 @@ class ExpressionSettings with SettingsBase {
           12.0,
           60.0,
         );
+    _expressionOnnxModel =
+        normalizeExpressionModel(
+          prefs?.getString(k('expression_onnx_model')) ?? '',
+        ) ??
+        kDefaultExpressionModel;
+    _modelLabels = {};
+    try {
+      final stored = prefs?.getString(k('expression_model_labels'));
+      if (stored != null) {
+        for (final MapEntry(:key, :value)
+            in (jsonDecode(stored) as Map<String, dynamic>).entries) {
+          _modelLabels[key] = [for (final l in value as List) '$l'];
+        }
+      }
+    } catch (e) {
+      debugPrint('[Expression] Invalid saved model labels: $e');
+    }
   }
 
   Future<void> setExpressionEnabled(bool value) async {
@@ -119,6 +156,36 @@ class ExpressionSettings with SettingsBase {
   Future<void> setExpressionEmojiBurst(bool value) async {
     _expressionEmojiBurst = value;
     await prefs?.setBool(k('expression_emoji_burst'), value);
+    notify();
+  }
+
+  /// Sets the ONNX classifier model from an `owner/name` id or a
+  /// huggingface.co link; empty goes back to the default. Throws
+  /// [ArgumentError] for anything else.
+  Future<void> setExpressionOnnxModel(String value) async {
+    final model = value.trim().isEmpty
+        ? kDefaultExpressionModel
+        : normalizeExpressionModel(value);
+    if (model == null) {
+      throw ArgumentError.value(value, 'value', 'not a Hugging Face model id');
+    }
+    if (model == _expressionOnnxModel) return;
+    _expressionOnnxModel = model;
+    await prefs?.setString(k('expression_onnx_model'), model);
+    notify();
+  }
+
+  /// Records the labels [model] gives, read from its config.json.
+  Future<void> setExpressionModelLabels(
+    String model,
+    List<String> labels,
+  ) async {
+    if (listEquals(_modelLabels[model], labels)) return;
+    _modelLabels = {..._modelLabels, model: List.unmodifiable(labels)};
+    await prefs?.setString(
+      k('expression_model_labels'),
+      jsonEncode(_modelLabels),
+    );
     notify();
   }
 

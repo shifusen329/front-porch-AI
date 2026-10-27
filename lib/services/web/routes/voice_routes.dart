@@ -45,7 +45,11 @@ class WebVoiceRoutes {
     } catch (_) {
       body = const {};
     }
-    return JsonResponse.ok(await _facade.apply(body));
+    try {
+      return JsonResponse.ok(await _facade.apply(body));
+    } on ArgumentError catch (e) {
+      return JsonResponse.badRequest('${e.message}');
+    }
   }
 
   Future<shelf.Response> _listVoices(shelf.Request r) async =>

@@ -75,8 +75,12 @@ class SpritePackResult {
 /// Decode a ZIP sprite pack: image files whose base name matches an emotion
 /// label (`joy.png`, `anger-1.png`, `sad_2.png`, …) become [SpritePackEntry]s;
 /// others are counted as [SpritePackResult.unrecognized]. Same matching as the
-/// old expression dialog.
-SpritePackResult decodeSpritePack(Uint8List zipBytes) {
+/// old expression dialog. [labels] are the names recognized: the standard
+/// set plus any the expression classifier model adds.
+SpritePackResult decodeSpritePack(
+  Uint8List zipBytes, {
+  List<String> labels = EmotionLabels.all,
+}) {
   const imageExts = {'png', 'jpg', 'jpeg', 'webp', 'gif'};
   final entries = <SpritePackEntry>[];
   var unrecognized = 0;
@@ -92,7 +96,7 @@ SpritePackResult decodeSpritePack(Uint8List zipBytes) {
 
     final base = name.replaceAll(RegExp(r'\.\w+$'), '').toLowerCase();
     String? emotion;
-    for (final label in EmotionLabels.all) {
+    for (final label in labels) {
       if (base == label ||
           base.startsWith('$label-') ||
           base.startsWith('$label.') ||

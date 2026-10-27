@@ -131,7 +131,10 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
   Future<void> _importZip() async {
     final zip = await pickZipBytes(context);
     if (zip == null) return;
-    final pack = decodeSpritePack(zip);
+    final pack = decodeSpritePack(
+      zip,
+      labels: _c.storage.expressionSettings.expressionLabels,
+    );
     final (added, unrecognized, skipped) = await _c.importSpritePack([
       for (final e in pack.entries) (bytes: e.bytes, emotion: e.emotion),
     ], pack.unrecognized);
@@ -159,6 +162,7 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
             padding: const EdgeInsets.all(18),
             child: EmotionPicker(
               previewBytes: preview,
+              labels: _c.storage.expressionSettings.expressionLabels,
               onPick: (e) => Navigator.pop(dctx, e),
               onCancel: () => Navigator.pop(dctx),
             ),

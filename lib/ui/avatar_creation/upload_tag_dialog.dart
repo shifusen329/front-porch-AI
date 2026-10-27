@@ -27,8 +27,14 @@ import 'package:front_porch_ai/utils/utils.dart';
 const String kUploadTagLook = '__look__';
 
 /// Look-or-emotion chooser for a pack-OFF extra upload in the Portrait &
-/// Avatars step: [kUploadTagLook], an EmotionLabels value, or null (cancel).
-Future<String?> showUploadTagDialog(BuildContext context, Uint8List bytes) {
+/// Avatars step: [kUploadTagLook], one of [labels], or null (cancel).
+/// [labels] are the standard set plus any the expression classifier model
+/// adds.
+Future<String?> showUploadTagDialog(
+  BuildContext context,
+  Uint8List bytes, {
+  List<String> labels = EmotionLabels.all,
+}) {
   return showDialog<String>(
     context: context,
     builder: (ctx) => Dialog(
@@ -96,7 +102,7 @@ Future<String?> showUploadTagDialog(BuildContext context, Uint8List bytes) {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final emotion in EmotionLabels.all)
+                      for (final emotion in labels)
                         ActionChip(
                           label: Text(
                             '${EmotionLabels.emoji[emotion] ?? ''} $emotion',

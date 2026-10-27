@@ -34,6 +34,7 @@ import 'package:front_porch_ai/ui/settings/tabs/voice_media_tab.dart';
 import '../../golden/support/fakes.dart';
 import '../../golden/support/fakes_services.dart';
 import '../../golden/support/fakes_storage.dart';
+import '../../helpers/double_tap.dart';
 
 /// Voice/media members the shared fake never needed before this net.
 class _FakeClassifier extends ChangeNotifier
@@ -171,6 +172,109 @@ void main() {
       reason:
           'enabling voice input must reveal the call section — its '
           'future part would otherwise be detached',
+    );
+  });
+
+  // The Local ONNX classifier's model: a pasted huggingface.co link becomes
+  // the owner/name id with one write per double tap, a non-id is refused,
+  // and the model's own labels show once known. Download and labels end to
+  // end: test/services/expression/expression_model_test.dart.
+  testWidgets('the Local ONNX model field takes a Hugging Face model', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final storage = _VoiceStorage();
+    final settings = storage.expressionSettings;
+    await settings.setExpressionClassificationMode('onnx');
+    final tts = FakeTtsService();
+    final stt = _SttWithModel();
+    final vm = FakeVoiceManager();
+    final mm = _ModelsManager();
+    final llm = FakeLLMProvider();
+    final classifier = _FakeClassifier();
+    addTearDown(() {
+      storage.dispose();
+      tts.dispose();
+      stt.dispose();
+      vm.dispose();
+      mm.dispose();
+      llm.dispose();
+      classifier.dispose();
+    });
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<StorageService>.value(value: storage),
+          ChangeNotifierProvider<TtsService>.value(value: tts),
+          ChangeNotifierProvider<SttService>.value(value: stt),
+          ChangeNotifierProvider<VoiceManager>.value(value: vm),
+          ChangeNotifierProvider<ModelManager>.value(value: mm),
+          ChangeNotifierProvider<LLMProvider>.value(value: llm),
+          ChangeNotifierProvider<ExpressionClassifierService>.value(
+            value: classifier,
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: VoiceMediaTab(
+              onDragCallBufferChanged: (_) {},
+              availableModels: const [],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final field = find.byWidgetPredicate(
+      (w) =>
+          w is TextField &&
+          w.decoration?.hintText == 'owner/name on Hugging Face',
+    );
+    await tester.scrollUntilVisible(
+      field,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(settings.expressionOnnxModel), findsOneWidget);
+    expect(find.textContaining('once it downloads'), findsOneWidget);
+
+    await tester.enterText(
+      field,
+      'https://huggingface.co/Shifusen/distilbert-go_emotions-nsfw/tree/main',
+    );
+    var writes = 0;
+    storage.addListener(() => writes++);
+    await doubleTapNoFrame(tester, find.text('Use'));
+    await tester.pumpAndSettle();
+    expect(
+      settings.expressionOnnxModel,
+      'Shifusen/distilbert-go_emotions-nsfw',
+    );
+    expect(writes, 1, reason: 'a double tap saves the model once');
+    expect(find.text('Shifusen/distilbert-go_emotions-nsfw'), findsOneWidget);
+
+    await settings.setExpressionModelLabels(settings.expressionOnnxModel, [
+      'joy',
+      'neutral',
+      'cowgirl',
+      'paizuri',
+    ]);
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Its own, for tagging images: cowgirl, paizuri'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(field, 'not a model');
+    await tester.tap(find.text('Use'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Use owner/name'), findsOneWidget);
+    expect(
+      settings.expressionOnnxModel,
+      'Shifusen/distilbert-go_emotions-nsfw',
     );
   });
 }

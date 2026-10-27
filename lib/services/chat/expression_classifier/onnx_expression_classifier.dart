@@ -155,8 +155,11 @@ class OnnxExpressionClassifier {
 
       final result = await _service!.classify(text);
       if (result != null) {
-        final label = result.emotion.toLowerCase();
-        if (EmotionLabels.all.contains(label)) {
+        // The label is one the model's own config.json names, so a
+        // fine-tune's extra labels (beyond EmotionLabels.all) pass through
+        // to the images tagged with them.
+        final label = result.emotion.toLowerCase().trim();
+        if (label.isNotEmpty) {
           debugPrint(
             '[Expression:ONNX] emotion=$emotion -> label=$label (confidence: ${result.confidence})',
           );

@@ -474,7 +474,11 @@ class PortraitSection extends StatelessWidget {
   ) async {
     final bytes = await pickImageBytes(context);
     if (bytes == null || !context.mounted) return;
-    final choice = await showUploadTagDialog(context, bytes);
+    final choice = await showUploadTagDialog(
+      context,
+      bytes,
+      labels: c.storage.expressionSettings.expressionLabels,
+    );
     if (choice == null || !context.mounted) return;
     final ok = await c.addExtraUpload(
       bytes,

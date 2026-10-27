@@ -16,10 +16,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:front_porch_ai/services/expression/onnx_emotion_classifier.dart';
+import 'package:front_porch_ai/services/expression/expression.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 
@@ -143,27 +144,65 @@ class ExpressionClassifierService extends ChangeNotifier {
   final StorageService _storage;
   ExpressionClassifier? _activeClassifier;
   String _activeMode = 'llm';
+  String _activeModel = '';
+
+  /// Where ONNX models are fetched from; tests point it at a local server.
+  final String hubBaseUrl;
 
   // Download progress tracking
   bool _isDownloading = false;
   OnnxDownloadProgress? _downloadProgress;
-  bool _modelReady = false;
+  String _readyModel = '';
 
-  ExpressionClassifierService(this._storage);
+  ExpressionClassifierService(
+    this._storage, {
+    this.hubBaseUrl = kHuggingFaceBase,
+  });
 
   String get activeMode => _activeMode;
   bool get isDownloading => _isDownloading;
   OnnxDownloadProgress? get downloadProgress => _downloadProgress;
-  bool get modelReady => _modelReady;
 
-  /// Returns true when the model cache directory has content.
+  String get _model => _storage.expressionSettings.expressionOnnxModel;
+
+  /// Whether the model in Settings finished downloading this session.
+  bool get modelReady => _readyModel == _model;
+
+  /// Returns true when the model in Settings is on disk.
   bool get isModelCached {
-    final dir = Directory('${_storage.rootPath}/models/emotion_classifier');
+    final files = ExpressionModelFiles(_storage.rootPath ?? '', _model);
     try {
+      if (!files.isDefault) return File(files.model).existsSync();
+      // The default model may sit in the retired sidecar's hub cache.
+      final dir = Directory(files.cacheDir);
       return dir.existsSync() && dir.listSync().isNotEmpty;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[ExpressionClassifierService] cache check failed: $e');
       return false;
     }
+  }
+
+  OnnxEmotionClassifier _onnxClassifier({
+    required void Function(OnnxDownloadProgress) onProgress,
+  }) {
+    final model = _model;
+    return OnnxEmotionClassifier(
+      storage: _storage,
+      hubBaseUrl: hubBaseUrl,
+      onProgress: onProgress,
+      onModelReady: () {
+        _isDownloading = false;
+        _readyModel = model;
+        notifyListeners();
+      },
+      onLabels: (model, labels) => unawaited(
+        _storage.expressionSettings
+            .setExpressionModelLabels(model, labels)
+            .catchError((Object e) {
+              debugPrint('[ExpressionClassifierService] labels not saved: $e');
+            }),
+      ),
+    );
   }
 
   /// Initialize or re-initialize the classifier based on current settings.
@@ -172,13 +211,18 @@ class ExpressionClassifierService extends ChangeNotifier {
     required Future<String> Function(String unknownEmotion) reclassify,
   }) async {
     final mode = _storage.expressionSettings.expressionClassificationMode;
-    if (mode == _activeMode && _activeClassifier != null) return;
+    if (mode == _activeMode &&
+        _model == _activeModel &&
+        _activeClassifier != null) {
+      return;
+    }
 
     debugPrint(
       '[ExpressionClassifierService] Switching from $_activeMode to $mode',
     );
 
     _activeMode = mode;
+    _activeModel = _model;
 
     switch (mode) {
       case 'llm':
@@ -189,18 +233,19 @@ class ExpressionClassifierService extends ChangeNotifier {
         break;
       case 'onnx':
         // In-process ONNX; the model auto-downloads on first classify.
-        _activeClassifier = OnnxEmotionClassifier(
-          storage: _storage,
+        final classifier = _onnxClassifier(
           onProgress: (progress) {
             _isDownloading = true;
             _downloadProgress = progress;
             notifyListeners();
           },
-          onModelReady: () {
-            _isDownloading = false;
-            _modelReady = true;
-            notifyListeners();
-          },
+        );
+        _activeClassifier = classifier;
+        // A model already on disk names its labels for the image pickers.
+        unawaited(
+          classifier.reportLabels().catchError((Object e) {
+            debugPrint('[ExpressionClassifierService] labels unread: $e');
+          }),
         );
         break;
       case 'manual':
@@ -221,11 +266,11 @@ class ExpressionClassifierService extends ChangeNotifier {
     return _activeClassifier!.classify(text);
   }
 
-  /// Triggers a background download of the ONNX model.
+  /// Triggers a background download of the ONNX model in Settings.
   ///
   /// Creates a dedicated [OnnxEmotionClassifier] that fetches the model
-  /// directly over HTTPS, cached to
-  /// [storage.rootPath]/models/emotion_classifier.
+  /// directly over HTTPS into its folder under [storage.rootPath]/models
+  /// (see [ExpressionModelFiles]).
   /// Progress is broadcast via [isDownloading] and [downloadProgress].
   /// Returns false if a download is already in progress, or if the
   /// fetch fails (truncated / tiny body / network). The settings button
@@ -239,15 +284,9 @@ class ExpressionClassifierService extends ChangeNotifier {
     _downloadProgress = null;
     notifyListeners();
 
-    final classifier = OnnxEmotionClassifier(
-      storage: _storage,
+    final classifier = _onnxClassifier(
       onProgress: (progress) {
         _downloadProgress = progress;
-        notifyListeners();
-      },
-      onModelReady: () {
-        _isDownloading = false;
-        _modelReady = true;
         notifyListeners();
       },
     );
@@ -257,7 +296,7 @@ class ExpressionClassifierService extends ChangeNotifier {
       // Guard: if onModelReady was never fired (already cached), finalize here
       if (_isDownloading) {
         _isDownloading = false;
-        _modelReady = true;
+        _readyModel = classifier.model;
         notifyListeners();
       }
       return true;

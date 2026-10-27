@@ -31,6 +31,7 @@ class EmotionPicker extends StatelessWidget {
   const EmotionPicker({
     super.key,
     this.previewBytes,
+    this.labels = EmotionLabels.all,
     required this.onPick,
     required this.onCancel,
   });
@@ -38,6 +39,10 @@ class EmotionPicker extends StatelessWidget {
   /// The image the user just picked, previewed above the chips. Null when
   /// re-labelling an existing image (chips only).
   final Uint8List? previewBytes;
+
+  /// The labels offered: the standard set plus any the expression
+  /// classifier model adds (`ExpressionSettings.expressionLabels`).
+  final List<String> labels;
 
   /// The chosen emotion label.
   final ValueChanged<String> onPick;
@@ -83,9 +88,9 @@ class EmotionPicker extends StatelessWidget {
               mainAxisSpacing: 8,
               childAspectRatio: 2.7,
             ),
-            itemCount: EmotionLabels.all.length,
+            itemCount: labels.length,
             itemBuilder: (context, index) {
-              final emotion = EmotionLabels.all[index];
+              final emotion = labels[index];
               return _EmotionChip(
                 emotion: emotion,
                 emoji: EmotionLabels.emoji[emotion] ?? '',

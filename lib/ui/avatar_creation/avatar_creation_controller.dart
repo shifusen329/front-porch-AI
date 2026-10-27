@@ -368,7 +368,10 @@ class AvatarCreationController extends ChangeNotifier {
   Future<(int, int)> importExpressionZip(Uint8List zipBytes) async {
     if (!await _anchor.ensure()) return (0, 0);
     final card = _anchor.card!;
-    final result = decodeSpritePack(zipBytes);
+    final result = decodeSpritePack(
+      zipBytes,
+      labels: storage.expressionSettings.expressionLabels,
+    );
     var added = 0;
     for (final e in result.entries) {
       await repository.addAvatar(card.dbId!, card.name, e.bytes, e.emotion);

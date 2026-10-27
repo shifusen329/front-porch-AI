@@ -23,6 +23,8 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 import 'package:front_porch_ai/ui/settings/widgets/widgets.dart';
 
+import 'expression_model_field.dart';
+
 /// Expression Images section of the Voice & Media tab: enable switch,
 /// classification-mode dropdown (+ ONNX download button), display-mode
 /// dropdown, reroll switch, emoji-burst switch + size slider, and fallback
@@ -181,6 +183,15 @@ class VoiceMediaExpressionSection extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (storage
+                            .expressionSettings
+                            .expressionClassificationMode ==
+                        'onnx') ...[
+                      const SizedBox(height: 8),
+                      ExpressionModelField(
+                        settings: storage.expressionSettings,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     // Display mode dropdown
                     Row(
