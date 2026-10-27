@@ -202,3 +202,7 @@ assets/web_app/**
 
 # CocoaPods writes this on every build; it was tracked but never committed.
 macos/Podfile.lock
+
+# graphify knowledge-graph output (a local tool, not part of the app).
+graphify-out/
+lib/graphify-out/
