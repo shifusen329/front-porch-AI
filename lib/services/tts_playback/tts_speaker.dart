@@ -131,6 +131,7 @@ class TtsSpeaker {
         await _c.player.play(cached);
       } catch (e) {
         print('TTS cache playback error: $e');
+        _c.state.lastError = 'Could not play the speech: $e';
       } finally {
         if (stillMine()) {
           _c.state.isSpeaking = false;
@@ -389,6 +390,7 @@ class TtsSpeaker {
             final file = results[j];
 
             if (file == null) {
+              _c.reportEngineFailure(engine);
               failed = true;
               break;
             }
@@ -452,6 +454,7 @@ class TtsSpeaker {
       return;
     } catch (e) {
       print('TTS error: $e');
+      _c.state.lastError = 'Text-to-speech failed: $e';
     } finally {
       // Only the owner may clear the shared state: a superseded call reaching
       // here must not switch off the Speak that replaced it.

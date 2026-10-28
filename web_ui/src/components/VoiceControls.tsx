@@ -9,14 +9,18 @@
 import { useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
 
-/** 🔊 Synthesize a message and play it on this device. */
+/** 🔊 Synthesize a message and play it on this device. When there is no
+ * audio, the host's reason shows beside the button (a speech server that
+ * refused the model or the voice, say), as the desktop shows it. */
 export function SpeakButton({ text }: { text: string }) {
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const speak = async () => {
     if (busy || !text.trim()) return;
     setBusy(true);
+    setProblem('');
     try {
       const blob = await api.postForBlob('/api/tts/speak', { text });
       const url = URL.createObjectURL(blob);
@@ -24,17 +28,24 @@ export function SpeakButton({ text }: { text: string }) {
       audioRef.current = audio;
       audio.onended = () => URL.revokeObjectURL(url);
       await audio.play();
-    } catch {
-      // TTS off or no audio — surface nothing intrusive; the button just resets.
+    } catch (e) {
+      setProblem(e instanceof ApiError ? e.message : 'This device could not play the speech.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button className="icon-btn" title="Speak" aria-label="Speak this message" disabled={busy} onClick={speak}>
-      {busy ? '…' : '🔊'}
-    </button>
+    <>
+      <button className="icon-btn" title={problem || 'Speak'} aria-label="Speak this message" disabled={busy} onClick={speak}>
+        {busy ? '…' : '🔊'}
+      </button>
+      {problem && (
+        <span className="small rag-engine-error" role="alert">
+          {problem}
+        </span>
+      )}
+    </>
   );
 }
 

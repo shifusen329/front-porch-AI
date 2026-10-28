@@ -20,6 +20,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:front_porch_ai/services/engine_health.dart';
+import 'package:front_porch_ai/services/openai_tts_engine.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/services/tts/sherpa_piper_engine.dart';
 import 'package:front_porch_ai/services/tts_engine.dart';
@@ -94,6 +95,16 @@ class TtsContext {
       ignoreAsterisks: s.ttsIgnoreAsterisks,
       narrateQuotedOnly: s.ttsNarrateQuotedOnly,
     );
+  }
+
+  /// Shows why a cloud engine gave no audio where the chat shows TTS errors
+  /// — an OpenAI-compatible server's own reason ("Unsupported model",
+  /// an unknown voice, unreachable). An engine with no reason stays quiet.
+  void reportEngineFailure(TtsEngine engine) {
+    final reason = engine is OpenAiTtsEngine ? engine.lastFailure : null;
+    if (reason == null) return;
+    state.lastError = 'Text-to-speech failed. $reason';
+    state.notify();
   }
 
   /// Makes sure the sherpa re-export for [voice] is on disk (downloading it

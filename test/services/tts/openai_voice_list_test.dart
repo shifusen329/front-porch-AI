@@ -19,6 +19,7 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf_router/shelf_router.dart';
 
 import 'package:front_porch_ai/services/services.dart';
+import 'package:front_porch_ai/services/openai_tts_engine.dart';
 import 'package:front_porch_ai/services/tts/openai_voice_list.dart';
 import 'package:front_porch_ai/services/web/facade/voice_facade.dart';
 import 'package:front_porch_ai/services/web/routes/routes.dart';
@@ -26,6 +27,7 @@ import 'package:front_porch_ai/services/web/routes/routes.dart';
 import '../../golden/support/fakes.dart';
 import '../../golden/support/fakes_services.dart';
 import '../../golden/support/fakes_storage.dart';
+import '../../helpers/speech_server.dart';
 import '../../helpers/tts_voice_server.dart';
 
 const _listPath = '/v1/audio/voices';
@@ -189,5 +191,54 @@ void main() {
       ['willa', 'orrin', 'design', 'auto'],
     );
     expect(server.hits(_listPath), 2);
+  });
+
+  test('a server of your own needs no API key: the request goes out with '
+      'none, and its audio comes back', () async {
+    final server = await SpeechServer.start();
+    final engine = OpenAiTtsEngine(
+      baseUrl: server.baseUrl,
+      model: SpeechServer.model,
+    );
+
+    expect(await engine.isAvailable, isTrue);
+    final audio = await engine.generateAudio('Hello there.', 'aisha', 1);
+    addTearDown(() => audio?.deleteSync());
+
+    expect(audio, isNotNull, reason: '${engine.lastFailure}');
+    expect(String.fromCharCodes(audio!.readAsBytesSync().take(4)), 'RIFF');
+    expect(server.requests.single.authorization, isNull);
+    expect(engine.lastFailure, isNull);
+  });
+
+  test('a server that refuses says why: the wrong model and an unknown '
+      'voice each name the reason', () async {
+    final server = await SpeechServer.start();
+    final engine = OpenAiTtsEngine(baseUrl: server.baseUrl);
+
+    expect(await engine.generateAudio('Hi.', 'aisha', 1), isNull);
+    expect(
+      engine.lastFailure,
+      contains("Unsupported model 'tts-1'. Supported: omnivoice."),
+    );
+
+    engine.model = SpeechServer.model;
+    expect(await engine.generateAudio('Hi.', 'af_heart', 1), isNull);
+    expect(engine.lastFailure, contains("Voice 'af_heart' not found."));
+  });
+
+  test('Speak on a server that refuses shows its reason instead of '
+      'staying silent', () async {
+    final server = await SpeechServer.start();
+    final storage = _openAiAt(server.baseUrl);
+    await storage.ttsSettings.setTtsEnabled(true);
+    await storage.ttsSettings.setTtsVoiceModel('aisha');
+    final tts = _ttsOn(storage);
+
+    await tts.speak('Hello there.');
+
+    expect(server.requests, isNotEmpty);
+    expect(tts.lastError, contains("Unsupported model 'tts-1'"));
+    expect(tts.isSpeaking, isFalse);
   });
 }

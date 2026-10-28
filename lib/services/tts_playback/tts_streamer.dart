@@ -166,6 +166,7 @@ class TtsStreamer {
                   '[TtsService] Streaming: generating audio for chunk (len=${sanitized.length})',
                 );
                 wavFile = await engine.generateAudio(sanitized, voice, speed);
+                if (wavFile == null) _c.reportEngineFailure(engine);
               }
             } on ElevenLabsApiException catch (e) {
               // ElevenLabs THROWS where every other engine returns null. An

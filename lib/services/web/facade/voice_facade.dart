@@ -112,6 +112,10 @@ class VoiceFacade {
     return (bytes: bytes, contentType: contentType);
   }
 
+  /// Why the last [speak] had no audio, when the engine said (an
+  /// OpenAI-compatible server's own reason).
+  String? get lastSpeakFailure => _tts.lastEngineFailure;
+
   /// Transcribe uploaded mic audio recorded on the client device. [bytes] is the
   /// raw recording; [ext] is its container extension (e.g. `webm`, `wav`) so the
   /// temp file Whisper reads has a sensible suffix. Returns the text or null.

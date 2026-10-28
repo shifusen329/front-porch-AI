@@ -105,8 +105,16 @@ class OpenAiTtsEngine implements TtsEngine {
   @override
   String get engineId => 'openai';
 
+  /// Why the last [generateAudio] gave no audio, in words for the user —
+  /// the server's own reason when it sent one ("Unsupported model 'tts-1'").
+  /// Null after a success.
+  String? lastFailure;
+
+  /// OpenAI itself needs a key; a server of your own (a LAN box) may not.
+  bool get _keyRequired => !isCustomOpenAiTtsUrl(baseUrl);
+
   @override
-  Future<bool> get isAvailable async => apiKey.isNotEmpty;
+  Future<bool> get isAvailable async => apiKey.isNotEmpty || !_keyRequired;
 
   @override
   Future<bool> ensureModelReady({void Function(double)? onProgress}) async =>
@@ -119,11 +127,12 @@ class OpenAiTtsEngine implements TtsEngine {
     double speed, {
     void Function(double progress)? onProgress,
   }) async {
-    if (apiKey.isEmpty) {
+    if (apiKey.isEmpty && _keyRequired) {
       print('OpenAI TTS: no API key configured');
       return null;
     }
 
+    final host = Uri.tryParse(baseUrl.trim())?.authority ?? baseUrl;
     try {
       // Strip trailing slash from baseUrl to avoid double-slash
       final url = baseUrl.endsWith('/')
@@ -132,7 +141,7 @@ class OpenAiTtsEngine implements TtsEngine {
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Authorization': 'Bearer $apiKey',
+          if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
         },
         body:
@@ -141,6 +150,9 @@ class OpenAiTtsEngine implements TtsEngine {
 
       if (response.statusCode != 200) {
         print('OpenAI TTS error: ${response.statusCode} ${response.body}');
+        lastFailure =
+            '$host answered ${response.statusCode}: '
+            '${_reason(response.body)}';
         return null;
       }
 
@@ -155,11 +167,28 @@ class OpenAiTtsEngine implements TtsEngine {
       );
       await outputFile.writeAsBytes(response.bodyBytes);
 
+      lastFailure = null;
       return outputFile;
     } catch (e) {
       print('OpenAI TTS error: $e');
+      lastFailure = 'Could not reach $host: $e';
       return null;
     }
+  }
+
+  /// The message in an error body: FastAPI's `detail`, OpenAI's
+  /// `error.message`, or the body itself, kept short.
+  static String _reason(String body) {
+    var reason = body.trim();
+    try {
+      final json = jsonDecode(reason);
+      if (json is Map) {
+        final error = json['error'];
+        reason =
+            '${json['detail'] ?? (error is Map ? error['message'] : error) ?? reason}';
+      }
+    } catch (_) {}
+    return reason.length > 200 ? '${reason.substring(0, 197)}…' : reason;
   }
 
   /// JSON-escape a string value.

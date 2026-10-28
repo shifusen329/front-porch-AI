@@ -101,6 +101,13 @@ class TtsService extends ChangeNotifier {
   Future<File?> generateAudioFile(String text, {String? voiceKey}) =>
       _headless.generateAudioFile(text, voiceKey: voiceKey);
 
+  /// Why the active engine last gave no audio (an OpenAI-compatible
+  /// server's reason), for surfaces that only get the missing audio.
+  String? get lastEngineFailure {
+    final engine = activeEngine;
+    return engine is OpenAiTtsEngine ? engine.lastFailure : null;
+  }
+
   /// The currently active TTS engine instance.
   TtsEngine get activeEngine {
     switch (_storageService.ttsSettings.ttsEngine) {
