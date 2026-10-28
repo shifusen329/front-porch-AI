@@ -3,6 +3,51 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-27 20:58:54 -0500 (CDT)
+
+### Added
+
+- **Android build: starts and chats over REST** (`2df48b61`). The app ran
+  only on Windows, Linux and macOS. It now builds for Android and runs there
+  as a client of OpenAI-compatible model hosts.
+  - First launch on a phone starts on OpenRouter. Settings → Backend offers
+    OpenRouter, Nano-GPT, xAI and Custom, under a note that the device cannot
+    run a local engine. A model server on another computer (KoboldCpp,
+    LM Studio, vLLM, Ollama) is reached through Custom, plain `http://`
+    included.
+  - Chats are saved each time the app goes to the background, because
+    Android ends a backgrounded app without a close event.
+  - KoboldCpp, LM Studio, the web server and Waifu Coder's OpenCode download
+    stay off on a phone.
+  - App id `app.sidepatio.android`, Android 11 (API 30) or later. Release
+    builds are arm64 only; debug builds add x86_64 for the emulator.
+
+### Changed
+
+- The "no local engine here" check that hid KoboldCpp on Intel Macs now
+  covers phones too (`2df48b61`): the Backend tab banner, the engine chip,
+  the side-jobs host bar, first-launch setup and the engine update check.
+  An Intel Mac's engine download now reports the same message the Backend
+  tab shows.
+- **Reveal in folder** on a chat image does nothing outside Windows, macOS
+  and Linux, where it used to run `xdg-open` (`2df48b61`).
+
+### Known gaps
+
+- On a phone the layout is still the desktop one: a fixed 250 px sidebar,
+  content under the status bar, Settings rows wrapping a word per line, and
+  Create Character's **Next** off-screen in portrait (landscape works). A
+  phone design is drafted, not built.
+- Tested only on the emulator. Not yet tried on a physical phone, against
+  OpenRouter, with voice input or speech, or as a release build.
+- Release builds are signed with the debug key, and the launcher icon is
+  Flutter's placeholder. No CI job builds the APK.
+- The library lives in the app's private storage and is lost on uninstall;
+  there is no export or share on the phone yet. Folder pickers do not work
+  on Android.
+- The phone web app bundle (`assets/web_app`) ships inside the APK unused.
+- Debug APKs still carry armeabi-v7a libraries despite the ABI filter.
+
 ## 2026-10-27 17:17:40 -0500 (CDT)
 
 Branched from `main` at `c1a14423`.
