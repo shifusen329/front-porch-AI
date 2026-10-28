@@ -64,8 +64,8 @@ Future<String?> showCardActionSheet(
   );
 }
 
-/// The Characters tab's "New" sheet: the creation destinations, then
-/// importing a card. Returns a destination id or [kImportCardAction].
+/// The Characters "New" sheet: the creation destinations and the Stoop,
+/// then importing a card. Returns a destination id or [kImportCardAction].
 Future<String?> showCreateSheet(BuildContext context) {
   return showWarmSheet<String>(
     context,
@@ -75,9 +75,12 @@ Future<String?> showCreateSheet(BuildContext context) {
           ListTile(
             leading: Icon(
               d.icon,
-              color: d.id == 'ai_creator'
-                  ? NavColors.creatorOf(sheet)
-                  : AppColors.iconSecondary(sheet),
+              color: switch (d.id) {
+                'ai_creator' => NavColors.creatorOf(sheet),
+                // The desktop sidebar's Stoop teal.
+                kStoopDestination => NavColors.stoopOf(sheet),
+                _ => AppColors.iconSecondary(sheet),
+              },
             ),
             title: Text(d.label),
             onTap: () => Navigator.of(sheet).pop(d.id),

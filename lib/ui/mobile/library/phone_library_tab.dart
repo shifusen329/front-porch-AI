@@ -26,7 +26,7 @@ import 'package:front_porch_ai/ui/mobile/library/phone_library_card.dart';
 import 'package:front_porch_ai/ui/mobile/library/phone_library_header.dart';
 import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/mobile/shell/destination_actions.dart';
-import 'package:front_porch_ai/ui/mobile/shell/mobile_shell.dart';
+import 'package:front_porch_ai/ui/mobile/shell/phone_tab_scope.dart';
 import 'package:front_porch_ai/ui/pages/home/cards/home_card_menu.dart';
 import 'package:front_porch_ai/ui/pages/home/home_actions/home_actions.dart';
 import 'package:front_porch_ai/ui/pages/home/library_controller.dart';

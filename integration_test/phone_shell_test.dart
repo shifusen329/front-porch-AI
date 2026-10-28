@@ -1,11 +1,14 @@
 // Copyright (C) 2026 Front Porch AI
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// E2E: the phone shell, driven like a phone. Characters → a card's ⋮ →
-// Start New Chat opens a full-screen chat; one tap-tap on Send writes one
+// E2E: the phone shell, driven like a phone. Porch → Characters → a card's
+// ⋮ → Start New Chat opens a full-screen chat; one tap-tap on Send writes one
 // message; the side panel opens over the chat as a sheet and + holds the
 // composer's other tools; back closes the chat; the Chats tab lists the
-// conversation and tapping it reopens that same chat. All at 412 wide.
+// conversation and tapping it reopens that same chat. Then the rest of the
+// bar: Porch's sub-tabs (back closes a persona form), Images opens Image
+// Studio over the tabs, Characters → New → Browse The Stoop, and Settings →
+// Backups writes one backup for a tap-tap. All at 412 wide.
 //
 // On the desktop runner PlatformCaps flips to a phone after boot (the tree
 // rebuilds the way a hot reload does); on an Android device or emulator the
@@ -24,9 +27,11 @@ import 'package:front_porch_ai/main.dart' as app;
 import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
+import 'package:front_porch_ai/ui/image_studio/home_image_studio.dart';
 import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/mobile/mobile.dart';
-import 'package:front_porch_ai/ui/pages/chat_page.dart';
+import 'package:front_porch_ai/ui/pages/pages.dart';
+import 'package:front_porch_ai/ui/pages/user_persona/user_persona.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 
@@ -71,6 +76,11 @@ void main() {
 
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(412, 915);
+    // On a device the real keyboard and system bars (in the device's own
+    // pixels) would read as taller than this whole screen.
+    tester.view.viewInsets = FakeViewPadding.zero;
+    tester.view.padding = FakeViewPadding.zero;
+    tester.view.viewPadding = FakeViewPadding.zero;
     addTearDown(tester.view.reset);
     // At phone width the rail gives way to the bottom bar.
     await tester.pump(const Duration(milliseconds: 800));
@@ -83,11 +93,9 @@ void main() {
     ).addCharacter(CharacterCard(name: _kName, firstMessage: _kGreeting));
     final d = ChatDriver(tester, chatService, backend);
 
-    // The app opens on Chats; the library is a tab away.
+    // The app opens on Chats; the library is Porch's first sub-tab.
     final nav = find.byType(NavigationBar);
-    await tester.tap(
-      find.descendant(of: nav, matching: find.text('Characters')),
-    );
+    await tester.tap(find.descendant(of: nav, matching: find.text('Porch')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Actions for $_kName').first);
     await tester.pumpAndSettle();
@@ -196,7 +204,98 @@ void main() {
       chatService.messages.where((m) => m.isUser && m.text == _kUserMessage),
       hasLength(1),
     );
+    await tester.binding.handlePopRoute();
+    await pumpUntilTrue(
+      tester,
+      () => find.byType(ChatPage).evaluate().isEmpty,
+      describe: () => 'the chat to close',
+    );
+
+    await _walkTheBar(tester, nav);
   });
+}
+
+/// Porch's sub-tabs, the Images button, the Stoop's new home and Settings →
+/// Backups. Pumps by time: the Personas and Worlds headers glow forever.
+Future<void> _walkTheBar(WidgetTester tester, Finder nav) async {
+  int selected() => tester.widget<NavigationBar>(nav).selectedIndex;
+  Future<void> frames() async {
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 150));
+    }
+  }
+
+  final porchTabs = find.byKey(const Key('porch-tabs'));
+  Future<void> porchTab(String label) async {
+    final tab = find.descendant(of: porchTabs, matching: find.text(label));
+    await tester.ensureVisible(tab);
+    await tester.tap(tab);
+    await frames();
+  }
+
+  await tester.tap(find.descendant(of: nav, matching: find.text('Porch')));
+  await frames();
+  final porch = selected();
+
+  // Back closes an open persona form instead of leaving Porch.
+  await porchTab('Personas');
+  await tester.tap(find.text('New Persona'));
+  await frames();
+  expect(find.byType(PersonaEditForm), findsOneWidget);
+  await tester.binding.handlePopRoute();
+  await frames();
+  expect(find.byType(PersonaEditForm), findsNothing, reason: 'back closed it');
+  expect(find.text('New Persona'), findsOneWidget);
+  expect(selected(), porch, reason: 'back stayed on Porch');
+
+  await porchTab('Worlds');
+  expect(find.text('World Management'), findsOneWidget);
+  await porchTab('Stories');
+  expect(find.text('Porch Stories'), findsOneWidget);
+  await porchTab('Characters');
+
+  // Images opens the studio over the tabs; closing it lands back here.
+  await tester.tap(find.descendant(of: nav, matching: find.text('Images')));
+  await pumpUntilFound(tester, find.byType(HomeImageStudio));
+  await tester.binding.handlePopRoute();
+  await pumpUntilTrue(
+    tester,
+    () => find.byType(HomeImageStudio).evaluate().isEmpty,
+    describe: () => 'Image Studio to close',
+  );
+  expect(selected(), porch, reason: 'Images is a button, not a tab');
+
+  // The Stoop lives in Characters → New now.
+  await tester.tap(find.text('New'));
+  await frames();
+  await tester.tap(find.text('Browse The Stoop'));
+  await pumpUntilFound(tester, find.byType(RepositoryPage));
+  await tester.binding.handlePopRoute();
+  await pumpUntilTrue(
+    tester,
+    () => find.byType(RepositoryPage).evaluate().isEmpty,
+    describe: () => 'the Stoop page to close',
+  );
+
+  // Settings → Backups: a tap-tap on Create writes one backup.
+  await tester.tap(find.descendant(of: nav, matching: find.text('Settings')));
+  await frames();
+  final backupsTab = find.widgetWithText(Tab, 'Backups');
+  await tester.ensureVisible(backupsTab);
+  await tester.tap(backupsTab);
+  final create = find.text('Create Backup Now');
+  await pumpUntilFound(tester, create);
+  // The tab slides in; a tap mid-slide lands beside the button.
+  await frames();
+  final before = (await BackupService.listBackups()).length;
+  await doubleTapNoFrame(tester, create);
+  await pumpUntilFound(tester, find.text('Backup created successfully'));
+  await frames();
+  expect(
+    await BackupService.listBackups(),
+    hasLength(before + 1),
+    reason: 'one tap-tapped Create writes one backup',
+  );
 }
 
 /// A sheet's open or close animation, without waiting for the chat to stop

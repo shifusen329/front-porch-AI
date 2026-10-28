@@ -40,15 +40,36 @@ void main() {
     for (final d in destinationsPlaced(PhonePlacement.tab)) {
       expect(phoneTabRoots, contains(d.id), reason: 'tab ${d.id}');
     }
+    for (final d in destinationsPlaced(PhonePlacement.porch)) {
+      expect(porchViewRoots, contains(d.id), reason: 'Porch sub-tab ${d.id}');
+    }
     for (final placement in [
+      PhonePlacement.barButton,
       PhonePlacement.createSheet,
-      PhonePlacement.more,
-      PhonePlacement.community,
     ]) {
       for (final d in destinationsPlaced(placement)) {
         expect(phoneDestinationActions, contains(d.id), reason: d.id);
       }
     }
-    expect(destinationsPlaced(PhonePlacement.tab), hasLength(5));
+  });
+
+  test('the bar is Chats, Porch, Images and Settings', () {
+    expect(phoneBarItems.map((d) => d.label), [
+      'Chats',
+      'Porch',
+      'Images',
+      'Settings',
+    ]);
+    expect(destinationsPlaced(PhonePlacement.porch).map((d) => d.label), [
+      'Characters',
+      'Personas',
+      'Worlds',
+      'Stories',
+    ]);
+    // The Stoop moved to Characters → New.
+    expect(
+      destinationsPlaced(PhonePlacement.createSheet).map((d) => d.id),
+      contains(kStoopDestination),
+    );
   });
 }

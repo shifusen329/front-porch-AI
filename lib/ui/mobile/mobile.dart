@@ -16,6 +16,7 @@ export 'library/library_sheets.dart';
 export 'library/phone_library_card.dart';
 export 'library/phone_library_header.dart';
 export 'library/phone_library_tab.dart';
-export 'more/more_tab.dart';
+export 'porch/porch_tab.dart';
 export 'shell/destination_actions.dart';
 export 'shell/mobile_shell.dart';
+export 'shell/phone_tab_scope.dart';

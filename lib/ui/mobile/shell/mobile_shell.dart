@@ -24,9 +24,9 @@ import 'package:front_porch_ai/providers/app_state.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/mobile/chats/chats_tab.dart';
-import 'package:front_porch_ai/ui/mobile/library/phone_library_tab.dart';
-import 'package:front_porch_ai/ui/mobile/more/more_tab.dart';
+import 'package:front_porch_ai/ui/mobile/porch/porch_tab.dart';
 import 'package:front_porch_ai/ui/mobile/shell/destination_actions.dart';
+import 'package:front_porch_ai/ui/mobile/shell/phone_tab_scope.dart';
 import 'package:front_porch_ai/ui/pages/pages.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
@@ -35,68 +35,15 @@ import 'package:front_porch_ai/ui/widgets/widgets.dart';
 /// test/hygiene/destination_registry_test.dart checks every tab has one.
 final Map<String, WidgetBuilder> phoneTabRoots = {
   kChatsDestination: (_) => const ChatsTab(),
-  kCharactersDestination: (_) => const PhoneLibraryTab(),
-  kStoopDestination: (_) => const RepositoryPage(),
-  // The view brings its own header (title, count, New); it only needs to
-  // keep clear of the status bar.
-  kStoriesDestination: (_) =>
-      const Scaffold(body: SafeArea(bottom: false, child: StoryHomeView())),
-  kMoreDestination: (_) => const MoreTab(),
+  kPorchDestination: (_) => const PorchTab(),
+  // Not pushed, so it shows no back arrow; its own app bar clears the
+  // status bar.
+  kSettingsDestination: (_) => const SettingsPage(),
 };
 
-/// What a tab does when the system back reaches it, or when its tab is
-/// tapped again. True from [onBack]: the tab handled it (left selection,
-/// went up a folder, closed search), so the shell does nothing more.
-class PhoneTabHooks {
-  final Map<String, bool Function()> _back = {};
-  final Map<String, VoidCallback> _reselect = {};
-
-  void register(
-    String tab, {
-    bool Function()? onBack,
-    VoidCallback? onReselect,
-  }) {
-    if (onBack != null) _back[tab] = onBack;
-    if (onReselect != null) _reselect[tab] = onReselect;
-  }
-
-  void unregister(String tab) {
-    _back.remove(tab);
-    _reselect.remove(tab);
-  }
-
-  bool back(String tab) => _back[tab]?.call() ?? false;
-
-  void reselect(String tab) => _reselect[tab]?.call();
-}
-
-/// Which tab the phone shell is showing, for a tab that refreshes when it
-/// comes back into view (Chats re-reads its list), and the hooks a tab
-/// registers for back and re-tap.
-class PhoneTabScope extends InheritedWidget {
-  const PhoneTabScope({
-    super.key,
-    required this.selected,
-    required this.hooks,
-    required super.child,
-  });
-
-  final String selected;
-  final PhoneTabHooks hooks;
-
-  static String? selectedOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<PhoneTabScope>()?.selected;
-
-  static PhoneTabHooks? hooksOf(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<PhoneTabScope>()?.hooks;
-
-  @override
-  bool updateShouldNotify(PhoneTabScope oldWidget) =>
-      oldWidget.selected != selected;
-}
-
-/// The phone's shell: five tabs in a bottom bar (a rail when the screen is
-/// wide or the phone is on its side). Tabs keep their state across
+/// The phone's shell: Chats, Porch and Settings tabs in a bottom bar (a rail
+/// when the screen is wide or the phone is on its side), with an Images
+/// button that opens Image Studio over them. Tabs keep their state across
 /// switches; anything a tab opens pushes on the app's one navigator and
 /// covers the bar, so dialogs and pages written for the desktop's single
 /// navigator behave the same here.
@@ -108,11 +55,16 @@ class MobileShell extends StatefulWidget {
 }
 
 class _MobileShellState extends State<MobileShell> implements ShellIntents {
+  /// What the bar shows: the tabs, and buttons that open a page over them.
+  static final List<AppDestination> _items = phoneBarItems.toList();
   static final List<AppDestination> _tabs = destinationsPlaced(
     PhonePlacement.tab,
   ).toList();
 
   final PhoneTabHooks _hooks = PhoneTabHooks();
+  final ValueNotifier<String> _porchView = ValueNotifier(
+    kCharactersDestination,
+  );
 
   /// Chats is where the app opens.
   int _index = 0;
@@ -139,6 +91,7 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
     if (EngineHealth.instance.onFirstFailure == _onEngineFailure) {
       EngineHealth.instance.onFirstFailure = null;
     }
+    _porchView.dispose();
     super.dispose();
   }
 
@@ -150,10 +103,15 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
   String get _current => _tabs[_index].id;
 
   @override
-  bool get isShowingLibrary => _current == kCharactersDestination;
+  bool get isShowingLibrary =>
+      _current == kPorchDestination &&
+      _porchView.value == kCharactersDestination;
 
   @override
-  void showLibrary() => _show(_indexOf(kCharactersDestination));
+  void showLibrary() {
+    _porchView.value = kCharactersDestination;
+    _show(_indexOf(kPorchDestination));
+  }
 
   @override
   void showCreateCharacter() =>
@@ -165,6 +123,17 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
       _index = index;
       _visited.add(index);
     });
+  }
+
+  /// A bar button opens its page over the tabs and leaves the selection
+  /// where it was; a tab is switched to.
+  Future<void> _onBarSelect(int position) async {
+    final item = _items[position];
+    if (item.phone == PhonePlacement.barButton) {
+      await phoneDestinationActions[item.id]?.call(context);
+      return;
+    }
+    await _onSelect(_indexOf(item.id));
   }
 
   Future<void> _onSelect(int index) async {
@@ -196,13 +165,18 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
     final body = PhoneTabScope(
       selected: _current,
       hooks: _hooks,
+      porchView: _porchView,
       child: IndexedStack(
         index: _index,
         children: [
           for (var i = 0; i < _tabs.length; i++)
-            _visited.contains(i)
-                ? Builder(builder: phoneTabRoots[_tabs[i].id]!)
-                : const SizedBox.shrink(),
+            // A tab out of view keeps its state but not its animations.
+            TickerMode(
+              enabled: i == _index,
+              child: _visited.contains(i)
+                  ? Builder(builder: phoneTabRoots[_tabs[i].id]!)
+                  : const SizedBox.shrink(),
+            ),
         ],
       ),
     );
@@ -228,25 +202,20 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
     );
   }
 
-  /// The selected icon takes the tab's own colour: the Stoop keeps its teal
-  /// from the desktop sidebar, every other tab the porch amber.
-  Color _selectedColor(BuildContext context, AppDestination tab) =>
-      tab.id == kStoopDestination
-      ? NavColors.stoopOf(context)
-      : AppColors.porchAmberOf(context);
+  int get _barPosition => _items.indexWhere((d) => d.id == _current);
 
   Widget _bar(BuildContext context) {
     return NavigationBar(
-      selectedIndex: _index,
-      onDestinationSelected: _onSelect,
+      selectedIndex: _barPosition,
+      onDestinationSelected: _onBarSelect,
       backgroundColor: AppColors.surfaceOf(context),
       indicatorColor: AppColors.navigationSelectionOf(context),
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       destinations: [
-        for (final t in _tabs)
+        for (final t in _items)
           NavigationDestination(
             icon: Icon(t.icon),
-            selectedIcon: Icon(t.icon, color: _selectedColor(context, t)),
+            selectedIcon: Icon(t.icon, color: AppColors.porchAmberOf(context)),
             label: t.label,
           ),
       ],
@@ -255,16 +224,16 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
 
   Widget _rail(BuildContext context) {
     return NavigationRail(
-      selectedIndex: _index,
-      onDestinationSelected: _onSelect,
+      selectedIndex: _barPosition,
+      onDestinationSelected: _onBarSelect,
       backgroundColor: AppColors.surfaceOf(context),
       indicatorColor: AppColors.navigationSelectionOf(context),
       labelType: NavigationRailLabelType.all,
       destinations: [
-        for (final t in _tabs)
+        for (final t in _items)
           NavigationRailDestination(
             icon: Icon(t.icon),
-            selectedIcon: Icon(t.icon, color: _selectedColor(context, t)),
+            selectedIcon: Icon(t.icon, color: AppColors.porchAmberOf(context)),
             label: Text(t.label),
           ),
       ],

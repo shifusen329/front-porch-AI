@@ -251,7 +251,11 @@ void main() {
             ? 'unknown'
             : (m.group(1) != null ? 'lib/${m.group(1)}' : m.group(2)!);
         found.add('$where: $file');
-        debugPrint('[layout] $where overflow in $file');
+        final by = RegExp(r'overflowed by [\d.]+ pixels on the \w+');
+        debugPrint(
+          '[layout] $where overflow in $file '
+          '(${by.firstMatch(text)?.group(0) ?? '?'})',
+        );
         return;
       }
       (previousOnError ?? FlutterError.presentError)(details);
@@ -277,14 +281,46 @@ void main() {
         firstMessage: _greeting,
       ),
     );
+    // Porch's Personas and Worlds show their cards, not empty states.
+    await Provider.of<UserPersonaService>(ctx, listen: false).createPersona(
+      'The traveller passing through',
+      'Wanderer With A Rather Long Name',
+      'Walks the long way round and stops at every porch with a light on.',
+      null,
+      activate: false,
+    );
+    await Provider.of<WorldRepository>(ctx, listen: false).saveWorld(
+      World(
+        name: 'Layout Hollow, a place with a long name',
+        description: 'A hollow of porches under one old cottonwood.',
+        lorebook: Lorebook(entries: const []),
+      ),
+    );
 
     final nav = find.byWidgetPredicate(
       (w) => w is NavigationBar || w is NavigationRail,
     );
     Finder tab(String label) =>
         find.descendant(of: nav, matching: find.text(label));
+    Finder porchTab(String label) => find.descendant(
+      of: find.byKey(const Key('porch-tabs')),
+      matching: find.text(label),
+    );
+    Finder settingsTab(String label) => find.widgetWithText(Tab, label);
+    Future<void> openLibrary() async {
+      await tester.tap(tab('Porch'));
+      await settle();
+      await tester.ensureVisible(porchTab('Characters'));
+      await tester.tap(porchTab('Characters'));
+      await settle();
+    }
 
     tester.view.devicePixelRatio = 1;
+    // On a device the real keyboard and system bars (in the device's own
+    // pixels) would read as taller than these whole screens.
+    tester.view.viewInsets = FakeViewPadding.zero;
+    tester.view.padding = FakeViewPadding.zero;
+    tester.view.viewPadding = FakeViewPadding.zero;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     const stops = {
@@ -296,16 +332,33 @@ void main() {
     for (final stop in stops.entries) {
       tester.view.physicalSize = stop.value.$1;
       tester.platformDispatcher.textScaleFactorTestValue = stop.value.$2;
-      for (final label in ['Chats', 'Characters', 'Stoop', 'Stories', 'More']) {
-        where = '${stop.key} $label';
-        await tester.tap(tab(label));
+      where = '${stop.key} Chats';
+      await tester.tap(tab('Chats'));
+      await settle();
+      scanText();
+
+      await tester.tap(tab('Porch'));
+      await settle();
+      for (final view in ['Characters', 'Personas', 'Worlds', 'Stories']) {
+        where = '${stop.key} Porch/$view';
+        await tester.ensureVisible(porchTab(view));
+        await tester.tap(porchTab(view));
+        await settle();
+        scanText();
+      }
+
+      await tester.tap(tab('Settings'));
+      await settle();
+      for (final view in ['General', 'Backups']) {
+        where = '${stop.key} Settings/$view';
+        await tester.ensureVisible(settingsTab(view));
+        await tester.tap(settingsTab(view));
         await settle();
         scanText();
       }
 
       where = '${stop.key} card sheet';
-      await tester.tap(tab('Characters'));
-      await settle();
+      await openLibrary();
       // The desktop test above shares this process's database, so its
       // Layout Tester is in the library too.
       await tester.tap(find.byTooltip('Actions for Layout Tester').first);
@@ -325,8 +378,7 @@ void main() {
     // The chat: its phone layout, the panel sheet and the + sheet.
     tester.view.physicalSize = const Size(412, 915);
     tester.platformDispatcher.textScaleFactorTestValue = 1.0;
-    await tester.tap(tab('Characters'));
-    await settle();
+    await openLibrary();
     await tester.tap(find.byTooltip('Actions for Layout Tester').first);
     await settle();
     await tester.tap(find.text('Start New Chat'));

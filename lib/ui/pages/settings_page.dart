@@ -32,6 +32,7 @@ import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
 
+import 'package:front_porch_ai/ui/pages/backups_page.dart';
 import 'package:front_porch_ai/ui/pages/settings_page/settings_page.dart';
 import 'package:front_porch_ai/ui/settings/tabs/tabs.dart';
 import 'package:front_porch_ai/utils/utils.dart';
@@ -226,10 +227,23 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // The desktop opens Backups & Restore from its sidebar; a phone has it
+    // here.
+    final backupsTab = PlatformCaps.current.usesMobileShell;
+    final tabs = [
+      'General',
+      'Appearance',
+      'Porch Life',
+      'Generation',
+      'Voice & Media',
+      'Backend',
+      'Advanced',
+      if (backupsTab) 'Backups',
+    ];
     return Stack(
       children: [
         DefaultTabController(
-          length: 7,
+          length: tabs.length,
           child: Scaffold(
             backgroundColor: AppColors.backgroundOf(
               context,
@@ -250,15 +264,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   AppColors.surfaceOf(context).withValues(alpha: 0),
                 ),
                 splashFactory: NoSplash.splashFactory,
-                tabs: const [
-                  Tab(text: 'General'),
-                  Tab(text: 'Appearance'),
-                  Tab(text: 'Porch Life'),
-                  Tab(text: 'Generation'),
-                  Tab(text: 'Voice & Media'),
-                  Tab(text: 'Backend'),
-                  Tab(text: 'Advanced'),
-                ],
+                tabs: [for (final t in tabs) Tab(text: t)],
               ),
             ),
             // The tabs' ink (a picked dropdown's focus box) lands on this
@@ -300,6 +306,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       onScanAndClean: _openDatabaseCleanup,
                     ),
                   ),
+                  if (backupsTab) const BackupsPage(embedded: true),
                 ],
               ),
             ),

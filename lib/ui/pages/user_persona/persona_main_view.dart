@@ -16,6 +16,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:front_porch_ai/services/services.dart';
@@ -103,26 +105,31 @@ class PersonaMainView extends StatelessWidget {
             // Persona grid
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 340,
-                  childAspectRatio: 1.35,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) => SliverGrid(
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: _cardMaxWidth,
+                    mainAxisExtent: _cardHeight(
+                      context,
+                      constraints.crossAxisExtent,
+                    ),
+                    crossAxisSpacing: _cardSpacing,
+                    mainAxisSpacing: _cardSpacing,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final persona = service.personas[index];
+                    final isDefault = persona.id == defaultPersona.id;
+                    return PersonaGridCard(
+                      persona: persona,
+                      isDefault: isDefault,
+                      service: service,
+                      onEdit: onEdit,
+                      onExport: onExport,
+                      onDelete: onDelete,
+                      onMakeCharacter: onMakeCharacter,
+                    );
+                  }, childCount: service.personas.length),
                 ),
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final persona = service.personas[index];
-                  final isDefault = persona.id == defaultPersona.id;
-                  return PersonaGridCard(
-                    persona: persona,
-                    isDefault: isDefault,
-                    service: service,
-                    onEdit: onEdit,
-                    onExport: onExport,
-                    onDelete: onDelete,
-                    onMakeCharacter: onMakeCharacter,
-                  );
-                }, childCount: service.personas.length),
               ),
             ),
           ],
@@ -130,6 +137,22 @@ class PersonaMainView extends StatelessWidget {
       },
     );
   }
+}
+
+const _cardMaxWidth = 340.0;
+const _cardSpacing = 16.0;
+
+/// A card's height: its width over 1.35, as the grid has always drawn it,
+/// but never less than its avatar row, one line of description and its
+/// badge need at the current text size (a phone at 200% text).
+double _cardHeight(BuildContext context, double gridWidth) {
+  final columns = (gridWidth / (_cardMaxWidth + _cardSpacing)).ceil();
+  final width = (gridWidth - _cardSpacing * (columns - 1)) / columns;
+  final text = MediaQuery.textScalerOf(context);
+  double line(double size, double height) => text.scale(size) * height;
+  final top = math.max(44.0, line(15, 1.35) + line(12, 1.35));
+  final need = 32 + top + 10 + line(12, 1.5) + 8 + line(11, 1.35) + 10;
+  return math.max(width / 1.35, need);
 }
 
 class _PersonaHeroHeader extends StatelessWidget {
@@ -147,14 +170,27 @@ class _PersonaHeroHeader extends StatelessWidget {
   final UserPersonaService service;
   final ValueChanged<UserPersona> onEdit;
 
+  /// Below this width (a phone) the card tightens and the avatar shrinks,
+  /// so the name and badge keep room beside it.
+  static const _narrowWidth = 560.0;
+
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, box) =>
+          _card(context, narrow: box.maxWidth < _narrowWidth),
+    );
+  }
+
+  Widget _card(BuildContext context, {required bool narrow}) {
     return AnimatedBuilder(
       animation: glow,
       builder: (context, child) {
         return Container(
-          margin: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-          padding: const EdgeInsets.all(28),
+          margin: narrow
+              ? const EdgeInsets.fromLTRB(16, 8, 16, 0)
+              : const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          padding: EdgeInsets.all(narrow ? 20 : 28),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
@@ -196,11 +232,11 @@ class _PersonaHeroHeader extends StatelessWidget {
                 child: PersonaColors.buildPersonaAvatar(
                   avatarPath: defaultPersona.avatarPath,
                   personaId: defaultPersona.id,
-                  radius: 44,
-                  iconSize: 36,
+                  radius: narrow ? 28 : 44,
+                  iconSize: narrow ? 24 : 36,
                 ),
               ),
-              const SizedBox(width: 24),
+              SizedBox(width: narrow ? 16 : 24),
               // Info
               Expanded(
                 child: Column(
@@ -301,11 +337,15 @@ class _PersonaStatChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: AppColors.textTertiary(context)),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.textTertiary(context),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textTertiary(context),
+              ),
             ),
           ),
         ],

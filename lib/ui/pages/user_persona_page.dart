@@ -22,11 +22,18 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
+import 'package:front_porch_ai/ui/layout/app_destinations.dart';
+import 'package:front_porch_ai/ui/mobile/shell/phone_tab_scope.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'user_persona/user_persona.dart';
 
 class UserPersonaPage extends StatefulWidget {
-  const UserPersonaPage({super.key});
+  const UserPersonaPage({super.key, this.embedded = false});
+
+  /// Shown as the phone's Porch → Personas sub-tab: the sub-tab names the
+  /// list, and system back reaches an open form through the tab's hook
+  /// instead of a pop.
+  final bool embedded;
 
   @override
   State<UserPersonaPage> createState() => _UserPersonaPageState();
@@ -63,8 +70,26 @@ class _UserPersonaPageState extends State<UserPersonaPage>
     );
   }
 
+  PhoneTabHooks? _hooks;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!widget.embedded) return;
+    _hooks = PhoneTabScope.hooksOf(context)
+      ?..register(
+        kPersonasDestination,
+        onBack: () {
+          if (!_isEditing) return false;
+          _requestCancel();
+          return true;
+        },
+      );
+  }
+
   @override
   void dispose() {
+    _hooks?.unregister(kPersonasDestination);
     _titleController.dispose();
     _nameController.dispose();
     _personaController.dispose();
@@ -290,19 +315,26 @@ class _UserPersonaPageState extends State<UserPersonaPage>
   }
 
   @override
-  Widget build(BuildContext context) =>
-      UnsavedChangesGuard(isDirty: _isDirty, child: _scaffold(context));
+  Widget build(BuildContext context) => UnsavedChangesGuard(
+    isDirty: _isDirty,
+    handlesPop: !widget.embedded,
+    child: _scaffold(context),
+  );
 
   Widget _scaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
-        title: Text(
-          _isEditing
-              ? (_editingPersona == null ? 'Create Persona' : 'Edit Persona')
-              : 'User Personas',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: widget.embedded && !_isEditing
+            ? null
+            : Text(
+                _isEditing
+                    ? (_editingPersona == null
+                          ? 'Create Persona'
+                          : 'Edit Persona')
+                    : 'User Personas',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: _isEditing

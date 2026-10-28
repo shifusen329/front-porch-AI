@@ -225,35 +225,39 @@ class PersonaGridCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Bottom row
+            // Bottom row, right-aligned; the chip shrinks (and ellipsizes) in a narrow
+            // card instead of overflowing it.
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 if (!isDefault) ...[
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cardColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: cardColor.withValues(alpha: 0.2),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                    ),
-                    child: Text(
-                      'Make default',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: cardColor,
+                      decoration: BoxDecoration(
+                        color: cardColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: cardColor.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Text(
+                        'Make default',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: cardColor,
+                        ),
                       ),
                     ),
                   ),
                 ] else ...[
-                  const Spacer(),
-                  PersonaDefaultBadge(color: cardColor),
+                  Flexible(child: PersonaDefaultBadge(color: cardColor)),
                 ],
               ],
             ),

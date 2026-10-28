@@ -40,13 +40,17 @@ class PersonaDefaultBadge extends StatelessWidget {
         children: [
           Icon(Icons.circle, size: 6, color: color),
           const SizedBox(width: 4),
-          Text(
-            'Default',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: color,
-              letterSpacing: 0.3,
+          Flexible(
+            child: Text(
+              'Default',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: color,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ],

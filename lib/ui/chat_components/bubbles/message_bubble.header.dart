@@ -101,75 +101,97 @@ class MessageBubbleHeader extends StatelessWidget {
           ),
           const Spacer(),
         ] else ...[
-          Builder(
-            builder: (context) {
-              final chatService = this.chatService;
-              final nameStyle = TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color:
-                    senderColor ??
-                    theme.accent ??
-                    // Your own name sits on your bubble: same readable
-                    // tint, from the same inputs, as the quotes in it.
-                    (message.isUser
-                        ? storage?.uiSettings.userBubbleDialogueColorFor(
-                            character,
-                            themePreset: theme.preset,
-                            themeOverrides: theme.overrides,
-                          )
-                        : storage?.uiSettings.getDialogueColor(character)) ??
-                    AppColors.textPrimary(context),
-              );
-              final findState = FindHighlightScope.maybeOf(
-                context,
-              )?.leafStateFor(message);
-              final senderSpans = FindLeafSplit(
-                findState,
-                AppColors.porchHoneyOf(context),
-                senderRegion: true,
-              ).expand(message.sender, nameStyle);
-              // No match inside the name = exactly the old plain Text: the
-              // header stays selectable/inspectable as before. Only a lit
-              // name becomes rich text.
-              final single =
-                  senderSpans.length == 1 &&
-                  senderSpans.single.text == message.sender &&
-                  senderSpans.single.style == nameStyle;
-              final nameWidget = single
-                  ? Text(message.sender, style: nameStyle)
-                  : Text.rich(TextSpan(children: senderSpans));
-              if (chatService != null &&
-                  chatService.isGroupMode &&
-                  !message.isUser) {
-                return GestureDetector(
-                  onTap: () {
-                    final ch = resolveGroupSpeakerForMessage(
-                      chatService.groupCharacters,
-                      message,
+          // The name takes the room the buttons leave and ends in "…"
+          // when that is not enough (a phone at a large text size).
+          Expanded(
+            child: Align(
+              alignment: mirrored
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
+              child: Builder(
+                builder: (context) {
+                  final chatService = this.chatService;
+                  final nameStyle = TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color:
+                        senderColor ??
+                        theme.accent ??
+                        // Your own name sits on your bubble: same readable
+                        // tint, from the same inputs, as the quotes in it.
+                        (message.isUser
+                            ? storage?.uiSettings.userBubbleDialogueColorFor(
+                                character,
+                                themePreset: theme.preset,
+                                themeOverrides: theme.overrides,
+                              )
+                            : storage?.uiSettings.getDialogueColor(
+                                character,
+                              )) ??
+                        AppColors.textPrimary(context),
+                  );
+                  final findState = FindHighlightScope.maybeOf(
+                    context,
+                  )?.leafStateFor(message);
+                  final senderSpans = FindLeafSplit(
+                    findState,
+                    AppColors.porchHoneyOf(context),
+                    senderRegion: true,
+                  ).expand(message.sender, nameStyle);
+                  // No match inside the name = exactly the old plain Text: the
+                  // header stays selectable/inspectable as before. Only a lit
+                  // name becomes rich text.
+                  final single =
+                      senderSpans.length == 1 &&
+                      senderSpans.single.text == message.sender &&
+                      senderSpans.single.style == nameStyle;
+                  final nameWidget = single
+                      ? Text(
+                          message.sender,
+                          style: nameStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : Text.rich(
+                          TextSpan(children: senderSpans),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                  if (chatService != null &&
+                      chatService.isGroupMode &&
+                      !message.isUser) {
+                    return GestureDetector(
+                      onTap: () {
+                        final ch = resolveGroupSpeakerForMessage(
+                          chatService.groupCharacters,
+                          message,
+                        );
+                        if (ch != null) {
+                          chatService.setNextCharacter(ch);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${message.sender} will respond next',
+                              ),
+                              duration: const Duration(seconds: 1),
+                              backgroundColor:
+                                  senderColor ??
+                                  AppColors.porchAmberOf(context),
+                            ),
+                          );
+                        }
+                      },
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: nameWidget,
+                      ),
                     );
-                    if (ch != null) {
-                      chatService.setNextCharacter(ch);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${message.sender} will respond next'),
-                          duration: const Duration(seconds: 1),
-                          backgroundColor:
-                              senderColor ?? AppColors.porchAmberOf(context),
-                        ),
-                      );
-                    }
-                  },
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: nameWidget,
-                  ),
-                );
-              }
-              return nameWidget;
-            },
+                  }
+                  return nameWidget;
+                },
+              ),
+            ),
           ),
-          const Spacer(),
         ],
         // TTS speaker button
         if (chatService != null &&

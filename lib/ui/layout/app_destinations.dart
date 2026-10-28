@@ -23,14 +23,15 @@ enum PhonePlacement {
   /// A bottom-bar tab.
   tab,
 
-  /// A row of the Characters tab's "New" sheet.
+  /// In the bottom bar, but it opens its page over the tabs instead of
+  /// becoming one.
+  barButton,
+
+  /// A sub-tab of the Porch tab.
+  porch,
+
+  /// A row of the Characters "New" sheet.
   createSheet,
-
-  /// A row of the More tab.
-  more,
-
-  /// An outbound link under More → Community.
-  community,
 
   /// Not offered on a phone; [AppDestination.hiddenBecause] says why.
   hidden,
@@ -64,17 +65,25 @@ class AppDestination {
   final String? hiddenBecause;
 }
 
-/// The community links, shared by the desktop sidebar and the phone's More.
+/// The desktop sidebar's community links.
 const kDiscordInviteUrl = 'https://discord.gg/e4tET6rpdv';
 const kKofiUrl = 'https://ko-fi.com/sosukeaizen37411';
 
 const kChatsDestination = 'chats';
+const kPorchDestination = 'porch';
+const kSettingsDestination = 'settings';
 const kCharactersDestination = 'characters';
-const kStoopDestination = 'stoop';
+const kPersonasDestination = 'personas';
+const kWorldsDestination = 'worlds';
 const kStoriesDestination = 'stories';
-const kMoreDestination = 'more';
+const kStoopDestination = 'stoop';
 
-/// In bottom-bar order for tabs, then sheet and More order.
+/// The phone leaves out the sidebar's community links.
+const _noCommunityLinks =
+    'The phone app leaves out the community links; the desktop sidebar '
+    'keeps them.';
+
+/// In bottom-bar order for tabs and bar buttons, then Porch and sheet order.
 const appDestinations = <AppDestination>[
   AppDestination(
     kChatsDestination,
@@ -83,26 +92,52 @@ const appDestinations = <AppDestination>[
     PhonePlacement.tab,
   ),
   AppDestination(
+    kPorchDestination,
+    'Porch',
+    Icons.deck_outlined,
+    PhonePlacement.tab,
+  ),
+  AppDestination(
+    'image_studio',
+    'Images',
+    Icons.auto_awesome,
+    PhonePlacement.barButton,
+    desktopLabel: 'Image Studio',
+  ),
+  AppDestination(
+    kSettingsDestination,
+    'Settings',
+    Icons.settings_outlined,
+    PhonePlacement.tab,
+    desktopLabel: 'Settings',
+  ),
+  AppDestination(
     kCharactersDestination,
     'Characters',
     Icons.people_outline,
-    PhonePlacement.tab,
+    PhonePlacement.porch,
     desktopLabel: 'Home',
   ),
   AppDestination(
-    kStoopDestination,
-    'Stoop',
-    Icons.travel_explore,
-    PhonePlacement.tab,
-    desktopLabel: 'The Stoop',
+    kPersonasDestination,
+    'Personas',
+    Icons.person_outline,
+    PhonePlacement.porch,
+    desktopLabel: 'User Persona',
+  ),
+  AppDestination(
+    kWorldsDestination,
+    'Worlds',
+    Icons.public,
+    PhonePlacement.porch,
+    desktopLabel: 'Worlds',
   ),
   AppDestination(
     kStoriesDestination,
     'Stories',
     Icons.auto_stories_outlined,
-    PhonePlacement.tab,
+    PhonePlacement.porch,
   ),
-  AppDestination(kMoreDestination, 'More', Icons.menu, PhonePlacement.tab),
   AppDestination(
     'ai_creator',
     'Create with AI',
@@ -125,53 +160,35 @@ const appDestinations = <AppDestination>[
     desktopLabel: 'Create Group Chat',
   ),
   AppDestination(
-    'personas',
-    'Personas',
-    Icons.person_outline,
-    PhonePlacement.more,
-    desktopLabel: 'User Persona',
-  ),
-  AppDestination(
-    'worlds',
-    'Worlds',
-    Icons.public,
-    PhonePlacement.more,
-    desktopLabel: 'Worlds',
-  ),
-  AppDestination(
-    'image_studio',
-    'Image Studio',
-    Icons.auto_awesome,
-    PhonePlacement.more,
-    desktopLabel: 'Image Studio',
+    kStoopDestination,
+    'Browse The Stoop',
+    Icons.travel_explore,
+    PhonePlacement.createSheet,
+    desktopLabel: 'The Stoop',
   ),
   AppDestination(
     'backups',
     'Backups & Restore',
     Icons.settings_backup_restore,
-    PhonePlacement.more,
+    PhonePlacement.hidden,
     desktopLabel: 'Backups & Restore',
-  ),
-  AppDestination(
-    'settings',
-    'Settings',
-    Icons.settings_outlined,
-    PhonePlacement.more,
-    desktopLabel: 'Settings',
+    hiddenBecause: 'A phone opens it as the Backups tab in Settings.',
   ),
   AppDestination(
     'discord',
     'Join the Discord',
     Icons.discord,
-    PhonePlacement.community,
+    PhonePlacement.hidden,
     desktopLabel: 'Join the Discord',
+    hiddenBecause: _noCommunityLinks,
   ),
   AppDestination(
     'coffee',
     'Buy Me a Coffee',
     Icons.coffee_outlined,
-    PhonePlacement.community,
+    PhonePlacement.hidden,
     desktopLabel: 'Buy Me a Coffee ☕',
+    hiddenBecause: _noCommunityLinks,
   ),
   AppDestination(
     'manage_models',
@@ -187,3 +204,8 @@ const appDestinations = <AppDestination>[
 
 Iterable<AppDestination> destinationsPlaced(PhonePlacement placement) =>
     appDestinations.where((d) => d.phone == placement);
+
+/// What the bottom bar (or rail) shows, in order: the tabs and the buttons.
+Iterable<AppDestination> get phoneBarItems => appDestinations.where(
+  (d) => d.phone == PhonePlacement.tab || d.phone == PhonePlacement.barButton,
+);

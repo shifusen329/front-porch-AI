@@ -31,7 +31,11 @@ import 'package:front_porch_ai/ui/widgets/widgets.dart';
 /// lives on its own — it was never cloud-dependent (it's driven entirely by
 /// the on-device [BackupService]).
 class BackupsPage extends StatefulWidget {
-  const BackupsPage({super.key});
+  const BackupsPage({super.key, this.embedded = false});
+
+  /// Shown as a tab inside Settings (the phone's place for it): just the
+  /// list, under Settings' own app bar.
+  final bool embedded;
 
   @override
   State<BackupsPage> createState() => _BackupsPageState();
@@ -41,6 +45,18 @@ class _BackupsPageState extends State<BackupsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final body = ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _sectionHeader(context, 'Database Backups'),
+        const SizedBox(height: 8),
+        if (isPreRelease)
+          _disabledNotice(context, theme)
+        else
+          _backupBody(context, theme),
+      ],
+    );
+    if (widget.embedded) return body;
     return Scaffold(
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
@@ -48,17 +64,7 @@ class _BackupsPageState extends State<BackupsPage> {
         backgroundColor: AppColors.surfaceOf(context),
         foregroundColor: AppColors.textPrimary(context),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _sectionHeader(context, 'Database Backups'),
-          const SizedBox(height: 8),
-          if (isPreRelease)
-            _disabledNotice(context, theme)
-          else
-            _backupBody(context, theme),
-        ],
-      ),
+      body: body,
     );
   }
 
@@ -133,7 +139,7 @@ class _BackupsPageState extends State<BackupsPage> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _createBackup,
+                  onPressed: _creating ? null : _createBackup,
                   icon: const Icon(Icons.backup, size: 18),
                   label: const Text('Create Backup Now'),
                   style: FilledButton.styleFrom(
@@ -234,8 +240,18 @@ class _BackupsPageState extends State<BackupsPage> {
     );
   }
 
+  /// A tap-tap on Create Backup Now writes one snapshot, not two.
+  bool _creating = false;
+
   Future<void> _createBackup() async {
-    final path = await BackupService.createBackup();
+    if (_creating) return;
+    setState(() => _creating = true);
+    final String? path;
+    try {
+      path = await BackupService.createBackup();
+    } finally {
+      _creating = false;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

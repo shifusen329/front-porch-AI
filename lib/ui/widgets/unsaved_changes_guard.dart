@@ -93,10 +93,16 @@ class UnsavedChangesGuard extends StatefulWidget {
   const UnsavedChangesGuard({
     super.key,
     required this.isDirty,
+    this.handlesPop = true,
     required this.child,
   });
 
   final ValueGetter<bool> isDirty;
+
+  /// False for a page shown inside a phone tab: every back handler on the
+  /// shell's one route runs on each back press, so the tab's own back hook
+  /// asks instead. Leaving the tab still asks through [UnsavedChanges].
+  final bool handlesPop;
   final Widget child;
 
   @override
@@ -131,9 +137,11 @@ class _UnsavedChangesGuardState extends State<UnsavedChangesGuard> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope<Object?>(
-    canPop: false,
-    onPopInvokedWithResult: _onPop,
-    child: widget.child,
-  );
+  Widget build(BuildContext context) => !widget.handlesPop
+      ? widget.child
+      : PopScope<Object?>(
+          canPop: false,
+          onPopInvokedWithResult: _onPop,
+          child: widget.child,
+        );
 }
