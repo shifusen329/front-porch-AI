@@ -80,6 +80,30 @@ Future<T?> showWarmDialogOf<T>(
   );
 }
 
+/// The warm-porch bottom sheet, for the phone's menus and pickers: a drag
+/// handle, the surface fill, a top radius that follows the corner choice,
+/// and the content kept clear of the gesture bar. It opens on the root
+/// navigator, so a sheet raised inside a tab covers the tab bar too.
+Future<T?> showWarmSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) {
+  final radius = AppCorners.of(context).scaled(28);
+  return showModalBottomSheet<T>(
+    context: context,
+    useRootNavigator: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: AppColors.surfaceOf(context),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+    ),
+    builder: (sheetContext) =>
+        SafeArea(top: false, child: builder(sheetContext)),
+  );
+}
+
 /// The warm-porch dialog scaffold itself. [showWarmDialog] builds one; a
 /// dialog with its own state returns one from `build` (see [showWarmDialogOf]).
 class WarmDialog extends StatelessWidget {

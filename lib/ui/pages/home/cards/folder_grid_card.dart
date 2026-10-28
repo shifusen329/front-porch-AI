@@ -288,27 +288,7 @@ void _showFolderMenu(
     color: AppColors.surfaceContainerOf(context),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     items: [
-      homeCardMenuItem(
-        context,
-        value: 'rename',
-        icon: Icons.drive_file_rename_outline,
-        label: 'Rename Folder',
-      ),
-      homeCardMenuItem(
-        context,
-        value: 'subfolder',
-        icon: Icons.create_new_folder,
-        label: 'New Subfolder',
-        iconColor: AppColors.porchAmberOf(context),
-      ),
-      homeCardMenuItem(
-        context,
-        value: 'delete',
-        icon: Icons.delete,
-        label: 'Delete Folder…',
-        iconColor: AppColors.negativeAccentOf(context),
-        labelColor: AppColors.negativeAccentOf(context),
-      ),
+      for (final e in folderCardMenuEntries) homeCardMenuItem(context, e),
     ],
   ).then((value) {
     switch (value) {

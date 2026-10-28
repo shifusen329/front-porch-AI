@@ -25,6 +25,7 @@ import 'package:front_porch_ai/providers/app_state.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/dialogs/update_dialog.dart';
 import 'package:front_porch_ai/ui/image_studio/home_image_studio.dart';
+import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/pages/pages.dart';
 import 'package:front_porch_ai/ui/widgets/sidebar_width.dart';
 import 'package:front_porch_ai/ui/widgets/unsaved_changes_guard.dart';
@@ -305,8 +306,7 @@ class Sidebar extends StatelessWidget {
                       vertical: 4.0,
                     ),
                     child: InkWell(
-                      onTap: () =>
-                          launchUrl(Uri.parse('https://discord.gg/e4tET6rpdv')),
+                      onTap: () => launchUrl(Uri.parse(kDiscordInviteUrl)),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -341,9 +341,7 @@ class Sidebar extends StatelessWidget {
                       vertical: 4.0,
                     ),
                     child: InkWell(
-                      onTap: () => launchUrl(
-                        Uri.parse('https://ko-fi.com/sosukeaizen37411'),
-                      ),
+                      onTap: () => launchUrl(Uri.parse(kKofiUrl)),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.symmetric(

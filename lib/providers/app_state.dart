@@ -56,11 +56,31 @@ class AppState extends ChangeNotifier {
   static const _libraryIndex = 0;
   static const _createCharacterIndex = 1;
 
-  bool get isShowingLibrary => _selectedIndex == _libraryIndex;
+  /// Set by a shell that is not the desktop sidebar (the phone's), which
+  /// answers the intents below itself. Null: MainLayout's page indexes.
+  ShellIntents? shellIntents;
+
+  bool get isShowingLibrary =>
+      shellIntents?.isShowingLibrary ?? _selectedIndex == _libraryIndex;
 
   /// The character library (Home). From Home itself this is a Home re-tap:
   /// it closes the open folder.
-  void showLibrary() => setIndex(_libraryIndex);
+  void showLibrary() {
+    final shell = shellIntents;
+    if (shell != null) return shell.showLibrary();
+    setIndex(_libraryIndex);
+  }
 
-  void showCreateCharacter() => setIndex(_createCharacterIndex);
+  void showCreateCharacter() {
+    final shell = shellIntents;
+    if (shell != null) return shell.showCreateCharacter();
+    setIndex(_createCharacterIndex);
+  }
+}
+
+/// Where a shell sends the intents pages raise through [AppState].
+abstract interface class ShellIntents {
+  bool get isShowingLibrary;
+  void showLibrary();
+  void showCreateCharacter();
 }

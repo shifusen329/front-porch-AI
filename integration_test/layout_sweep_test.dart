@@ -30,7 +30,9 @@ import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/providers/app_state.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/layout/main_layout.dart';
+import 'package:front_porch_ai/ui/mobile/mobile.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.dart';
+import 'package:front_porch_ai/utils/utils.dart';
 
 import 'support/e2e_sandbox.dart';
 import 'support/fake_backend.dart';
@@ -196,6 +198,128 @@ void main() {
       reason:
           'New layout overflow (window: file that built the overflowing '
           'widget). Fix the layout at that size; do not add it to _known.',
+    );
+    expect(raw, isEmpty, reason: 'Raw placeholders on screen.');
+  });
+
+  testWidgets('the phone shell fits phone screens, portrait, landscape and '
+      'at 200% text, with no raw placeholders — sandboxed', (tester) async {
+    final sandbox = Directory.systemTemp.createTempSync('fpai_layout_phone_');
+    PathProviderPlatform.instance = SandboxPathProvider(sandbox.path);
+    final backend = await FakeBackendServer.start(
+      replyPieces: const ['Glad you came by.'],
+    );
+    addTearDown(backend.close);
+    SharedPreferences.setMockInitialValues({
+      'update_auto_check': false,
+      'import_llmerta_porch_memories': false,
+      'backend_type': 'openRouter',
+      'remote_api_url': '${backend.baseUrl}/v1',
+      'remote_model_name': 'sweep-model',
+    });
+
+    app.main(const []);
+    await pumpUntilFound(tester, find.byType(MainLayout));
+    await tester.pump(const Duration(seconds: 2));
+
+    // The phone shell on a desktop runner: the app boots as itself, then
+    // the capabilities flip and the tree rebuilds the way a hot reload
+    // does. Android itself is checked on a device.
+    PlatformCaps.debugOverride = const PlatformCaps(isDesktop: false);
+    addTearDown(() => PlatformCaps.debugOverride = PlatformCaps.host());
+    await tester.binding.reassembleApplication();
+    await pumpUntilFound(tester, find.byType(MobileShell));
+
+    // A new phone screen starts with nothing known: every overflow fails.
+    var where = '';
+    final found = <String>{};
+    final previousOnError = FlutterError.onError;
+    addTearDown(() => FlutterError.onError = previousOnError);
+    FlutterError.onError = (details) {
+      final text = details.toString();
+      if (text.contains('overflowed by')) {
+        final m = _creator.firstMatch(text);
+        final file = m == null
+            ? 'unknown'
+            : (m.group(1) != null ? 'lib/${m.group(1)}' : m.group(2)!);
+        found.add('$where: $file');
+        debugPrint('[layout] $where overflow in $file');
+        return;
+      }
+      (previousOnError ?? FlutterError.presentError)(details);
+    };
+    final raw = <String>{};
+    void scanText() {
+      for (final e in find.byType(RichText).evaluate()) {
+        final text = (e.widget as RichText).text.toPlainText();
+        if (_placeholder.hasMatch(text)) raw.add('$where: "$text"');
+      }
+    }
+
+    Future<void> settle() async {
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    final ctx = tester.element(find.byType(MobileShell));
+    await Provider.of<CharacterRepository>(ctx, listen: false).addCharacter(
+      CharacterCard(
+        name: 'Layout Tester',
+        description: _description,
+        firstMessage: _greeting,
+      ),
+    );
+
+    final nav = find.byWidgetPredicate(
+      (w) => w is NavigationBar || w is NavigationRail,
+    );
+    Finder tab(String label) =>
+        find.descendant(of: nav, matching: find.text(label));
+
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    const stops = {
+      'phone': (Size(360, 740), 1.0),
+      'phone-tall': (Size(412, 915), 1.0),
+      'phone-landscape': (Size(915, 412), 1.0),
+      'phone-200%': (Size(412, 915), 2.0),
+    };
+    for (final stop in stops.entries) {
+      tester.view.physicalSize = stop.value.$1;
+      tester.platformDispatcher.textScaleFactorTestValue = stop.value.$2;
+      for (final label in ['Chats', 'Characters', 'Stoop', 'Stories', 'More']) {
+        where = '${stop.key} $label';
+        await tester.tap(tab(label));
+        await settle();
+        scanText();
+      }
+
+      where = '${stop.key} card sheet';
+      await tester.tap(tab('Characters'));
+      await settle();
+      // The desktop test above shares this process's database, so its
+      // Layout Tester is in the library too.
+      await tester.tap(find.byTooltip('Actions for Layout Tester').first);
+      await settle();
+      scanText();
+      await tester.tapAt(const Offset(8, 8)); // the barrier closes it
+      await settle();
+
+      where = '${stop.key} new sheet';
+      await tester.tap(find.text('New'));
+      await settle();
+      scanText();
+      await tester.tapAt(const Offset(8, 8));
+      await settle();
+    }
+
+    expect(
+      found,
+      isEmpty,
+      reason:
+          'Layout overflow on the phone shell (stop tab: file). Fix the '
+          'layout at that size.',
     );
     expect(raw, isEmpty, reason: 'Raw placeholders on screen.');
   });

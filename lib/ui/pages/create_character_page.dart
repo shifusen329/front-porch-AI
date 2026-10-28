@@ -36,11 +36,15 @@ import 'package:front_porch_ai/providers/app_state.dart';
 /// Step 6: Portrait & Avatars — the shared AvatarGenerationPanel (phase #12);
 ///         post-save by design, so a failed generation can't lose the writing.
 class CreateCharacterPage extends StatefulWidget {
-  const CreateCharacterPage({super.key, this.seed});
+  const CreateCharacterPage({super.key, this.seed, this.asRoute = false});
 
   /// Pre-fills the wizard from a persona ("Make a Character"). A seeded page
   /// is pushed as a route, so leaving it pops instead of switching tabs.
   final PersonaCharacterSeed? seed;
+
+  /// Pushed as a route without a seed (the phone's "New" sheet), rather
+  /// than shown as the desktop's Create Character tab.
+  final bool asRoute;
 
   @override
   State<CreateCharacterPage> createState() => _CreateCharacterPageState();
@@ -61,7 +65,7 @@ class _CreateCharacterPageState extends State<CreateCharacterPage> {
   /// drop work the engine is still finishing.
   bool _panelBusy = false;
 
-  bool get _pushed => widget.seed != null;
+  bool get _pushed => widget.seed != null || widget.asRoute;
 
   @override
   void initState() {

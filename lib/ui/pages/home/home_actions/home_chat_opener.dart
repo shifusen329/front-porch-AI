@@ -64,7 +64,9 @@ class HomeChatOpener {
       await load;
       return;
     }
-    final nav = Navigator.of(context);
+    // The root navigator: on a phone the chat covers the tab bar (its
+    // composer owns the bottom edge); the desktop has only this one.
+    final nav = Navigator.of(context, rootNavigator: true);
     final route = nav.push(MaterialPageRoute(builder: (_) => const ChatPage()));
     try {
       await load;
@@ -296,15 +298,14 @@ class HomeChatOpener {
       startReplacement: false,
       closeOnDeleteCurrent: false,
       onNewChat: () => startNewChatWith(character: character, group: group),
-      onOpen: (sessionId) => _openHistorySession(
-        sessionId: sessionId,
-        character: character,
-        group: group,
-      ),
+      onOpen: (sessionId) =>
+          openSession(sessionId: sessionId, character: character, group: group),
     );
   }
 
-  Future<void> _openHistorySession({
+  /// Opens exactly [sessionId] of [character] or [group]: Manage Chats'
+  /// rows and the phone's Chats tab.
+  Future<void> openSession({
     required String sessionId,
     CharacterCard? character,
     GroupChat? group,

@@ -57,4 +57,12 @@ class PlatformCaps {
 
   /// `localhost` is a computer the user runs model servers on.
   bool get hasLoopbackPresets => isDesktop;
+
+  /// The phone shell (bottom navigation, sheets) instead of the desktop
+  /// sidebar. Layout inside it follows the screen's form factor.
+  bool get usesMobileShell => !isDesktop;
+
+  /// `getDirectoryPath` returns a folder `dart:io` can walk. Android's
+  /// picker hands back a content tree instead.
+  bool get canPickDirectories => isDesktop;
 }

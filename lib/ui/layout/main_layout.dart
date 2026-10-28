@@ -17,12 +17,10 @@
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:front_porch_ai/app_version.dart';
 import 'package:front_porch_ai/services/image/image.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
-import 'package:front_porch_ai/ui/theme/app_colors.dart';
+import 'package:front_porch_ai/ui/layout/engine_failure_notice.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/ui/pages/pages.dart';
 import 'package:provider/provider.dart';
@@ -74,34 +72,8 @@ class _MainLayoutState extends State<MainLayout> {
     super.dispose();
   }
 
-  void _showEngineFailureNotice(String engine, String reason) {
-    if (!isPreRelease || !mounted) return;
-    // Engines report from service code that may be mid-frame; defer so the
-    // snackbar never fires during a build.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.porchAmberOf(context),
-          duration: const Duration(seconds: 10),
-          // Without persist:false, action snackbars never auto-dismiss.
-          persist: false,
-          content: Text(
-            '⚠️ $engine hit an engine error — please report this on '
-            'Discord.',
-            style: TextStyle(color: AppColors.onAccentOf(context)),
-          ),
-          action: SnackBarAction(
-            label: 'Copy details',
-            textColor: AppColors.onAccentOf(context),
-            onPressed: () => Clipboard.setData(
-              ClipboardData(text: EngineHealth.instance.buildReport()),
-            ),
-          ),
-        ),
-      );
-    });
-  }
+  void _showEngineFailureNotice(String engine, String reason) =>
+      showEngineFailureNotice(context, engine, isMounted: () => mounted);
 
   @override
   Widget build(BuildContext context) {

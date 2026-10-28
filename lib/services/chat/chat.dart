@@ -147,6 +147,7 @@ export 'story_clock_reader.dart';
 export 'story_clock_writer.dart';
 export 'time_service.dart';
 export 'variant_snippet.dart';
+export 'recent_chat_snippet.dart';
 export 'today_line_tag.dart';
 export 'token_count_memo.dart';
 export 'tool_support_tester.dart';

@@ -32,6 +32,10 @@ import 'package:front_porch_ai/database/session_gen_overrides_heal.dart';
 import 'package:front_porch_ai/utils/character_id.dart';
 import 'package:front_porch_ai/models/chat_place_slots.dart';
 
+// A plain library (not a part) so the Chats tab query rides the import
+// every database caller already has.
+export 'package:front_porch_ai/database/recent_sessions.dart';
+
 part 'database.g.dart';
 part 'context_budget_db.dart';
 part 'database.tables.core.dart';

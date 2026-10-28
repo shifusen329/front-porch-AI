@@ -59,7 +59,6 @@ class _WaifuProjectCardState extends State<WaifuProjectCard> {
   var _hot = false;
 
   void _menu(Offset global) {
-    final amber = AppColors.porchAmberOf(context);
     showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(global.dx, global.dy, global.dx, 0),
@@ -67,26 +66,31 @@ class _WaifuProjectCardState extends State<WaifuProjectCard> {
       items: [
         homeCardMenuItem(
           context,
-          value: 'resume',
-          icon: Icons.play_arrow_rounded,
-          label: 'Resume',
-          iconColor: amber,
+          const CardMenuEntry(
+            'resume',
+            Icons.play_arrow_rounded,
+            'Resume',
+            tone: CardMenuTone.accent,
+          ),
         ),
         homeCardMenuItem(
           context,
-          value: 'new',
-          icon: Icons.add_comment_outlined,
-          label: 'New session',
-          iconColor: amber,
+          const CardMenuEntry(
+            'new',
+            Icons.add_comment_outlined,
+            'New session',
+            tone: CardMenuTone.accent,
+          ),
         ),
         if (widget.onForget != null)
           homeCardMenuItem(
             context,
-            value: 'forget',
-            icon: Icons.delete_outline,
-            label: 'Forget this project',
-            iconColor: AppColors.negativeAccentOf(context),
-            labelColor: AppColors.negativeAccentOf(context),
+            const CardMenuEntry(
+              'forget',
+              Icons.delete_outline,
+              'Forget this project',
+              tone: CardMenuTone.danger,
+            ),
           ),
       ],
     ).then((v) async {

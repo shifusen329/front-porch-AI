@@ -56,26 +56,41 @@ class StoryHomeView extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Text(
-                    'Porch Stories',
-                    style: StudioType.ui(
-                      context,
-                      size: 15,
-                      weight: FontWeight.w700,
+                  // Shrinks to an ellipsis before the buttons give way
+                  // (large phone text); laid out as before when it fits.
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Porch Stories',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: StudioType.ui(
+                              context,
+                              size: 15,
+                              weight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            projects.isEmpty
+                                ? 'no stories yet'
+                                : '${projects.length} ${projects.length == 1 ? 'story' : 'stories'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: StudioType.ui(
+                              context,
+                              size: 12.5,
+                              color: StudioColors.mutedOf(context),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    projects.isEmpty
-                        ? 'no stories yet'
-                        : '${projects.length} ${projects.length == 1 ? 'story' : 'stories'}',
-                    style: StudioType.ui(
-                      context,
-                      size: 12.5,
-                      color: StudioColors.mutedOf(context),
-                    ),
-                  ),
-                  const Spacer(),
                   if (!narrow) ...[
                     StoryButton(
                       'From a chat',

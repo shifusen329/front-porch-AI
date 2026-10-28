@@ -32,7 +32,7 @@ import 'package:front_porch_ai/database/data_migration_service.dart';
 import 'package:front_porch_ai/services/prefs_recovery.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/web_server_host.dart';
-import 'package:front_porch_ai/ui/layout/main_layout.dart';
+import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/utils/utils.dart'
@@ -358,13 +358,17 @@ class _MyAppState extends State<MyApp>
               final effectiveScale =
                   responsiveScale * storage.uiSettings.textScale;
 
+              // A phone keeps the system font size (up to 200%) rather than
+              // the desktop's window-width scaling.
+              final textScaler = PlatformCaps.current.usesMobileShell
+                  ? MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 2.0)
+                  : TextScaler.linear(effectiveScale);
+
               return MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: TextScaler.linear(effectiveScale)),
+                data: MediaQuery.of(context).copyWith(textScaler: textScaler),
                 child: Stack(
                   children: [
-                    const MainLayout(),
+                    const ShellSwitch(),
                     // Mounted one frame late ON PURPOSE: SetupOverlay reads
                     // SetupService/BackendManager and RemoteLockOverlay
                     // consumes WebServerHost — whose provider reads ~15
