@@ -3,6 +3,50 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-28 14:07:15 -0500 (CDT)
+
+On the `uiux` branch.
+
+### Changed
+
+- **The phone's bar is Chats, Porch, Images and Settings** (`cef71530`).
+  The same four sit in the rail with the phone on its side. The desktop is
+  unchanged.
+  - **Porch** holds the library's main content in four sub-tabs:
+    Characters, Personas, Worlds and Stories. Each keeps its place when you
+    switch away. Back closes an open persona form before it leaves the tab,
+    and switching away from unsaved persona edits asks first. Tapping the
+    open sub-tab again takes it back to its start.
+  - **Images** opens Image Studio over the tabs. Closing it returns to the
+    tab you were on.
+  - **Settings** is a tab of its own, with a **Backups** tab inside it for
+    making, restoring and deleting backups. About & License is under
+    General.
+  - **The Stoop** moved from the bar to Characters → **New** → **Browse The
+    Stoop**, next to importing a card.
+  - More is gone, and the Discord and Ko-fi links are left off the phone.
+- The Worlds and Personas headers fit a phone screen: below 560 px wide the
+  buttons move under the title and the picture shrinks (`cef71530`).
+- Release builds are signed with the key named in `android/key.properties`
+  (`619b4588`). Without that file they still fall back to the debug key, and
+  the build says so.
+
+### Fixed
+
+- **Create Backup Now tapped twice quickly makes one backup**, not two
+  (`cef71530`). This was true on the desktop too.
+- Persona cards no longer overflow at large text sizes; they grow to fit
+  (`cef71530`).
+- A long sender name at a large text size ends in "…" instead of pushing a
+  message's buttons off its bubble (`cef71530`).
+
+### Known gaps
+
+- Pages inside Porch and Settings are still their desktop layouts fitted to
+  the width; Settings rows can wrap a word per line.
+- The phone tests ran on the Android emulator, not yet on a physical
+  phone, and there is no Android CI job.
+
 ## 2026-10-28 03:55:27 -0500 (CDT)
 
 On the `uiux` branch.
