@@ -3,6 +3,56 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-28 00:36:03 -0500 (CDT)
+
+On the `uiux` branch.
+
+### Added
+
+- **A phone layout: five tabs in a bottom bar** (`17a9da7a`). On a phone the
+  app no longer shows the desktop sidebar beside a squeezed page. A bottom
+  bar holds **Chats**, **Characters**, **Stoop**, **Stories** and **More**;
+  with the phone on its side or on a tablet it becomes a rail down the left.
+  Each tab keeps its place when you switch away or turn the phone. Back
+  steps out of a selection or a folder first, then returns to Chats, then
+  leaves the app. The desktop is unchanged.
+  - **Chats** is new and is where the app opens: your recent conversations,
+    one-on-one and group together, newest first, each with who it is with,
+    the chat's own name if it has one, when, and the last thing said.
+    Tapping one opens exactly that chat. Holding one offers Start New Chat,
+    Manage Chats, Rename and Delete. A search box filters by name or words,
+    and **Chat** starts a new one with whoever you pick.
+  - **Characters** is the library: search, a sort chip, folder chips (hold
+    one to rename it, add a subfolder or delete it), and cards with an
+    always-visible ⋮. The ⋮ and a long press open the same actions as the
+    desktop's right-click menu, plus **Select**, which picks cards to move,
+    export or delete together. **New** offers Create with AI, Create
+    Character, Create Group Chat and importing a card. Import Folder is left
+    out, since a phone's folder picker gives no folder the app can read.
+  - **More** opens Personas, Worlds, Image Studio, Backups & Restore and
+    Settings, the Discord and Ko-fi links, and About.
+- The phone uses its own font size setting, up to 200%, instead of the
+  desktop's scaling by window width.
+
+### Changed
+
+- Porch Stories' header shortens its title and story count with an ellipsis
+  when text is very large, instead of overflowing (`17a9da7a`). It looks the
+  same as before at normal sizes.
+
+### Known gaps
+
+- Opening a chat on a phone still shows the desktop chat screen squeezed to
+  fit: the side panel takes half the width and the composer overflows. The
+  phone chat screen is the next step.
+- Pages opened from More (Settings, Personas, Worlds, Backups) are still
+  their desktop layouts, and they cover the tab bar while open.
+- Starting a new chat with a character that has never been opened leaves an
+  extra chat holding only the greeting, which shows in Chats. This is how
+  new chats already behave on the desktop (seen in Manage Chats there).
+- The phone layout is tested on the desktop runner with the phone switched
+  on, and by hand on the emulator; there is no Android CI job yet.
+
 ## 2026-10-27 22:40:51 -0500 (CDT)
 
 On the `uiux` branch, from `dev` at `c009330c`.
