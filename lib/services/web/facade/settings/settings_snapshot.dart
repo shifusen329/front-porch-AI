@@ -197,6 +197,8 @@ class SettingsSnapshot {
       // older PWA ignores the key.
       'evaluationMinimized': _storage.uiSettings.evaluationMinimized,
       'followStreamingReplies': _storage.uiSettings.followStreamingReplies,
+      // Appearance → Visual novel mode (additive).
+      'visualNovelMode': _storage.expressionSettings.visualNovelMode,
       // The resolved app theme (mode + both token maps). The web never
       // computes a palette; it paints these. Additive.
       'theme': webThemeWire(_storage.appearance),

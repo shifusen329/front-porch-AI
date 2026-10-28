@@ -45,6 +45,7 @@ export 'growth_review.dart';
 export 'group_lite.dart';
 export 'group_member_realism.dart';
 export 'group_speaker_resolution.dart';
+export 'stage_cast.dart';
 export 'growth_service.dart';
 export 'growth_store.dart';
 export 'image_command_service.dart';

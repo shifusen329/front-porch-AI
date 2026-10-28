@@ -198,6 +198,12 @@ import 'package:front_porch_ai/services/web/web_server_deps.dart';
     backendFacade: backendFacade,
     imageFacade: imageFacade,
     voiceFacade: voiceFacade,
+    memorySearchFacade: chatService != null
+        ? MemorySearchFacade(chatService, storage)
+        : null,
+    chatStageFacade: chatService != null
+        ? ChatStageFacade(chatService, storage)
+        : null,
     storyFacade: storyFacade,
     storyExportFacade: storyExportFacade,
     tunnelManager: tunnelManager,

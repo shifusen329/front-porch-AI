@@ -28,9 +28,11 @@ class _GroupRagModelNoteState extends State<GroupRagModelNote> {
     // A group has no sidebar memory panel to load a model that is already
     // on disk, so start it here (else "Starting…" would never move). A
     // missing model is never downloaded without the Download tap.
-    if (emb.isAvailable || !emb.modelOnDisk) return;
+    if (emb.isAvailable || !emb.isConfigured) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !emb.isAvailable && emb.modelOnDisk) emb.ensureReady();
+      if (mounted && !emb.isAvailable && emb.isConfigured) {
+        emb.ensureReady();
+      }
     });
   }
 
@@ -38,13 +40,16 @@ class _GroupRagModelNoteState extends State<GroupRagModelNote> {
   Widget build(BuildContext context) {
     final emb = Provider.of<EmbeddingService>(context);
     if (emb.isAvailable) return const SizedBox.shrink();
-    final missing = !emb.modelOnDisk;
+    final missing = !emb.isConfigured;
     final failed = emb.setupError != null || emb.lastEngineError != null;
     final warning = emb.isSettingUp
         ? null
         : missing
         ? 'Memory search needs a memory model, and none is installed, so '
               'this does nothing yet.'
+        : failed && emb.usesEndpoint
+        ? 'Memory search isn\'t running: the memory model server didn\'t '
+              'answer, so this does nothing until it does.'
         : failed
         ? 'Memory search isn\'t running: the memory model is installed but '
               'didn\'t start, so this does nothing until it does.'

@@ -19,6 +19,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:front_porch_ai/services/embedding_service.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 import 'package:front_porch_ai/ui/chat_components/sidebar/sidebar_tokens.dart';
@@ -41,6 +42,7 @@ class _RagSettingsWellState extends State<RagSettingsWell> {
   @override
   Widget build(BuildContext context) {
     final storage = Provider.of<StorageService>(context);
+    final emb = Provider.of<EmbeddingService>(context);
     final accent = widget.accent;
     final count =
         (_dragCount ?? storage.memorySettings.ragRetrievalCount.toDouble())
@@ -116,12 +118,20 @@ class _RagSettingsWellState extends State<RagSettingsWell> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.lock_outline, size: 12, color: accent),
+              Icon(
+                emb.usesEndpoint ? Icons.dns_outlined : Icons.lock_outline,
+                size: 12,
+                color: accent,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  'Private on this computer — uses a local embedding model, '
-                  'not the cloud.',
+                  emb.usesEndpoint
+                      ? 'Memories are sent to ${emb.endpointHost} to be '
+                            'indexed. Change it in Settings → Backend → '
+                            'Memory search.'
+                      : 'Private on this computer — uses a local embedding '
+                            'model, not the cloud.',
                   style: TextStyle(
                     fontSize: 10,
                     height: 1.35,

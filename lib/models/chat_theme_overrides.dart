@@ -15,6 +15,10 @@ class ChatThemeOverrides {
   String? borderStyle;
   String? borderColor;
 
+  /// This chat's visual-novel choice; null follows Settings → Appearance.
+  /// Kept apart from the theme: picking or clearing a theme leaves it.
+  bool? visualNovel;
+
   ChatThemeOverrides({
     this.themeId,
     this.fontFamily,
@@ -27,6 +31,7 @@ class ChatThemeOverrides {
     this.backgroundKey,
     this.borderStyle,
     this.borderColor,
+    this.visualNovel,
   });
 
   bool get hasTheme => themeId != null;
@@ -52,23 +57,20 @@ class ChatThemeOverrides {
 
   Color resolvedUserBubbleColor(ChatThemePreset preset) =>
       userBubbleColor != null
-          ? _parseColor(userBubbleColor!, preset.defaultUserBubbleColor)
-          : preset.defaultUserBubbleColor;
+      ? _parseColor(userBubbleColor!, preset.defaultUserBubbleColor)
+      : preset.defaultUserBubbleColor;
 
-  Color resolvedUserTextColor(ChatThemePreset preset) =>
-      userTextColor != null
-          ? _parseColor(userTextColor!, preset.defaultUserTextColor)
-          : preset.defaultUserTextColor;
+  Color resolvedUserTextColor(ChatThemePreset preset) => userTextColor != null
+      ? _parseColor(userTextColor!, preset.defaultUserTextColor)
+      : preset.defaultUserTextColor;
 
-  Color resolvedAiBubbleColor(ChatThemePreset preset) =>
-      aiBubbleColor != null
-          ? _parseColor(aiBubbleColor!, preset.defaultAiBubbleColor)
-          : preset.defaultAiBubbleColor;
+  Color resolvedAiBubbleColor(ChatThemePreset preset) => aiBubbleColor != null
+      ? _parseColor(aiBubbleColor!, preset.defaultAiBubbleColor)
+      : preset.defaultAiBubbleColor;
 
-  Color resolvedAiTextColor(ChatThemePreset preset) =>
-      aiTextColor != null
-          ? _parseColor(aiTextColor!, preset.defaultAiTextColor)
-          : preset.defaultAiTextColor;
+  Color resolvedAiTextColor(ChatThemePreset preset) => aiTextColor != null
+      ? _parseColor(aiTextColor!, preset.defaultAiTextColor)
+      : preset.defaultAiTextColor;
 
   String resolvedBackgroundKey(ChatThemePreset preset) =>
       backgroundKey ?? preset.defaultBackgroundKey;
@@ -76,23 +78,20 @@ class ChatThemeOverrides {
   String resolvedBorderStyle(ChatThemePreset preset) =>
       borderStyle ?? preset.defaultBorderStyle;
 
-  Color? resolvedBorderColor(ChatThemePreset preset) =>
-      borderColor != null
-          ? _parseColor(
-              borderColor!,
-              preset.defaultBorderColor ?? const Color(0x00000000),
-            )
-          : preset.defaultBorderColor;
+  Color? resolvedBorderColor(ChatThemePreset preset) => borderColor != null
+      ? _parseColor(
+          borderColor!,
+          preset.defaultBorderColor ?? const Color(0x00000000),
+        )
+      : preset.defaultBorderColor;
 
-  Color resolvedDialogueColor(ChatThemePreset preset) =>
-      dialogueColor != null
-          ? _parseColor(dialogueColor!, preset.defaultDialogueColor)
-          : preset.defaultDialogueColor;
+  Color resolvedDialogueColor(ChatThemePreset preset) => dialogueColor != null
+      ? _parseColor(dialogueColor!, preset.defaultDialogueColor)
+      : preset.defaultDialogueColor;
 
-  Color resolvedActionColor(ChatThemePreset preset) =>
-      actionColor != null
-          ? _parseColor(actionColor!, preset.defaultActionColor)
-          : preset.defaultActionColor;
+  Color resolvedActionColor(ChatThemePreset preset) => actionColor != null
+      ? _parseColor(actionColor!, preset.defaultActionColor)
+      : preset.defaultActionColor;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -107,6 +106,7 @@ class ChatThemeOverrides {
     if (backgroundKey != null) map['backgroundKey'] = backgroundKey;
     if (borderStyle != null) map['borderStyle'] = borderStyle;
     if (borderColor != null) map['borderColor'] = borderColor;
+    if (visualNovel != null) map['visualNovel'] = visualNovel;
     return map;
   }
 
@@ -123,11 +123,14 @@ class ChatThemeOverrides {
       backgroundKey: json['backgroundKey'] as String?,
       borderStyle: json['borderStyle'] as String?,
       borderColor: json['borderColor'] as String?,
+      visualNovel: json['visualNovel'] is bool
+          ? json['visualNovel'] as bool
+          : null,
     );
   }
 
   String? toJsonString() {
-    if (!hasTheme && !isCustomized) return null;
+    if (!hasTheme && !isCustomized && visualNovel == null) return null;
     return jsonEncode(toJson());
   }
 

@@ -20,3 +20,4 @@ export 'chat_color_slot.dart';
 export 'chat_theme_dropdown_row.dart';
 export 'chat_theme_preset_picker.dart';
 export 'ui_settings_controls.dart';
+export 'visual_novel_choice.dart';

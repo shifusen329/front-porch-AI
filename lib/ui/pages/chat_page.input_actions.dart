@@ -25,16 +25,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:front_porch_ai/services/services.dart';
-import 'package:front_porch_ai/ui/widgets/widgets.dart';
+
 import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
+import 'package:front_porch_ai/ui/pages/chat_page.composer_parts.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.input.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.session_dialogs.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.regen_shortcut.dart';
+import 'package:front_porch_ai/utils/utils.dart';
 
-/// The folder-icon chat-management popup. Import, export and add-character
-/// are the page's own flows; the rest open from this menu's context.
+/// The chat-management popup: the composer's folder icon on the desktop, the
+/// app bar's ⋮ on a phone ([icon]). Import, export and add-character are the
+/// page's own flows; the rest open from this menu's context.
 class ChatManagementMenu extends StatelessWidget {
   const ChatManagementMenu({
     super.key,
@@ -42,18 +45,20 @@ class ChatManagementMenu extends StatelessWidget {
     required this.onImport,
     required this.onExport,
     required this.onConvertToGroup,
+    this.icon = Icons.folder_open,
   });
 
   final ChatService chatService;
   final VoidCallback onImport;
   final VoidCallback onExport;
   final VoidCallback onConvertToGroup;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final logInk = StatusColors.successOf(context);
     return PopupMenuButton<String>(
-      icon: Icon(Icons.folder_open, color: AppColors.iconSecondary(context)),
+      icon: Icon(icon, color: AppColors.iconSecondary(context)),
       padding: EdgeInsets.zero,
       tooltip: 'Chat Management',
       onSelected: (value) {
@@ -176,17 +181,20 @@ class ChatManagementMenu extends StatelessWidget {
                 ],
               ),
             ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'kobold_log',
-            child: Row(
-              children: [
-                Icon(Icons.terminal, size: 20, color: logInk),
-                const SizedBox(width: 12),
-                const Text('KoboldCpp Log'),
-              ],
+          // No local engine here (a phone): no engine log to read.
+          if (PlatformCaps.current.canRunLocalEngine) ...[
+            const PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'kobold_log',
+              child: Row(
+                children: [
+                  Icon(Icons.terminal, size: 20, color: logInk),
+                  const SizedBox(width: 12),
+                  const Text('KoboldCpp Log'),
+                ],
+              ),
             ),
-          ),
+          ],
         ];
       },
     );
@@ -218,10 +226,6 @@ class ChatInputActionStrip {
   final VoidCallback onAttachImage;
   final VoidCallback onStartCall;
   final VoidCallback onSend;
-
-  /// Whether the page that owns [controller] is still alive. Async results
-  /// (Impersonate tokens, Whisper transcripts) land after it may have closed.
-  bool get mounted => isPageMounted();
 
   /// The buttons, spread into the bar's Row (a spread of the same widgets in
   /// the same order is an identical child list).
@@ -269,52 +273,12 @@ class ChatInputActionStrip {
       const SizedBox(width: 4),
 
       Expanded(
-        child: Consumer2<LLMProvider, OpenRouterService>(
-          builder: (context, llm, _, _) {
-            final apiReady = llm.composerConnectionReady;
-            final hint = chatComposerHint(
-              apiReady: apiReady,
-              observerMode: chatService.observerMode,
-              reason: llm.composerConnectionHint,
-            );
-            final storage = Provider.of<StorageService>(context);
-            return ReadingSizeScope(
-              textScale: storage.uiSettings.textScale,
-              child: AppTextField(
-                controller: controller,
-                focusNode: focusNode,
-                enabled: !chatService.isLoadingSession,
-                maxLines: 10,
-                minLines: minLines,
-                textInputAction: TextInputAction.newline,
-                style: readingSurfaceStyle(
-                  color: AppColors.textPrimary(context),
-                ),
-                spellCheckConfiguration: SpellCheckConfiguration.disabled(),
-                decoration: InputDecoration(
-                  hintText: hint,
-                  hintStyle: TextStyle(
-                    color: !apiReady
-                        ? AppColors.negativeAccentOf(context)
-                        : chatService.observerMode
-                        ? AppColors.porchAmberOf(context).withValues(alpha: 0.7)
-                        : AppColors.textTertiary(context),
-                  ),
-                  filled: true,
-                  fillColor: AppColors.surfaceContainerOf(context),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: AppCorners.of(context).circular(20),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                ),
-              ),
-            );
-          },
+        child: ChatComposerField(
+          chatService: chatService,
+          controller: controller,
+          focusNode: focusNode,
+          minLines: minLines,
+          maxLines: 10,
         ),
       ),
       const SizedBox(width: 4),
@@ -326,22 +290,11 @@ class ChatInputActionStrip {
           padding: EdgeInsets.zero,
           onPressed: chatService.isGenerating
               ? null
-              : () {
-                  final prefix = controller.text;
-                  chatService.impersonateUser(
-                    prefix: prefix,
-                    onToken: (accumulated) {
-                      // ChatService is app-scoped and impersonation keeps
-                      // streaming after the page pops — writing a disposed
-                      // controller here throws inside the stream loop.
-                      if (!mounted) return;
-                      controller.text = accumulated;
-                      controller.selection = TextSelection.fromPosition(
-                        TextPosition(offset: accumulated.length),
-                      );
-                    },
-                  );
-                },
+              : () => impersonateIntoComposer(
+                  chatService,
+                  controller,
+                  isPageMounted: isPageMounted,
+                ),
         ),
       ),
       // Mic button (push-to-talk STT)
@@ -374,33 +327,14 @@ class ChatInputActionStrip {
               ),
               onPressed: chatService.isGenerating
                   ? null
-                  : () async {
-                      if (sttService.isRecording) {
-                        final text = await sttService
-                            .stopRecordingAndTranscribe();
-                        if (!mounted) return;
-                        if (text != null && text.isNotEmpty) {
-                          if (storage.sttSettings.autoSendTranscription &&
-                              controller.text.isEmpty) {
-                            chatService.sendMessage(text);
-                          } else {
-                            controller.text = controller.text.isEmpty
-                                ? text
-                                : '${controller.text} $text';
-                            controller.selection = TextSelection.fromPosition(
-                              TextPosition(offset: controller.text.length),
-                            );
-                          }
-                        }
-                      } else {
-                        final micOk = await sttService.checkMicAvailable();
-                        if (!micOk && context.mounted) {
-                          showNoMicDialog(context);
-                          return;
-                        }
-                        await sttService.startRecording();
-                      }
-                    },
+                  : () => toggleVoiceInput(
+                      context,
+                      sttService: sttService,
+                      storage: storage,
+                      chatService: chatService,
+                      controller: controller,
+                      isPageMounted: isPageMounted,
+                    ),
             ),
           );
         },
@@ -432,35 +366,11 @@ class ChatInputActionStrip {
       // Auto-play (Director Mode) + Next Character; Next stays greyed out
       // while auto-play runs so Pause lands where Play was. Pause stays up
       // through an auto-chat reply: it lets that reply finish.
-      if (chatService.isGroupMode &&
-          (!chatService.isGenerating || chatService.autoPlayActive))
-        DirectorTurnButtons(
-          showAutoPlay: chatService.observerMode,
-          autoPlayActive: chatService.autoPlayActive,
-          autoPlayPaused: chatService.autoPlayPaused,
-          turnsLeft: chatService.autoChatTurnsLeft,
-          onStopAutoPlay: chatService.stopAutoPlay,
-          nextTooltip: chatService.nextCharacter != null
-              ? 'Next: ${chatService.nextCharacter!.name}'
-              : 'Trigger next character',
-          onToggleAutoPlay: chatService.autoPlayActive
-              ? chatService.pauseAutoPlay
-              : chatService.startAutoPlay,
-          onNextCharacter: chatService.triggerNextCharacter,
-          playColor: AppColors.porchAmberOf(context),
-          pauseColor: StatusColors.warningOf(context),
-          nextColor: Colors.purpleAccent, // theme-keep: director Next, not Play
-        ),
-      // Generate reply button (1:1 only) — shown when the AI is
-      // "up next", i.e. the last message is the user's (e.g. the
-      // previous reply was deleted). Gives a visible way to
-      // (re)generate without retyping. Group mode already covers
-      // this via the Next Character button above.
-      if (!chatService.isGroupMode &&
-          !chatService.isGenerating &&
-          !chatService.autoPlayActive &&
-          chatService.messages.isNotEmpty &&
-          chatService.messages.last.isUser)
+      if (showsDirectorTurnButtons(chatService))
+        chatDirectorTurnButtons(context, chatService),
+      // Generate reply (1:1 only): a visible way to (re)generate without
+      // retyping. Group mode covers this with Next Character above.
+      if (showsGenerateReply(chatService))
         Tooltip(
           message: 'Generate reply ($chatRegenShortcutLabel)',
           child: IconButton(
@@ -474,10 +384,7 @@ class ChatInputActionStrip {
               tooltip: chatService.autoPlayActive
                   ? 'Stop Auto-Chat'
                   : 'Stop Generation',
-              onPressed: () {
-                chatService.stopAutoPlay();
-                chatService.stopGeneration();
-              },
+              onPressed: () => stopComposerGeneration(chatService),
             )
           : Tooltip(
               message: chatService.observerMode
@@ -495,4 +402,66 @@ class ChatInputActionStrip {
             ),
     ];
   }
+}
+
+/// Auto-play (Director Mode) + Next Character, for both composers. Next
+/// stays greyed out while auto-play runs so Pause lands where Play was;
+/// Pause stays up through an auto-chat reply: it lets that reply finish.
+Widget chatDirectorTurnButtons(BuildContext context, ChatService chatService) {
+  return DirectorTurnButtons(
+    showAutoPlay: chatService.observerMode,
+    autoPlayActive: chatService.autoPlayActive,
+    autoPlayPaused: chatService.autoPlayPaused,
+    turnsLeft: chatService.autoChatTurnsLeft,
+    onStopAutoPlay: chatService.stopAutoPlay,
+    nextTooltip: chatService.nextCharacter != null
+        ? 'Next: ${chatService.nextCharacter!.name}'
+        : 'Trigger next character',
+    onToggleAutoPlay: chatService.autoPlayActive
+        ? chatService.pauseAutoPlay
+        : chatService.startAutoPlay,
+    onNextCharacter: chatService.triggerNextCharacter,
+    playColor: AppColors.porchAmberOf(context),
+    pauseColor: StatusColors.warningOf(context),
+    nextColor: Colors.purpleAccent, // theme-keep: director Next, not Play
+  );
+}
+
+/// Push-to-talk, for both composers: starts recording, or stops and puts
+/// the transcript in [controller] (or sends it, when the user asked for
+/// that and the box is empty).
+Future<void> toggleVoiceInput(
+  BuildContext context, {
+  required SttService sttService,
+  required StorageService storage,
+  required ChatService chatService,
+  required TextEditingController controller,
+  required ValueGetter<bool> isPageMounted,
+}) async {
+  if (sttService.isRecording) {
+    final text = await sttService.stopRecordingAndTranscribe();
+    // Whisper can finish after the chat closed and disposed [controller].
+    final mounted = isPageMounted();
+    if (!mounted) return;
+    if (text != null && text.isNotEmpty) {
+      if (storage.sttSettings.autoSendTranscription &&
+          controller.text.isEmpty) {
+        chatService.sendMessage(text);
+      } else {
+        controller.text = controller.text.isEmpty
+            ? text
+            : '${controller.text} $text';
+        controller.selection = TextSelection.fromPosition(
+          TextPosition(offset: controller.text.length),
+        );
+      }
+    }
+    return;
+  }
+  final micOk = await sttService.checkMicAvailable();
+  if (!micOk && context.mounted) {
+    showNoMicDialog(context);
+    return;
+  }
+  await sttService.startRecording();
 }

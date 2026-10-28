@@ -379,3 +379,47 @@ mark.find-hit.active {
   background: var(--porch-honey); color: var(--on-accent); font-weight: 600;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--porch-honey) 45%, transparent);
 }
+
+/* ── Visual novel mode ─────────────────────────────────────────────
+   The cast stands on the chat's background; the log is a see-through panel
+   over the lower part of the stage (desktop twin: visual_novel_stage.dart
+   and visual_novel_log_panel.dart). */
+.chat-find-host.vn { position: relative; }
+.vn-stage {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  display: flex; align-items: flex-end; overflow: hidden;
+}
+.vn-sprite {
+  flex: 1 1 0; min-width: 0; height: 100%;
+  display: flex; align-items: flex-end; justify-content: center;
+  transition: opacity 0.4s ease;
+}
+.vn-sprite.back { opacity: 0.6; }
+.vn-sprite img {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain; object-position: bottom;
+  animation: vn-fade 0.4s ease;
+}
+@keyframes vn-fade { from { opacity: 0; } to { opacity: 1; } }
+.vn-log {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  margin: 0 auto; max-width: 920px; height: 38%;
+  display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  border-radius: 16px 16px 0 0;
+}
+.vn-log.expanded { height: 100%; }
+.vn-log > .chat-messages { flex: 1; min-height: 0; }
+.vn-handle {
+  flex: none; height: 24px; border: 0; background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.vn-handle > span {
+  width: 44px; height: 4px; border-radius: 2px;
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .vn-sprite { transition: none; }
+  .vn-sprite img { animation: none; }
+}

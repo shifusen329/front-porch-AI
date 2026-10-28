@@ -3,12 +3,13 @@
 //
 // E2E: the phone shell, driven like a phone. Characters → a card's ⋮ →
 // Start New Chat opens a full-screen chat; one tap-tap on Send writes one
-// message; back closes the chat; the Chats tab lists the conversation and
-// tapping it reopens that same chat.
+// message; the side panel opens over the chat as a sheet and + holds the
+// composer's other tools; back closes the chat; the Chats tab lists the
+// conversation and tapping it reopens that same chat. All at 412 wide.
 //
-// It runs on the desktop runner with PlatformCaps flipped to a phone after
-// boot (the tree rebuilds the way a hot reload does). Android itself is
-// checked on a device.
+// On the desktop runner PlatformCaps flips to a phone after boot (the tree
+// rebuilds the way a hot reload does); on an Android device or emulator the
+// app boots as a phone.
 
 import 'dart:io';
 
@@ -22,6 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:front_porch_ai/main.dart' as app;
 import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
+import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
 import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/mobile/mobile.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.dart';
@@ -56,10 +58,15 @@ void main() {
     });
 
     app.main(const []);
-    await pumpUntilFound(tester, find.byType(MainLayout));
-    PlatformCaps.debugOverride = const PlatformCaps(isDesktop: false);
-    addTearDown(() => PlatformCaps.debugOverride = PlatformCaps.host());
-    await tester.binding.reassembleApplication();
+    await pumpUntilFound(
+      tester,
+      find.byWidgetPredicate((w) => w is MainLayout || w is MobileShell),
+    );
+    if (find.byType(MainLayout).evaluate().isNotEmpty) {
+      PlatformCaps.debugOverride = const PlatformCaps(isDesktop: false);
+      addTearDown(() => PlatformCaps.debugOverride = PlatformCaps.host());
+      await tester.binding.reassembleApplication();
+    }
     await pumpUntilFound(tester, find.byType(MobileShell));
 
     tester.view.devicePixelRatio = 1;
@@ -88,11 +95,6 @@ void main() {
     // A fresh chat picks its persona first: the seeded default, "User".
     await pumpUntilFound(tester, find.textContaining('Start a new chat with'));
 
-    // The chat screen's phone layout is the next phase; until it lands the
-    // desktop composer overflows a 412px screen. The chat steps run at
-    // tablet width (the shell shows its rail); every shell step is at 412.
-    tester.view.physicalSize = const Size(800, 1280);
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.tap(
       find
           .descendant(of: find.byType(WarmDialog), matching: find.text('User'))
@@ -135,6 +137,30 @@ void main() {
     );
     final sessionId = chatService.currentSessionId;
     expect(sessionId, isNotNull);
+    // The message box keeps most of a phone's width: nothing sits beside it
+    // but + and Send.
+    expect(tester.getSize(d.input).width, greaterThan(250));
+
+    // The side panel opens over the chat as a sheet, not as a column
+    // squeezing it, and back closes it.
+    expect(find.byType(ChatResizeSidebar), findsNothing);
+    await tester.tap(find.byTooltip('Stats & story'));
+    await settleSheet(tester);
+    expect(find.byType(SidebarBody), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await settleSheet(tester);
+    expect(find.byType(SidebarBody), findsNothing);
+    expect(find.byType(ChatPage), findsOneWidget);
+
+    // + holds what the desktop composer shows as buttons.
+    await tester.tap(find.byTooltip('Attach and tools'));
+    await settleSheet(tester);
+    expect(find.text('Persona'), findsOneWidget);
+    expect(find.text('Attach photo'), findsOneWidget);
+    expect(find.text('Impersonate'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await settleSheet(tester);
+    expect(find.text('Impersonate'), findsNothing);
 
     await tester.binding.handlePopRoute();
     // The page leaves with its exit transition.
@@ -146,8 +172,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
     }
     expect(find.byType(ChatPage), findsNothing, reason: 'back closes the chat');
-    tester.view.physicalSize = const Size(412, 915);
-    await tester.pump(const Duration(milliseconds: 800));
 
     await tester.tap(find.descendant(of: nav, matching: find.text('Chats')));
     await tester.pumpAndSettle();
@@ -164,8 +188,6 @@ void main() {
       reason: 'the row names who the chat is with',
     );
 
-    tester.view.physicalSize = const Size(800, 1280);
-    await tester.pump(const Duration(milliseconds: 800));
     await tester.tap(row);
     await pumpUntilFound(tester, find.byType(ChatPage));
     await d.waitSendable();
@@ -175,4 +197,12 @@ void main() {
       hasLength(1),
     );
   });
+}
+
+/// A sheet's open or close animation, without waiting for the chat to stop
+/// animating (a streaming transcript never settles).
+Future<void> settleSheet(WidgetTester tester) async {
+  for (var i = 0; i < 4; i++) {
+    await tester.pump(const Duration(milliseconds: 200));
+  }
 }

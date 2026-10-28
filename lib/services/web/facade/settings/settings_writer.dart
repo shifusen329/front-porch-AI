@@ -96,6 +96,11 @@ class SettingsWriter {
       await _storage.uiSettings.setFollowStreamingReplies(follow);
     }
 
+    final novel = body['visualNovelMode'];
+    if (novel is bool) {
+      await _storage.expressionSettings.setVisualNovelMode(novel);
+    }
+
     final realism = body['realism'];
     if (realism is Map) {
       final amb = realism['ambitionsEnabled'];

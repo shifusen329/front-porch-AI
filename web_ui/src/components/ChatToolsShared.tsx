@@ -38,6 +38,13 @@ export interface ToolsState {
       setupStatus?: string;
       setupError?: string | null;
       lastEngineError?: string | null;
+      // Additive (2026-10-28): where vectors come from.
+      provider?: 'endpoint' | 'onDevice';
+      model?: string;
+      endpointHost?: string | null;
+      configured?: boolean;
+      dimensions?: number;
+      indexMatches?: boolean;
     } | null;
     // The last reply's retrieval receipt (additive, 2026-08-10 — absent on
     // older facades; null when that reply needed no retrieval). Desktop

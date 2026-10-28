@@ -99,6 +99,20 @@ function EmbeddingStatus({ t }: { t: ToolsState }) {
       </p>
     );
   }
+  if (e.provider === 'endpoint') {
+    const err = e.setupError || e.lastEngineError;
+    return (
+      <p className={`muted small${err && e.configured ? ' rag-engine-error' : ''}`}>
+        {e.available
+          ? `Memory engine ready — ${e.model} on ${e.endpointHost}.`
+          : !e.configured
+            ? 'Memory needs an embedding model. Pick a model server in Settings → Backend → Memory search.'
+            : err
+              ? `Can't reach the memory model (${e.model} on ${e.endpointHost}): ${err}`
+              : 'Connecting to the memory model…'}
+      </p>
+    );
+  }
   if (e.available) {
     return <p className="muted small">Memory engine ready — private on this computer.</p>;
   }

@@ -67,6 +67,20 @@ class ChatAppearanceSection extends StatelessWidget {
         ),
         const SectionHeader('Chat Appearance'),
         const SizedBox(height: 8),
+        SwitchListTile(
+          key: const ValueKey('visual-novel-mode'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Visual novel mode'),
+          subtitle: const Text(
+            'The characters stand on stage with the chat in a panel over '
+            'them. Each shows their expression image for how they feel, or '
+            'their portrait. A chat can choose for itself in its UI '
+            'Settings.',
+          ),
+          value: storageService.expressionSettings.visualNovelMode,
+          activeTrackColor: AppColors.porchAmberOf(context),
+          onChanged: storageService.expressionSettings.setVisualNovelMode,
+        ),
         ColorRow(
           label: 'User Bubble',
           color: storageService.uiSettings.globalUserBubbleColor,

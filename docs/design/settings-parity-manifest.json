@@ -38,6 +38,13 @@
       "dartMarker": "Chat Appearance",
       "webMarker": "Chat colors"
     },
+    "visualNovelMode": {
+      "section": "general",
+      "group": "chat-appearance",
+      "dart": "lib/ui/settings/tabs/appearance_tab/chat_appearance_section.dart",
+      "dartMarker": "Visual novel mode",
+      "webMarker": "Visual novel mode"
+    },
     "spellCheckLanguage": {
       "section": "generation",
       "dart": "lib/ui/settings/tabs/general_tab.dart",
@@ -115,6 +122,12 @@
       "dart": "lib/ui/pages/settings_page.launch.dart",
       "dartMarker": "KoboldKeepRecentRow",
       "webMarker": "Keep recent chats ready"
+    },
+    "memorySearch": {
+      "section": "backend",
+      "dart": "lib/ui/settings/tabs/backend/memory_search_section.dart",
+      "dartMarker": "SectionHeader('Memory search')",
+      "webMarker": "Memory search"
     },
     "aboutLicense": {
       "section": "advanced",

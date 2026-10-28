@@ -53,6 +53,11 @@ class ExpressionSettings with SettingsBase {
   double _expressionEmojiBurstSize = 28.0; // particle base font size (12–60)
   String _expressionOnnxModel = kDefaultExpressionModel;
 
+  // Settings → Appearance → Visual novel mode: characters on stage, the
+  // chat log in a panel over them. A chat can overrule it
+  // (ChatThemeOverrides.visualNovel).
+  bool _visualNovelMode = false;
+
   /// Each downloaded classifier model's labels, by model id.
   Map<String, List<String>> _modelLabels = {};
 
@@ -63,6 +68,7 @@ class ExpressionSettings with SettingsBase {
   String get expressionFallback => _expressionFallback;
   bool get expressionEmojiBurst => _expressionEmojiBurst;
   double get expressionEmojiBurstSize => _expressionEmojiBurstSize;
+  bool get visualNovelMode => _visualNovelMode;
 
   /// The Hugging Face model (`owner/name`) the ONNX classifier runs.
   String get expressionOnnxModel => _expressionOnnxModel;
@@ -95,6 +101,7 @@ class ExpressionSettings with SettingsBase {
         prefs?.getString(k('expression_display_mode')) ?? 'sidebar';
     _expressionRerollSame =
         prefs?.getBool(k('expression_reroll_same')) ?? false;
+    _visualNovelMode = prefs?.getBool(k('visual_novel_mode')) ?? false;
     _expressionFallback =
         prefs?.getString(k('expression_fallback')) ?? 'neutral';
     _expressionEmojiBurst =
@@ -138,6 +145,12 @@ class ExpressionSettings with SettingsBase {
   Future<void> setExpressionDisplayMode(String value) async {
     _expressionDisplayMode = value;
     await prefs?.setString(k('expression_display_mode'), value);
+    notify();
+  }
+
+  Future<void> setVisualNovelMode(bool value) async {
+    _visualNovelMode = value;
+    await prefs?.setBool(k('visual_novel_mode'), value);
     notify();
   }
 

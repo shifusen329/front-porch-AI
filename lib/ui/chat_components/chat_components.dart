@@ -32,6 +32,8 @@ export 'sidebar/character_portrait.dart';
 export 'sidebar/chat_main_settings.dart';
 export 'stage/chat_message_list.dart';
 export 'stage/chat_resize_sidebar.dart';
+export 'stage/visual_novel_log_panel.dart';
+export 'stage/visual_novel_stage.dart';
 export 'stage/transcript_anchor.dart';
 export 'stage/transcript_auto_scroll.dart';
 export 'stage/transcript_window.dart';

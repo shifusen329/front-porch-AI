@@ -30,6 +30,7 @@ import 'package:provider/provider.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
+import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 
@@ -300,4 +301,46 @@ void showManageChats(BuildContext context) {
     chatService: chatService,
     onNewChat: chatService.startNewChat,
   );
+}
+
+/// Prompt-picker SOW trigger: a new 1:1 chat whose card ships its own system
+/// prompt opens the picker once ChatService has armed it (or applied the
+/// character's remembered choice and armed nothing). Guards against stacking
+/// while its dialog is open: every ChatService notify would re-offer it.
+class PromptPickerGate {
+  bool _open = false;
+
+  Future<void> maybeShow(
+    BuildContext context,
+    ChatService chat, {
+    required ValueGetter<bool> isMounted,
+  }) async {
+    if (_open) return;
+    final pendingFor = chat.promptPickerPendingFor;
+    if (pendingFor == null) return;
+    final card = chat.activeCharacter;
+    if (card == null) return;
+    _open = true;
+    final storage = Provider.of<StorageService>(context, listen: false);
+    try {
+      final choice = await showPromptSourcePicker(
+        context,
+        characterName: card.name,
+        cardPrompt: card.systemPrompt,
+        userPrompt: storage.generationSettings.systemPrompt,
+        amendment: storage.generationSettings.additionalSystemPrompt,
+      );
+      // The chat may have changed under the dialog (another chat opened, or
+      // the phone answered first): this answer only belongs to the chat it
+      // was asked about.
+      if (!isMounted() || chat.promptPickerPendingFor != pendingFor) return;
+      await chat.applyPromptSourceChoice(
+        preset: choice?.preset.wireName,
+        remember: choice?.remember ?? false,
+        askEveryChat: choice?.askEveryChat ?? false,
+      );
+    } finally {
+      _open = false;
+    }
+  }
 }

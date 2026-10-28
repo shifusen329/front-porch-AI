@@ -220,15 +220,17 @@ Long-term memory pulls older parts of a long conversation back into context by t
 
 **Where the controls are depends on the chat, and this is the single most common reason people think memory is broken:**
 
-Memory (RAG) has a master switch that is off until you turn it on and download the embedding model. Once it is on, group chats use it too and are enabled by default; the sidebar Memory (RAG) panel itself only appears in one-on-one chats, and groups are configured under Group Settings → Memory & RAG.
+Memory (RAG) has a master switch that is off until you turn it on, and it needs an embedding model: a model server you point it at in **Settings → Backend → Memory search** (Ollama, or any OpenAI-compatible server), or the on-device model the app downloads. Once it is on, group chats use it too and are enabled by default; the sidebar Memory (RAG) panel itself only appears in one-on-one chats, and groups are configured under Group Settings → Memory & RAG.
 
 - **1:1 chats:** the chat sidebar, under **Journal & Memory** → **Memory (RAG)**. That panel is where the master switch lives, so if you only ever chat in groups, open a one-on-one chat once to turn it on — or use the web/mobile UI, which carries the same switch.
 - **Group chats:** the group's own controls live in **Group Settings** (the button just below **Main Settings** at the top of the chat sidebar) → the **Memory & RAG** tab. That's where the group's on/off switch, **Memories per turn**, the **RAG memory budget**, and a per-character priority slider are. That switch only ever takes memory *away*: turning it off skips retrieval for this group even when the master switch is on, and turning it on can't make up for a master switch that's still off.
 
 A few things can trip it:
 
-- **Check its status.** In the 1:1 panel, under the toggle there's a coloured dot: *Memory engine ready*, *Starting…*, or *Model not downloaded*.
-- **First use downloads a model** — about 550 MB, once, with a progress bar. Give it time on a slow connection.
+- **Check its status.** In the 1:1 panel, under the toggle there's a coloured dot: *Memory engine ready*, *Connecting to the memory model…*, *Memory needs an embedding model*, or *Can't reach the memory model* with the server's reason.
+- **On a model server,** type its address in **Settings → Backend → Memory search** and press **Load models**; the dropdown lists the server's embedding models. The desktop app is what calls it, so use an address the desktop can reach.
+- **On this device,** first use downloads a model — about 550 MB, once, with a progress bar. Give it time on a slow connection.
+- **Changed the embedding model?** Vectors from two models don't compare, so old memories stop being found, and Memory search says so. Press **Clear and re-vectorize everything** there: the text of every memory, Journal card and Data Bank entry is kept and given a new vector. You can stop it and finish later with **Vectorize the missing**.
 - **Stuck?** Toggle Memory (RAG) off and back on; if it stays stuck, restart the app.
 - **Memories exist but aren't recalled:** retrieval needs *meaningful* content to match on — one-word messages don't give it much. In the 1:1 panel, **Settings** (the sliders icon) raises **Memories per turn** and the **Window size** of each remembered chunk; in a group, **Memories per turn** is in the **Memory & RAG** tab. Window size is one global setting shared by every chat, so changing it in one place changes it for all of them.
 - **Waiting for a character to bring up something from an *earlier chat*? That won't happen, on purpose.** A character's own memories are scoped to the chat they were made in — a match from a different chat with that same character is deliberately skipped, so a fresh start can't drag in a storyline or a location you left behind. The Journal's memory cards work the same way. Two things *are* meant to cross chats: the opt-in **Sources** list in the 1:1 panel (press **Sources** and tick another character to let this one draw on *their* memories), and the Data Bank, which exists to be shared knowledge.

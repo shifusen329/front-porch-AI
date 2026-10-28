@@ -26,16 +26,17 @@ typedef LoreHit = ({StoryLoreEntry entry, double score});
 
 /// Finds the lore that matters for the beat being written.
 ///
-/// Uses the in-process embedding model when it is set up; without it the
-/// search degrades to word overlap, so lore still reaches the writer on a
-/// machine that never downloaded the embedding model. Vectors are cached in
-/// memory by text — they are cheap to recompute and would bloat the project
-/// blob, which is rewritten after every beat.
+/// Uses memory search's embedding model when one is set up; without it the
+/// search degrades to word overlap, so lore still reaches the writer with
+/// no embedding model at all. Vectors are cached in memory by text, for the
+/// current model only — they are cheap to recompute and would bloat the
+/// project blob, which is rewritten after every beat.
 class StoryLoreIndex {
   StoryLoreIndex(this._embeddings);
 
   final EmbeddingService? _embeddings;
   final Map<String, List<double>> _vectors = {};
+  String _vectorsModel = '';
 
   /// Long uploads are cut into entries of about this many characters.
   static const chunkChars = 900;
@@ -55,11 +56,21 @@ class StoryLoreIndex {
         (e.validFromAct == act + 1 && e.validFromScene <= scene + 1),
   );
 
-  Future<List<double>?> _embed(String text) async {
-    final cached = _vectors[text];
+  Future<List<double>?> _embed(String text, {bool query = false}) async {
+    final embeddings = _embeddings;
+    if (embeddings == null) return null;
+    // Another model's vectors compare against nothing.
+    if (embeddings.choice.activeModelId != _vectorsModel) {
+      _vectors.clear();
+      _vectorsModel = embeddings.choice.activeModelId;
+    }
+    final key = query ? 'q:$text' : 'd:$text';
+    final cached = _vectors[key];
     if (cached != null) return cached;
-    final vector = await _embeddings?.embed(text);
-    if (vector != null) _vectors[text] = vector;
+    final vector = query
+        ? await embeddings.embedQuery(text)
+        : await embeddings.embed(text);
+    if (vector != null) _vectors[key] = vector;
     return vector;
   }
 
@@ -96,7 +107,7 @@ class StoryLoreIndex {
   }) async {
     final entries = candidates.toList();
     if (entries.isEmpty || query.trim().isEmpty) return const [];
-    final queryVector = semantic ? await _embed(query) : null;
+    final queryVector = semantic ? await _embed(query, query: true) : null;
     final hits = <LoreHit>[];
     for (final entry in entries) {
       final text = _text(entry);

@@ -145,7 +145,20 @@ class _UiSettingsDialogState extends State<UiSettingsDialog> {
                 ),
               ChatThemePresetPicker(
                 overrides: overrides,
-                onSelected: (next) => _commitTheme(chatService, next),
+                // A picked (or cleared) theme keeps this chat's VN choice.
+                onSelected: (next) => _commitTheme(
+                  chatService,
+                  next..visualNovel = overrides.visualNovel,
+                ),
+              ),
+              const SizedBox(height: 16),
+              VisualNovelChoice(
+                value: overrides.visualNovel,
+                appearanceOn: storageService.expressionSettings.visualNovelMode,
+                onChanged: (value) {
+                  overrides.visualNovel = value;
+                  _commitTheme(chatService, overrides);
+                },
               ),
 
               if (hasTheme) ...[

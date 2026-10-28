@@ -20,6 +20,7 @@ import 'package:front_porch_ai/database/database.dart' show Objective;
 import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/chat/chat.dart';
+import 'package:front_porch_ai/services/embedding/embedding_status.dart';
 import 'package:front_porch_ai/services/web/facade/chat_tools/chat_tools_context.dart';
 import 'package:front_porch_ai/services/web/facade/chat_tools/chat_tools_scene.dart';
 

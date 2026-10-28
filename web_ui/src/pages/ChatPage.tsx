@@ -9,6 +9,8 @@ import { DirectorStrip, ExitUndoBar } from '../components/DirectorStrip';
 import { ChatMessageList } from '../components/ChatMessageList';
 import { ChatComposer } from '../components/ChatComposer';
 import { ChatInsight } from '../components/ChatInsight';
+import { MaybeVisualNovelLog, VisualNovelStage } from '../components/VisualNovelStage';
+import { useChatStage } from './chat/useChatStage';
 import { ConversationsDrawer } from '../components/ConversationsDrawer';
 import { ChatThemeSettings } from '../components/ChatThemeSettings';
 import { PromptSourcePickerModal, PromptSourceSettings } from '../components/PromptSource';
@@ -86,6 +88,18 @@ export function ChatPage() {
   const [importNotice, setImportNotice] = useState('');
   const [showStats, setShowStats] = useState(false);
   const [showTheme, setShowTheme] = useState(false);
+  // Visual novel: the log panel grown to the full height to read back.
+  const [vnExpanded, setVnExpanded] = useState(false);
+  // The stage follows the chat: re-read when it moves on.
+  const novel = useChatStage(
+    [
+      state?.sessionId,
+      state?.messages.length,
+      state?.isGenerating,
+      state?.expressionLabel,
+      JSON.stringify(state?.themeOverrides ?? null),
+    ].join('|'),
+  );
   const [showPersona, setShowPersona] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   // Unified-cast UI: which participant the sidebar is scoped to, the add-picker,
@@ -341,8 +355,14 @@ export function ChatPage() {
             </button>
           </div>
         )}
-        <div className="chat-find-host">
+        <div className={`chat-find-host${novel.visualNovel ? ' vn' : ''}`}>
+          {novel.visualNovel && <VisualNovelStage sprites={novel.stage} />}
           <FindSurfaceContext.Provider value={find.surface}>
+            <MaybeVisualNovelLog
+              on={novel.visualNovel}
+              expanded={vnExpanded}
+              onToggle={() => setVnExpanded((v) => !v)}
+            >
             <ChatMessageList
               sessionId={state.sessionId}
               messages={state.messages}
@@ -373,6 +393,7 @@ export function ChatPage() {
               onActionFailed={reportActionFailure}
               revealTarget={find.reveal}
             />
+            </MaybeVisualNovelLog>
           </FindSurfaceContext.Provider>
           {find.open && (
             <FindBar

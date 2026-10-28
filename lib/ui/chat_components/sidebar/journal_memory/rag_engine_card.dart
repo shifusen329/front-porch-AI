@@ -27,6 +27,9 @@ import 'package:front_porch_ai/ui/chat_components/sidebar/sidebar_tokens.dart';
 /// downloading with a real progress bar, missing model with a Download
 /// button, or failed with Retry + the actual error. The old panel only
 /// painted a 8px dot that said "Model not downloaded" with no way out.
+///
+/// On a model server with none set yet, Download is the on-device way out
+/// (it switches memory search to the on-device model).
 class RagEngineCard extends StatelessWidget {
   final Color accent;
 
@@ -41,8 +44,8 @@ class RagEngineCard extends StatelessWidget {
     final hasProgress = downloading && progress >= 0 && progress <= 1;
     final failed =
         emb.setupError != null ||
-        (!emb.isAvailable && emb.modelOnDisk && emb.lastEngineError != null);
-    final needsDownload = !emb.isAvailable && !emb.modelOnDisk && !downloading;
+        (!emb.isAvailable && emb.isConfigured && emb.lastEngineError != null);
+    final needsDownload = !emb.isAvailable && !emb.isConfigured && !downloading;
 
     return Container(
       width: double.infinity,
@@ -136,7 +139,11 @@ class RagEngineCard extends StatelessWidget {
                     ? null
                     : () {
                         emb.clearSetupError();
-                        emb.runSetup();
+                        if (needsDownload && emb.usesEndpoint) {
+                          emb.useOnDeviceModel();
+                        } else {
+                          emb.runSetup();
+                        }
                       },
                 icon: Icon(
                   failed ? Icons.refresh : Icons.download,
@@ -175,6 +182,7 @@ class RagEngineCard extends StatelessWidget {
     final amber = AppColors.porchAmberOf(context);
     final red = AppColors.bondLowOf(context);
 
+    if (emb.usesEndpoint) return _endpointStatus(emb, green, amber, red);
     if (emb.isAvailable) {
       return (green, 'Memory engine ready', 'Runs fully on this computer.');
     }
@@ -203,6 +211,43 @@ class RagEngineCard extends StatelessWidget {
       amber,
       'Memory model not installed',
       'One free download (~550 MB). Nothing leaves your machine after that.',
+    );
+  }
+
+  (Color, String, String?) _endpointStatus(
+    EmbeddingService emb,
+    Color green,
+    Color amber,
+    Color red,
+  ) {
+    if (emb.isAvailable) {
+      return (
+        green,
+        'Memory engine ready',
+        '${emb.endpointModel} on ${emb.endpointHost}, '
+            '${emb.dimensions}-dimension vectors.',
+      );
+    }
+    if (!emb.isConfigured) {
+      return (
+        amber,
+        'Memory needs an embedding model',
+        'Pick a model server in Settings → Backend → Memory search, or '
+            'download one to run here (~550 MB, one time).',
+      );
+    }
+    final error = emb.setupError ?? emb.lastEngineError;
+    if (error != null) {
+      return (
+        red,
+        'Can\'t reach the memory model',
+        '${emb.endpointModel} on ${emb.endpointHost}: ${_friendlyError(error)}',
+      );
+    }
+    return (
+      amber,
+      'Connecting to the memory model…',
+      '${emb.endpointModel} on ${emb.endpointHost}.',
     );
   }
 

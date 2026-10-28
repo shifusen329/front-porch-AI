@@ -117,6 +117,7 @@ class BackendTab extends StatelessWidget {
             ),
           const OpenCodeManagedSection(),
           WorkerBackendSection(kcppsPresets: localPresets),
+          const MemorySearchSection(),
         ],
       ),
     );

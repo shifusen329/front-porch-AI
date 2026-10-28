@@ -294,6 +294,26 @@ test('a setting survives a reload', async ({ page }) => {
   await page.waitForLoadState('networkidle');
 });
 
+test('Memory search keeps a typed model server and says when it cannot list its models', async ({
+  page,
+  allowHttp,
+}) => {
+  // Nothing listens on the discard port: the host's listing fails (502).
+  allowHttp((url, status) => status === 502 && /\/api\/memory\/embedding\/models/.test(url));
+  const before = await (await page.request.get('/api/memory/embedding')).json();
+  await openRoute(page, '/settings');
+  const card = page.getByTestId('memory-search-card');
+  await card.getByTestId('memory-search-provider').selectOption('endpoint');
+  await card.getByTestId('memory-search-url').fill('http://127.0.0.1:9');
+  await card.getByTestId('memory-search-load').click();
+  await expect(card.getByRole('alert')).toContainText('Could not list models');
+  await page.reload();
+  await expect(page.getByTestId('memory-search-url')).toHaveValue('http://127.0.0.1:9');
+  await page.request.post('/api/memory/embedding', {
+    data: { provider: before.provider, endpointUrl: before.endpointUrl ?? '' },
+  });
+});
+
 test('edit a character, save, and nothing else on the card is lost', async ({ page }) => {
   const list = (await (await page.request.get('/api/characters')).json()) as { id: string; name: string }[];
   const id = list.find((c) => c.name === 'Porch Tester')!.id;

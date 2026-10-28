@@ -40,6 +40,8 @@ import 'package:front_porch_ai/ui/pages/chat_page.sidebar_widgets.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.speakers.dart';
 import 'package:front_porch_ai/ui/pages/chat_page_overlays.dart';
 import 'package:front_porch_ai/ui/pages/chat_page_sidebar_host.dart';
+import 'package:front_porch_ai/ui/layout/layout.dart';
+import 'package:front_porch_ai/ui/mobile/mobile.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 
 class ChatPage extends StatefulWidget {
@@ -109,9 +111,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _onFindShortcut(KeyEvent event) =>
       handleChatFindShortcut(event, this, _find);
 
-  /// Guards the prompt-source picker against stacking while its dialog is
-  /// open (every ChatService notify would otherwise re-offer it).
-  bool _promptPickerOpen = false;
+  final PromptPickerGate _promptPicker = PromptPickerGate();
 
   bool _onRegenShortcut(KeyEvent event) => handleChatRegenShortcut(event, this);
 
@@ -181,38 +181,10 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  /// Prompt-picker SOW trigger: a new 1:1 chat whose card ships its own
-  /// system prompt opens the picker once ChatService has armed it (or
-  /// applied the character's remembered choice and armed nothing).
   Future<void> _maybeShowPromptPicker() async {
     final chat = _chatService;
-    if (chat == null || !mounted || _promptPickerOpen) return;
-    final pendingFor = chat.promptPickerPendingFor;
-    if (pendingFor == null) return;
-    final card = chat.activeCharacter;
-    if (card == null) return;
-    _promptPickerOpen = true;
-    final storage = Provider.of<StorageService>(context, listen: false);
-    try {
-      final choice = await showPromptSourcePicker(
-        context,
-        characterName: card.name,
-        cardPrompt: card.systemPrompt,
-        userPrompt: storage.generationSettings.systemPrompt,
-        amendment: storage.generationSettings.additionalSystemPrompt,
-      );
-      // The chat may have changed under the dialog (another chat opened,
-      // or the phone answered first): this answer only belongs to the
-      // chat it was asked about.
-      if (!mounted || chat.promptPickerPendingFor != pendingFor) return;
-      await chat.applyPromptSourceChoice(
-        preset: choice?.preset.wireName,
-        remember: choice?.remember ?? false,
-        askEveryChat: choice?.askEveryChat ?? false,
-      );
-    } finally {
-      _promptPickerOpen = false;
-    }
+    if (chat == null || !mounted) return;
+    await _promptPicker.maybeShow(context, chat, isMounted: () => mounted);
   }
 
   void _onTtsChanged() {
@@ -227,37 +199,7 @@ class _ChatPageState extends State<ChatPage> {
       if (_isCallActive) {
         setState(() => _isCallActive = false);
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(
-                Icons.warning_amber_rounded,
-                color: StatusColors.onFill,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  error,
-                  style: const TextStyle(color: StatusColors.onFill),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: StatusColors.errorToast,
-          duration: const Duration(seconds: 6),
-          behavior: SnackBarBehavior.floating,
-          // Opt out of Flutter's persist-when-action default so the 6s duration
-          // is honored (otherwise this error toast never leaves the screen).
-          persist: false,
-          action: SnackBarAction(
-            label: 'OK',
-            textColor: StatusColors.onFillMuted,
-            onPressed: () {},
-          ),
-        ),
-      );
+      showTtsErrorSnackBar(context, error);
     }
   }
 
@@ -344,46 +286,65 @@ class _ChatPageState extends State<ChatPage> {
           );
         }
 
-        return Stack(
-          children: [
-            DesktopChatChrome(
-              chatService: chatService,
-              appBar: ChatPageAppBar(
-                chatService: chatService,
-                coverFor: _speakers.coverFor,
-                sidebarOpen: _sidebarWidth > 0,
-                onToggleSidebar: () => setState(
+        // A phone (or a small tablet) puts the panel in a sheet over the
+        // chat, and the composer's extra buttons in its own + sheet.
+        final phone =
+            PlatformCaps.current.usesMobileShell &&
+            formFactorOf(context) != FormFactor.desktop;
+        final appBar = ChatPageAppBar(
+          chatService: chatService,
+          coverFor: _speakers.coverFor,
+          sidebarOpen: _sidebarWidth > 0,
+          panelAsSheet: phone,
+          menu: phone ? _chatMenu(chatService, icon: Icons.more_vert) : null,
+          onToggleSidebar: phone
+              ? _openPanelSheet
+              : () => setState(
                   () => _sidebarWidth = _sidebarWidth > 0
                       ? 0
                       : SidebarTokens.widthFromEnvironment(),
                 ),
+        );
+        final transcript = ChatFindLayer(
+          controller: _find,
+          transcript: ChatSurface(
+            transcriptListKey: _transcriptListKey,
+            character: character,
+            isGroup: isGroup,
+            controller: _controller,
+            focusNode: _chatFocusNode,
+            scrollController: _scrollController,
+            window: _transcriptWindow,
+            bgExistsCache: _bgExistsCache,
+            resolveSpeaker: _speakers.resolveSpeaker,
+            bubbleKeyFor: _anchors.keyFor,
+            jumpFlash: _anchors.jumpFlash,
+            externalImagesAllowed: _imageConsent.allowed,
+            onRequestImagePermission: () => _imageConsent.request(this.context),
+          ),
+        );
+
+        return Stack(
+          children: [
+            if (phone)
+              PhoneChatChrome(
+                chatService: chatService,
+                appBar: appBar,
+                transcript: transcript,
+                inputArea: _buildInputArea(chatService, phone: true),
+              )
+            else
+              DesktopChatChrome(
+                chatService: chatService,
+                appBar: appBar,
+                transcript: transcript,
+                inputArea: _buildInputArea(chatService),
+                // A 1:1 chat with no character returned above, so there is
+                // always a cast to show here.
+                sidebar: _buildRightSidebar(chatService),
+                sidebarWidth: _sidebarWidth,
+                onSidebarWidth: (w) => setState(() => _sidebarWidth = w),
               ),
-              transcript: ChatFindLayer(
-                controller: _find,
-                transcript: ChatSurface(
-                  transcriptListKey: _transcriptListKey,
-                  character: character,
-                  isGroup: isGroup,
-                  controller: _controller,
-                  focusNode: _chatFocusNode,
-                  scrollController: _scrollController,
-                  window: _transcriptWindow,
-                  bgExistsCache: _bgExistsCache,
-                  resolveSpeaker: _speakers.resolveSpeaker,
-                  bubbleKeyFor: _anchors.keyFor,
-                  jumpFlash: _anchors.jumpFlash,
-                  externalImagesAllowed: _imageConsent.allowed,
-                  onRequestImagePermission: () =>
-                      _imageConsent.request(this.context),
-                ),
-              ),
-              inputArea: _buildInputArea(chatService),
-              // A 1:1 chat with no character returned above, so there is
-              // always a cast to show here.
-              sidebar: _buildRightSidebar(chatService),
-              sidebarWidth: _sidebarWidth,
-              onSidebarWidth: (w) => setState(() => _sidebarWidth = w),
-            ),
             ...buildChatPageOverlays(
               context,
               chatService: chatService,
@@ -398,7 +359,34 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildInputArea(ChatService chatService) {
+  Widget _buildInputArea(ChatService chatService, {bool phone = false}) {
+    if (phone) {
+      return ChatInputArea(
+        chatService: chatService,
+        controller: _controller,
+        focusNode: _chatFocusNode,
+        inputBar: PhoneComposer(
+          chatService: chatService,
+          controller: _controller,
+          focusNode: _chatFocusNode,
+          pendingImage: _pendingImage,
+          isPageMounted: () => mounted,
+          onSend: () => _sendCurrentMessage(chatService),
+          onOpenTools: () => showComposerToolsSheet(
+            context,
+            chatService: chatService,
+            controller: _controller,
+            isPageMounted: () => mounted,
+            onAttachImage: () => _pendingImage.pick(context),
+            onOpenImageStudio: () => showChatImageStudio(
+              context,
+              chatService,
+              onAvatarsRefreshed: _refresh,
+            ),
+          ),
+        ),
+      );
+    }
     return ChatInputArea(
       chatService: chatService,
       controller: _controller,
@@ -412,16 +400,7 @@ class _ChatPageState extends State<ChatPage> {
         onImage: (bytes) => _pendingImage.accept(context, bytes),
         onResizeReset: _composerHeight.resetDrag,
         onResize: _composerHeight.drag,
-        menu: ChatManagementMenu(
-          chatService: chatService,
-          onImport: () => importChatPackageFile(context),
-          onExport: () => exportChatFile(context),
-          onConvertToGroup: () => showConvertToGroupPicker(
-            context,
-            chatService,
-            coverFor: _speakers.coverFor,
-          ),
-        ),
+        menu: _chatMenu(chatService),
         actions: ChatInputActionStrip(
           chatService: chatService,
           controller: _controller,
@@ -441,15 +420,56 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildRightSidebar(ChatService chatService) {
+  Widget _chatMenu(ChatService chatService, {IconData? icon}) {
+    return ChatManagementMenu(
+      chatService: chatService,
+      icon: icon ?? Icons.folder_open,
+      onImport: () => importChatPackageFile(context),
+      onExport: () => exportChatFile(context),
+      onConvertToGroup: () => showConvertToGroupPicker(
+        context,
+        chatService,
+        coverFor: _speakers.coverFor,
+      ),
+    );
+  }
+
+  /// The side panel in a sheet (phone). It rebuilds with the chat, and a
+  /// Journal receipt's jump closes it so the message can be seen.
+  void _openPanelSheet() => showChatPanelSheet(
+    context,
+    builder: (sheet, close) => StatefulBuilder(
+      builder: (_, setSheet) => ChatTurnBuilder(
+        builder: (_, chat) => _buildRightSidebar(
+          chat,
+          width: kPanelSheetPortraitSize,
+          onFocusChanged: () => setSheet(() {}),
+          onJumpToMessage: (i) {
+            close();
+            _jumpToMessage(i);
+          },
+        ),
+      ),
+    ),
+  );
+
+  Widget _buildRightSidebar(
+    ChatService chatService, {
+    double? width,
+    VoidCallback? onFocusChanged,
+    ValueChanged<int>? onJumpToMessage,
+  }) {
     return ChatRightSidebar(
       chatService: chatService,
       focusedParticipantId: _focusedParticipantId,
-      onFocusParticipant: (id) => setState(() => _focusedParticipantId = id),
-      sidebarWidth: _sidebarWidth,
+      onFocusParticipant: (id) {
+        setState(() => _focusedParticipantId = id);
+        onFocusChanged?.call();
+      },
+      sidebarWidth: width ?? _sidebarWidth,
       resolveCharImage: _speakers.resolveCharImage,
       draft: _controller,
-      onJumpToMessage: _jumpToMessage,
+      onJumpToMessage: onJumpToMessage ?? _jumpToMessage,
       onEditCharacter: _editCharacter,
       onAvatarsChanged: _refresh,
     );

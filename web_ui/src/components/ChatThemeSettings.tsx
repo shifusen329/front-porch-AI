@@ -167,7 +167,7 @@ export function ChatThemeSettings({ overrides, onSave }: {
         {/* "None" card */}
         <button
           className={`theme-preset-card${!local.themeId ? ' active' : ''}`}
-          onClick={() => setLocal({})}
+          onClick={() => setLocal((prev) => ({ visualNovel: prev.visualNovel }))}
         >
           <span className="theme-preset-none">—</span>
           <span className="theme-preset-name">None</span>
@@ -239,10 +239,29 @@ export function ChatThemeSettings({ overrides, onSave }: {
         </select>
       </>}
 
+      {/* Kept apart from the theme: clearing the theme leaves it. */}
+      <h4 className="section-label">Visual novel</h4>
+      <p className="reading-blurb">The characters on stage, with the chat in a panel over them.</p>
+      <select
+        className="theme-select"
+        data-testid="chat-visual-novel"
+        aria-label="Visual novel for this chat"
+        value={local.visualNovel == null ? 'follow' : local.visualNovel ? 'on' : 'off'}
+        onChange={(e) =>
+          set({ visualNovel: e.target.value === 'follow' ? null : e.target.value === 'on' })
+        }
+      >
+        <option value="follow">As Settings</option>
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+
       <div className="theme-actions">
         <button className="primary" onClick={() => onSave(local)}>Save theme</button>
         {local.themeId && (
-          <button className="ghost" onClick={() => setLocal({})}>Remove theme</button>
+          <button className="ghost" onClick={() => setLocal((prev) => ({ visualNovel: prev.visualNovel }))}>
+            Remove theme
+          </button>
         )}
       </div>
     </section>

@@ -50,7 +50,11 @@ class JournalStore {
   /// path never needs embeddings (design invariant: no-RAG floor).
   final Future<List<double>?> Function(String text)? embedText;
 
-  JournalStore({required this.getDb, this.embedText});
+  /// Embeds the conversation a recall searches with (MemoryService.
+  /// embedQueryText). Null falls back to [embedText].
+  final Future<List<double>?> Function(String text)? embedQuery;
+
+  JournalStore({required this.getDb, this.embedText, this.embedQuery});
 
   /// All cards for one diary owner in one chat — pinned first, then oldest
   /// first. This exact order is what the maintenance prompt numbers its

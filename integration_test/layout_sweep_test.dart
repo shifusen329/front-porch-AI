@@ -32,6 +32,7 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/layout/main_layout.dart';
 import 'package:front_porch_ai/ui/mobile/mobile.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.dart';
+import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 
 import 'support/e2e_sandbox.dart';
@@ -202,8 +203,10 @@ void main() {
     expect(raw, isEmpty, reason: 'Raw placeholders on screen.');
   });
 
-  testWidgets('the phone shell fits phone screens, portrait, landscape and '
-      'at 200% text, with no raw placeholders — sandboxed', (tester) async {
+  testWidgets('the phone shell and a chat fit phone screens, portrait, '
+      'landscape and at 200% text, with no raw placeholders — sandboxed', (
+    tester,
+  ) async {
     final sandbox = Directory.systemTemp.createTempSync('fpai_layout_phone_');
     PathProviderPlatform.instance = SandboxPathProvider(sandbox.path);
     final backend = await FakeBackendServer.start(
@@ -219,15 +222,20 @@ void main() {
     });
 
     app.main(const []);
-    await pumpUntilFound(tester, find.byType(MainLayout));
+    await pumpUntilFound(
+      tester,
+      find.byWidgetPredicate((w) => w is MainLayout || w is MobileShell),
+    );
     await tester.pump(const Duration(seconds: 2));
 
     // The phone shell on a desktop runner: the app boots as itself, then
     // the capabilities flip and the tree rebuilds the way a hot reload
-    // does. Android itself is checked on a device.
-    PlatformCaps.debugOverride = const PlatformCaps(isDesktop: false);
-    addTearDown(() => PlatformCaps.debugOverride = PlatformCaps.host());
-    await tester.binding.reassembleApplication();
+    // does. On an Android device or emulator it boots as a phone.
+    if (find.byType(MainLayout).evaluate().isNotEmpty) {
+      PlatformCaps.debugOverride = const PlatformCaps(isDesktop: false);
+      addTearDown(() => PlatformCaps.debugOverride = PlatformCaps.host());
+      await tester.binding.reassembleApplication();
+    }
     await pumpUntilFound(tester, find.byType(MobileShell));
 
     // A new phone screen starts with nothing known: every overflow fails.
@@ -313,6 +321,57 @@ void main() {
       await tester.tapAt(const Offset(8, 8));
       await settle();
     }
+
+    // The chat: its phone layout, the panel sheet and the + sheet.
+    tester.view.physicalSize = const Size(412, 915);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.0;
+    await tester.tap(tab('Characters'));
+    await settle();
+    await tester.tap(find.byTooltip('Actions for Layout Tester').first);
+    await settle();
+    await tester.tap(find.text('Start New Chat'));
+    await pumpUntilFound(tester, find.textContaining('Start a new chat with'));
+    await tester.tap(
+      find
+          .descendant(of: find.byType(WarmDialog), matching: find.text('User'))
+          .first,
+    );
+    await pumpUntilFound(tester, find.byType(ChatPage));
+    // Each size twice: the classic chat, then visual novel mode (the stage
+    // and the log panel).
+    final storage = Provider.of<StorageService>(ctx, listen: false);
+    for (final novel in [false, true]) {
+      await storage.expressionSettings.setVisualNovelMode(novel);
+      for (final stop in stops.entries) {
+        tester.view.physicalSize = stop.value.$1;
+        tester.platformDispatcher.textScaleFactorTestValue = stop.value.$2;
+        where = '${stop.key} chat${novel ? ' (visual novel)' : ''}';
+        await settle();
+        scanText();
+        where = '${stop.key} chat panel sheet';
+        await tester.tap(find.byTooltip('Stats & story'));
+        await settle();
+        scanText();
+        await tester.binding.handlePopRoute();
+        await settle();
+        where = '${stop.key} chat + sheet';
+        await tester.tap(find.byTooltip('Attach and tools'));
+        await settle();
+        scanText();
+        await tester.binding.handlePopRoute();
+        await settle();
+        if (novel) {
+          expect(find.byKey(const Key('vn-log-panel')), findsOneWidget);
+          where = '${stop.key} chat (visual novel, whole log)';
+          await tester.tap(find.byKey(const Key('vn-log-handle')));
+          await settle();
+          scanText();
+          await tester.tap(find.byKey(const Key('vn-log-handle')));
+          await settle();
+        }
+      }
+    }
+    await storage.expressionSettings.setVisualNovelMode(false);
 
     expect(
       found,

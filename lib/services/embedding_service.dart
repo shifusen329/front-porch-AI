@@ -20,10 +20,15 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:front_porch_ai/services/embedding/embedding_model_choice.dart';
+import 'package:front_porch_ai/services/embedding/embedding_prefixes.dart';
 import 'package:front_porch_ai/services/embedding/native_embedding_engine.dart';
+import 'package:front_porch_ai/services/embedding/remote_embedding_client.dart';
 import 'package:front_porch_ai/services/engine_health.dart';
 import 'package:front_porch_ai/services/model_fetch.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
+
+export 'package:front_porch_ai/services/embedding/embedding_status.dart';
 
 /// Unwinds [EmbeddingService.runSetup] when the user presses Cancel. Not an
 /// error: the setup path treats it as a plain stop, never a failure.
@@ -33,17 +38,21 @@ class _SetupCancelled implements Exception {
 
 /// Service that generates text embeddings (numerical vectors) for RAG memory retrieval.
 ///
-/// Runs nomic-embed-text-v1.5 fully in-process via onnxruntime (phase 5 of
-/// docs/design/sidecar-retirement.md — the Rust embed_server is gone,
-/// completing the retirement: the app spawns no helper processes at all).
-/// The engine is golden-pinned to the retired server's exact vectors, so
-/// every embedding already stored in users' memory databases keeps
-/// comparing correctly. Existing installs reuse the fastembed model cache
-/// the server downloaded; fresh installs download the model here
-/// ([runSetup], driven by the RAG consent dialog).
+/// Vectors come from a model server the user points at (Ollama or any
+/// OpenAI-compatible host, [RemoteEmbeddingClient]) or from the on-device
+/// model, as [EmbeddingModelChoice] reads the settings.
+///
+/// The on-device engine runs nomic-embed-text-v1.5 fully in-process via
+/// onnxruntime (phase 5 of docs/design/sidecar-retirement.md — the app
+/// spawns no helper processes at all). It is golden-pinned to the retired
+/// Rust server's exact vectors, so embeddings already stored in users'
+/// memory databases keep comparing correctly. Existing installs reuse the
+/// fastembed model cache the server downloaded; fresh installs download
+/// the model here ([runSetup]).
 class EmbeddingService extends ChangeNotifier {
   final StorageService _storage;
   final NativeEmbeddingEngine _native = NativeEmbeddingEngine();
+  final RemoteEmbeddingClient _remote;
   ({String model, String vocab})? _files;
 
   bool _available = false;
@@ -66,19 +75,57 @@ class EmbeddingService extends ChangeNotifier {
       (_files ??= NativeEmbeddingEngine.resolveModelFiles(_storage.rootPath)) !=
       null;
 
-  /// Compact status for the web tools panel (and any other remote surface).
-  /// Additive fields only — never remove keys from an old reader.
-  Map<String, dynamic> get statusSnapshot => {
-    'available': _available,
-    'modelOnDisk': modelOnDisk,
-    'settingUp': _settingUp,
-    'setupProgress': _setupProgress,
-    'setupStatus': _setupStatus,
-    'setupError': _setupError,
-    'lastEngineError': _lastEngineError,
-  };
+  /// Which model memory search uses, and which made the stored vectors.
+  late final EmbeddingModelChoice choice = EmbeddingModelChoice(
+    _storage,
+    modelOnDisk: () => modelOnDisk,
+  );
 
-  EmbeddingService(this._storage);
+  bool get usesEndpoint => choice.usesEndpoint;
+  String get endpointUrl => choice.endpointUrl;
+  String get endpointModel => choice.endpointModel;
+  String get endpointHost => choice.endpointHost;
+  bool get isConfigured => choice.isConfigured;
+
+  EmbeddingService(this._storage, {RemoteEmbeddingClient? remote})
+    : _remote = remote ?? RemoteEmbeddingClient() {
+    _signature = choice.signature;
+    _storage.addListener(_onSettingsChanged);
+  }
+
+  // ---- Model choice ----
+
+  String _signature = '';
+
+  /// Bumped when the model choice changes, so a check still in flight for
+  /// the old one cannot report the new one ready.
+  int _configGen = 0;
+
+  /// A new server, model or key starts over: the next search or the
+  /// settings card checks the new one.
+  void _onSettingsChanged() {
+    final signature = choice.signature;
+    if (signature == _signature) return;
+    _signature = signature;
+    _configGen++;
+    _available = false;
+    _dimensions = 0;
+    _lastEngineError = null;
+    _setupError = null;
+    notifyListeners();
+  }
+
+  /// Switches memory search to the on-device model and sets it up.
+  Future<bool> useOnDeviceModel() async {
+    await choice.useOnDevice();
+    return runSetup();
+  }
+
+  /// The embedding models the server at [url] offers.
+  Future<List<String>> listEndpointModels(String url, {String? apiKey}) async {
+    final key = apiKey ?? _storage.backendSettings.remoteApiKeyFor(url);
+    return (await _remote.listModels(url, apiKey: key)).models;
+  }
 
   // ---- Setup / download state (consumed by RagSetupDialog) ----
 
@@ -100,9 +147,15 @@ class EmbeddingService extends ChangeNotifier {
 
   /// Downloads the model if it isn't on disk, then loads + verifies the
   /// engine. Progress/status/error surface through the getters above.
-  /// Returns true when embeddings are ready.
+  /// Returns true when embeddings are ready. On a model server there is
+  /// nothing to download: it is reached and self-tested.
   Future<bool> runSetup() async {
     if (_settingUp) return false;
+    if (usesEndpoint) {
+      _setupError = null;
+      await checkAvailability();
+      return _available;
+    }
     _settingUp = true;
     _setupCancelled = false;
     _setupError = null;
@@ -223,6 +276,10 @@ class EmbeddingService extends ChangeNotifier {
     // Latch on setup failure AND self-test failure (_setupError is set by
     // both paths) so we never spin forever on open. Explicit Retry clears it.
     if (_available || _settingUp || _checking || _setupError != null) return;
+    if (usesEndpoint) {
+      if (choice.isConfigured) unawaited(checkAvailability());
+      return;
+    }
     _files = NativeEmbeddingEngine.resolveModelFiles(_storage.rootPath);
     if (_files == null) {
       unawaited(runSetup());
@@ -231,72 +288,139 @@ class EmbeddingService extends ChangeNotifier {
     unawaited(checkAvailability());
   }
 
-  /// Loads the engine (if the model is on disk) and verifies it end to end
-  /// with a real embed, which also warms the session so the first
-  /// user-visible embed isn't the one paying the model load.
+  /// Loads the engine (if the model is on disk) or reaches the model
+  /// server, and verifies it end to end with a real embed, which also
+  /// warms it so the first user-visible embed isn't the one paying the load.
+  ///
+  /// A call while a check runs waits for that one ("Check connection" just
+  /// after saving a model must report the answer, not the moment before).
   Future<void> checkAvailability() async {
-    if (_checking) return;
+    final running = _inFlight;
+    if (running != null) return running;
+    final gen = _configGen;
+    final run = _check(gen);
+    _inFlight = run;
+    try {
+      await run;
+    } finally {
+      _inFlight = null;
+    }
+    // The choice moved mid-check: that answer was for the old one.
+    if (gen != _configGen) await checkAvailability();
+  }
+
+  Future<void>? _inFlight;
+
+  Future<void> _check(int gen) async {
     _checking = true;
     debugPrint('[RAG:Embed] ── Checking embedding availability ──');
-
     try {
-      _files = NativeEmbeddingEngine.resolveModelFiles(_storage.rootPath);
-      if (_files == null) {
-        _available = false;
-        debugPrint(
-          '[RAG:Embed] ⚠ No embedding model on disk — run RAG setup to '
-          'download it',
-        );
-        notifyListeners();
-        return;
-      }
-
-      try {
-        final result = await _nativeEmbed('test');
-        _dimensions = result.length;
-        _available = true;
-        _lastEngineError = null;
-        // Clear a prior self-test latch so ensureReady can re-arm after Retry.
-        if (_setupError != null &&
-            _setupError!.startsWith('engine self-test failed')) {
-          _setupError = null;
-        }
-        debugPrint(
-          '[RAG:Embed] ✅ In-process embeddings available '
-          '(${_dimensions}d vectors)',
-        );
-      } catch (e) {
-        _available = false;
-        _lastEngineError = '$e';
-        // Latch for ensureReady (audit P2.18) — without this, every
-        // dependency rebuild re-kicks self-test forever.
-        _setupError = 'engine self-test failed: $e';
-        debugPrint('[RAG:Embed] ✗ In-process engine failed: $e');
-        EngineHealth.instance.reportFailure(
-          EngineHealth.embeddings,
-          'engine self-test failed: $e',
-        );
-      }
-      notifyListeners();
+      await (usesEndpoint ? _checkEndpoint(gen) : _checkOnDevice(gen));
     } finally {
       _checking = false;
     }
   }
 
-  /// Generate an embedding vector for a text string.
-  /// Returns null if embeddings are not available.
+  Future<void> _checkEndpoint(int gen) async {
+    if (!choice.isConfigured) {
+      _available = false;
+      notifyListeners();
+      return;
+    }
+    try {
+      final vectors = await _remoteEmbed([
+        'test',
+      ]).timeout(const Duration(seconds: 20));
+      if (gen != _configGen) return;
+      _dimensions = vectors.first.length;
+      _available = true;
+      _lastEngineError = null;
+      _setupError = null;
+      debugPrint(
+        '[RAG:Embed] ✅ $endpointModel on $endpointHost '
+        '(${_dimensions}d vectors)',
+      );
+    } catch (e) {
+      if (gen != _configGen) return;
+      _available = false;
+      _lastEngineError = '$e';
+      // Latched like the on-device self-test: ensureReady waits for Retry.
+      _setupError = 'could not reach the memory model: $e';
+      debugPrint('[RAG:Embed] ✗ $endpointModel on $endpointHost: $e');
+      EngineHealth.instance.reportFailure(
+        EngineHealth.embeddings,
+        'model server check failed: $e',
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> _checkOnDevice(int gen) async {
+    _files = NativeEmbeddingEngine.resolveModelFiles(_storage.rootPath);
+    if (_files == null) {
+      _available = false;
+      debugPrint(
+        '[RAG:Embed] ⚠ No embedding model on disk — run RAG setup to '
+        'download it',
+      );
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final result = await _nativeEmbed('test');
+      if (gen != _configGen) return;
+      _dimensions = result.length;
+      _available = true;
+      _lastEngineError = null;
+      // Clear a prior self-test latch so ensureReady can re-arm after Retry.
+      if (_setupError != null &&
+          _setupError!.startsWith('engine self-test failed')) {
+        _setupError = null;
+      }
+      debugPrint(
+        '[RAG:Embed] ✅ In-process embeddings available '
+        '(${_dimensions}d vectors)',
+      );
+    } catch (e) {
+      if (gen != _configGen) return;
+      _available = false;
+      _lastEngineError = '$e';
+      // Latch for ensureReady (audit P2.18) — without this, every
+      // dependency rebuild re-kicks self-test forever.
+      _setupError = 'engine self-test failed: $e';
+      debugPrint('[RAG:Embed] ✗ In-process engine failed: $e');
+      EngineHealth.instance.reportFailure(
+        EngineHealth.embeddings,
+        'engine self-test failed: $e',
+      );
+    }
+    notifyListeners();
+  }
+
+  /// Set by [embedQuery] for the [embed] call it makes, which reads and
+  /// clears it before its first await.
+  bool _queryRole = false;
+
+  /// Generate an embedding vector for stored text (a memory, a card, a
+  /// Data Bank entry). Returns null if embeddings are not available.
   Future<List<double>?> embed(String text) async {
+    final asQuery = _queryRole;
+    _queryRole = false;
     if (!_available || text.trim().isEmpty) return null;
     final preview = text.length > 80 ? '${text.substring(0, 80)}...' : text;
     final sw = Stopwatch()..start();
 
     try {
-      final result = await _nativeEmbed(text);
+      final result = usesEndpoint
+          ? (await _remoteEmbed([text], query: asQuery)).first
+          : await _nativeEmbed(text);
       sw.stop();
       EngineHealth.instance.reportNative(EngineHealth.embeddings);
       debugPrint(
         '[RAG:Embed] ✅ ${result.length}d vector in ${sw.elapsedMilliseconds}ms ← "$preview"',
       );
+      if (!asQuery) unawaited(choice.noteVectorStored());
       return result;
     } catch (e) {
       sw.stop();
@@ -311,6 +435,45 @@ class EmbeddingService extends ChangeNotifier {
     return null;
   }
 
+  /// Embed a search query. Models trained with separate query and passage
+  /// prefixes ([embeddingPrefixesFor]) get the query one. Goes through
+  /// [embed], so a subclass that overrides it sees queries too.
+  Future<List<double>?> embedQuery(String text) {
+    _queryRole = true;
+    try {
+      return embed(text);
+    } finally {
+      _queryRole = false;
+    }
+  }
+
+  /// Vectors for stored passages, in order. A model server takes them in
+  /// one request, the on-device model one at a time. Throws when the
+  /// engine is down or the call fails, for the caller to report.
+  Future<List<List<double>>> embedDocuments(List<String> texts) async {
+    if (!_available) throw StateError('the memory model is not ready');
+    if (texts.isEmpty) return const [];
+    final vectors = usesEndpoint
+        ? await _remoteEmbed(texts)
+        : [for (final t in texts) await _nativeEmbed(t)];
+    unawaited(choice.noteVectorStored());
+    return vectors;
+  }
+
+  Future<List<List<double>>> _remoteEmbed(
+    List<String> texts, {
+    bool query = false,
+  }) {
+    final prefixes = embeddingPrefixesFor(endpointModel);
+    final prefix = query ? prefixes.query : prefixes.document;
+    return _remote.embed(
+      endpointUrl,
+      model: endpointModel,
+      apiKey: choice.apiKey,
+      inputs: [for (final t in texts) '$prefix$t'],
+    );
+  }
+
   Future<List<double>> _nativeEmbed(String text) => _native.embed(
     modelPath: _files!.model,
     vocabPath: _files!.vocab,
@@ -319,7 +482,9 @@ class EmbeddingService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _storage.removeListener(_onSettingsChanged);
     _native.shutdown();
+    _remote.close();
     super.dispose();
   }
 }

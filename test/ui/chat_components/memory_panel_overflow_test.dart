@@ -31,6 +31,10 @@ class _FakeEmb extends ChangeNotifier implements EmbeddingService {
   @override
   bool get modelOnDisk => true;
   @override
+  bool get usesEndpoint => false;
+  @override
+  bool get isConfigured => true;
+  @override
   String? get lastEngineError => null;
   @override
   String get setupStatus => '';
@@ -124,6 +128,9 @@ void main() {
     final storage = StorageService();
     addTearDown(storage.dispose);
     await storage.memorySettings.setRagEnabled(true);
+    // The on-device model: a model server (a fresh install's default)
+    // downloads nothing, so there is no setup to start.
+    await storage.memorySettings.setEmbeddingProvider('onDevice');
     final chat = FakeChatService();
     addTearDown(chat.dispose);
     final emb = _NoDownloadEmb(storage);

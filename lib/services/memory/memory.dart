@@ -5,3 +5,4 @@ export 'memory_retriever.dart';
 export 'memory_vectors.dart';
 export 'memory_window_embedder.dart';
 export 'retrieved_memory.dart';
+export 'vector_rebuilder.dart';

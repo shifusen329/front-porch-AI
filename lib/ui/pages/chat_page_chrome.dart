@@ -58,26 +58,7 @@ class DesktopChatChrome extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                // "Previously on…" welcome-back banner (Living Time §2).
-                // App-voice, dismissible, gated: enabled + over-threshold
-                // gap + a real session.
-                Builder(
-                  builder: (context) {
-                    // Subscribe so a settings toggle updates live; the gate
-                    // itself lives once on ChatService.
-                    Provider.of<StorageService>(context);
-                    final phrase = chatService.absenceBannerPhrase;
-                    final sid = chatService.currentSessionId;
-                    if (phrase == null || sid == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return AbsenceRecapBanner(
-                      sessionId: sid,
-                      phrase: phrase,
-                      recap: chatService.summary,
-                    );
-                  },
-                ),
+                ChatAbsenceBanner(chatService: chatService),
                 Expanded(child: transcript),
                 const LiveGenerationStatusBar(),
                 ChatEvaluationProgress(chatService: chatService, inline: true),
@@ -92,6 +73,29 @@ class DesktopChatChrome extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The "Previously on…" welcome-back banner (Living Time §2). App-voice,
+/// dismissible, gated: enabled + over-threshold gap + a real session.
+class ChatAbsenceBanner extends StatelessWidget {
+  const ChatAbsenceBanner({super.key, required this.chatService});
+
+  final ChatService chatService;
+
+  @override
+  Widget build(BuildContext context) {
+    // Subscribe so a settings toggle updates live; the gate itself lives
+    // once on ChatService.
+    Provider.of<StorageService>(context);
+    final phrase = chatService.absenceBannerPhrase;
+    final sid = chatService.currentSessionId;
+    if (phrase == null || sid == null) return const SizedBox.shrink();
+    return AbsenceRecapBanner(
+      sessionId: sid,
+      phrase: phrase,
+      recap: chatService.summary,
     );
   }
 }

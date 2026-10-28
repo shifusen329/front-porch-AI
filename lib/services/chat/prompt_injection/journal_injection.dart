@@ -120,7 +120,7 @@ class JournalInjection {
     // expand-memory scoring (they ask the same "what is the conversation
     // reaching for?" question).
     List<double>? queryVector;
-    final embed = store.embedText;
+    final embed = store.embedQuery ?? store.embedText;
     if (embed != null && queryText.trim().isNotEmpty) {
       queryVector = await embed(queryText);
       if (queryVector != null && queryVector.isEmpty) queryVector = null;

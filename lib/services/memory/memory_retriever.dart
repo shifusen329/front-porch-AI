@@ -72,7 +72,7 @@ class MemoryRetriever {
     );
 
     try {
-      final queryVector = await _embeddings.embed(cleanedQuery);
+      final queryVector = await _embeddings.embedQuery(cleanedQuery);
       if (queryVector == null) {
         _reportError('query embed failed');
         debugPrint(

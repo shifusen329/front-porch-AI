@@ -16,7 +16,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 //
-// The ChatPage app bar, including the sidebar toggle.
+// The ChatPage app bar, including the sidebar toggle (on a phone, the
+// button that opens the panel sheet) and, on a phone, the chat menu.
 
 import 'dart:io';
 
@@ -42,12 +43,21 @@ class ChatPageAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.coverFor,
     required this.sidebarOpen,
     required this.onToggleSidebar,
+    this.panelAsSheet = false,
+    this.menu,
   });
 
   final ChatService chatService;
   final File? Function(ChatService chat, CharacterCard card) coverFor;
   final bool sidebarOpen;
   final VoidCallback onToggleSidebar;
+
+  /// The panel opens over the chat as a sheet (a phone) rather than beside
+  /// it: the button says so instead of showing a sidebar's open/closed.
+  final bool panelAsSheet;
+
+  /// The chat menu (a phone keeps it here instead of in the composer).
+  final Widget? menu;
 
   /// What the inner [AppBar] asks for (no toolbarHeight, no bottom).
   @override
@@ -167,38 +177,52 @@ class ChatPageAppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           avatars,
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary(context),
-                ),
-              ),
-              if (subtitle != null)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle,
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textTertiary(context),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
-            ],
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textTertiary(context),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
       actions: [
-        IconButton(
-          icon: Icon(
-            sidebarOpen ? Icons.last_page : Icons.first_page,
-            color: AppColors.iconSecondary(context),
+        if (panelAsSheet)
+          IconButton(
+            icon: Icon(Icons.tune, color: AppColors.iconSecondary(context)),
+            tooltip: 'Stats & story',
+            onPressed: onToggleSidebar,
+          )
+        else
+          IconButton(
+            icon: Icon(
+              sidebarOpen ? Icons.last_page : Icons.first_page,
+              color: AppColors.iconSecondary(context),
+            ),
+            tooltip: 'Toggle Sidebar',
+            onPressed: onToggleSidebar,
           ),
-          tooltip: 'Toggle Sidebar',
-          onPressed: onToggleSidebar,
-        ),
+        ?menu,
         const SizedBox(width: 8),
       ],
     );

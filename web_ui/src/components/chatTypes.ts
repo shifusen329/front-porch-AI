@@ -147,6 +147,8 @@ export interface ChatThemeOverrides {
   backgroundKey?: string | null;
   borderStyle?: string | null;
   borderColor?: string | null;
+  /** This chat's visual-novel choice; null/absent follows Settings. */
+  visualNovel?: boolean | null;
 }
 
 /** A theme preset as returned by the desktop (mirrors ChatThemePreset). */

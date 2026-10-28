@@ -159,48 +159,7 @@ class ChatInputBar extends StatelessWidget {
                 );
               },
             ),
-          // Offline captioner at work — sending is quiet for a few seconds
-          // while the photo is described, so say what's happening.
-          AnimatedBuilder(
-            animation: LocalCaptionService.instance,
-            builder: (context, _) {
-              if (!LocalCaptionService.instance.isCaptioning) {
-                return const SizedBox.shrink();
-              }
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                color: AppColors.surfaceContainerOf(context),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: StatusColors.infoOf(context),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Reading the photo so the character knows what it '
-                        'shows…',
-                        style: TextStyle(
-                          color: AppColors.textSecondary(context),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+          const CaptionerStatusLine(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             decoration: BoxDecoration(
@@ -216,33 +175,12 @@ class ChatInputBar extends StatelessWidget {
 
               children: [
                 // Persona Switcher
-                Consumer<UserPersonaService>(
-                  builder: (context, personaService, _) {
-                    final persona = personaService.persona;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0, bottom: 6),
-                      child: GestureDetector(
-                        onTap: () => showDialog(
-                          context: context,
-                          builder: (_) => const UserPersonaDialog(),
-                        ),
-                        child: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: InkColors.gripOf(context),
-                          backgroundImage: persona.avatarPath != null
-                              ? portraitAvatarImage(File(persona.avatarPath!))
-                              : null,
-                          child: persona.avatarPath == null
-                              ? Icon(
-                                  Icons.person,
-                                  size: 18,
-                                  color: AppColors.iconSecondary(context),
-                                )
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0, bottom: 6),
+                  child: GestureDetector(
+                    onTap: () => showPersonaSwitcher(context),
+                    child: const ComposerPersonaAvatar(),
+                  ),
                 ),
                 menu,
                 ...actions.build(context),
@@ -251,6 +189,83 @@ class ChatInputBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Opens the persona picker: who the user is in this chat.
+void showPersonaSwitcher(BuildContext context) {
+  showDialog(context: context, builder: (_) => const UserPersonaDialog());
+}
+
+/// The active persona's picture (or a person icon), as the composer shows it.
+class ComposerPersonaAvatar extends StatelessWidget {
+  const ComposerPersonaAvatar({super.key, this.radius = 16});
+
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final persona = context.watch<UserPersonaService>().persona;
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: InkColors.gripOf(context),
+      backgroundImage: persona.avatarPath != null
+          ? portraitAvatarImage(File(persona.avatarPath!))
+          : null,
+      child: persona.avatarPath == null
+          ? Icon(
+              Icons.person,
+              size: radius + 2,
+              color: AppColors.iconSecondary(context),
+            )
+          : null,
+    );
+  }
+}
+
+/// The offline captioner at work: sending is quiet for a few seconds while
+/// an attached photo is described, so say what's happening.
+class CaptionerStatusLine extends StatelessWidget {
+  const CaptionerStatusLine({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: LocalCaptionService.instance,
+      builder: (context, _) {
+        if (!LocalCaptionService.instance.isCaptioning) {
+          return const SizedBox.shrink();
+        }
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: AppColors.surfaceContainerOf(context),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: StatusColors.infoOf(context),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Reading the photo so the character knows what it shows…',
+                  style: TextStyle(
+                    color: AppColors.textSecondary(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

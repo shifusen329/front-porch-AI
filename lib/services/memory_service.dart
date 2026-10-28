@@ -90,6 +90,13 @@ class MemoryService extends ChangeNotifier {
     reportError: (error) => lastRetrieveError = error,
   );
 
+  /// Clears and remakes every stored vector after a model change. One per
+  /// chat service, shared by the settings card and the web relay.
+  late final VectorRebuilder vectorRebuilder = VectorRebuilder(
+    embeddings: _embeddingService,
+    db: () => _db,
+  );
+
   late final MemoryWindowEmbedder _embedder = MemoryWindowEmbedder(
     embeddings: _embeddingService,
     storage: _storageService,
@@ -210,11 +217,31 @@ class MemoryService extends ChangeNotifier {
   /// for other services — the Journal uses it for card vectors and cold-card
   /// query embedding.
   Future<List<double>?> embedText(String text) async {
+    final asQuery = _queryRole;
+    _queryRole = false;
     await ensureEmbeddingsReady(_embeddingService);
     if (!isOperational) return null;
     final cleaned = cleanForEmbedding(text);
     if (cleaned.isEmpty) return null;
-    return _embeddingService.embed(cleaned);
+    return asQuery
+        ? _embeddingService.embedQuery(cleaned)
+        : _embeddingService.embed(cleaned);
+  }
+
+  /// Set by [embedQueryText] for the [embedText] call it makes, which reads
+  /// and clears it before its first await.
+  bool _queryRole = false;
+
+  /// [embedText] for a search query, which some models embed differently
+  /// from stored text ([EmbeddingService.embedQuery]). Goes through
+  /// [embedText], so a subclass that overrides it sees queries too.
+  Future<List<double>?> embedQueryText(String text) {
+    _queryRole = true;
+    try {
+      return embedText(text);
+    } finally {
+      _queryRole = false;
+    }
   }
 
   /// Convert stored bytes back to a vector of doubles.

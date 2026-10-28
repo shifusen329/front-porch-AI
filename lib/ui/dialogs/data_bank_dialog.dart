@@ -106,7 +106,8 @@ class _DataBankDialogState extends State<DataBankDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Embedding service not available. Start the ONNX server or enable an API source.',
+            'Memory search isn\'t ready. Set it up in Settings → Backend → '
+            'Memory search.',
           ),
         ),
       );

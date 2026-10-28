@@ -18,6 +18,11 @@
 
 import 'settings_base.dart';
 
+/// Where memory search gets its vectors: a model server the user points
+/// at (Ollama or OpenAI-compatible), or the bundled on-device model.
+const kEmbeddingEndpoint = 'endpoint';
+const kEmbeddingOnDevice = 'onDevice';
+
 /// RAG / memory, The Journal, and character evolution intervals and toggles.
 /// (The old summary_* / auto_persona_* keys were replaced by the Journal —
 /// docs/design/journal-memory.md; stale prefs entries are harmless.)
@@ -31,6 +36,15 @@ class MemorySettings with SettingsBase {
   int _ragWindowSize = 5;
   String _ragEmbeddingSource = 'auto';
   String _ragEmbeddingModel = 'text-embedding-3-small';
+
+  // Memory search's embedding model. An empty provider was never chosen:
+  // EmbeddingService keeps an install that already set up the on-device
+  // model on it and starts everyone else on a model server. The index
+  // model names the model the stored vectors came from ('' = none yet).
+  String _embeddingProvider = '';
+  String _embeddingEndpointUrl = '';
+  String _embeddingEndpointModel = '';
+  String _embeddingIndexModel = '';
 
   // The Journal (docs/design/journal-memory.md §6) — per-chat, per-character
   // memory cards + "Where we are" recap. Enabled by default (flagship;
@@ -61,6 +75,14 @@ class MemorySettings with SettingsBase {
   String get ragEmbeddingSource => _ragEmbeddingSource;
   String get ragEmbeddingModel => _ragEmbeddingModel;
 
+  String get embeddingProvider => _embeddingProvider;
+  String get embeddingEndpointUrl => _embeddingEndpointUrl;
+  String get embeddingEndpointModel => _embeddingEndpointModel;
+  String get embeddingIndexModel => _embeddingIndexModel;
+
+  /// The first-run Memory consent, written by the sidebar under a bare key.
+  bool get ragSetupConsented => prefs?.getBool('rag_setup_consented') ?? false;
+
   bool get journalEnabled => _journalEnabled;
   int get journalInterval => _journalInterval;
   int get journalMaxCards => _journalMaxCards;
@@ -80,6 +102,11 @@ class MemorySettings with SettingsBase {
     _ragEmbeddingSource = prefs?.getString(k('rag_embedding_source')) ?? 'auto';
     _ragEmbeddingModel =
         prefs?.getString(k('rag_embedding_model')) ?? 'text-embedding-3-small';
+    _embeddingProvider = prefs?.getString(k('embedding_provider')) ?? '';
+    _embeddingEndpointUrl = prefs?.getString(k('embedding_endpoint_url')) ?? '';
+    _embeddingEndpointModel =
+        prefs?.getString(k('embedding_endpoint_model')) ?? '';
+    _embeddingIndexModel = prefs?.getString(k('embedding_index_model')) ?? '';
 
     _journalEnabled = prefs?.getBool(k('journal_enabled')) ?? true;
     _journalInterval = prefs?.getInt(k('journal_interval')) ?? 10;
@@ -125,6 +152,33 @@ class MemorySettings with SettingsBase {
   Future<void> setRagEmbeddingModel(String value) async {
     _ragEmbeddingModel = value;
     await prefs?.setString(k('rag_embedding_model'), value);
+    notify();
+  }
+
+  Future<void> setEmbeddingProvider(String value) async {
+    _embeddingProvider = value;
+    await prefs?.setString(k('embedding_provider'), value);
+    notify();
+  }
+
+  Future<void> setEmbeddingEndpointUrl(String value) async {
+    _embeddingEndpointUrl = value.trim();
+    await prefs?.setString(k('embedding_endpoint_url'), _embeddingEndpointUrl);
+    notify();
+  }
+
+  Future<void> setEmbeddingEndpointModel(String value) async {
+    _embeddingEndpointModel = value.trim();
+    await prefs?.setString(
+      k('embedding_endpoint_model'),
+      _embeddingEndpointModel,
+    );
+    notify();
+  }
+
+  Future<void> setEmbeddingIndexModel(String value) async {
+    _embeddingIndexModel = value;
+    await prefs?.setString(k('embedding_index_model'), value);
     notify();
   }
 

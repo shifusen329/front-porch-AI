@@ -56,6 +56,8 @@ class WebServerDeps {
     this.backendFacade,
     this.imageFacade,
     this.voiceFacade,
+    this.memorySearchFacade,
+    this.chatStageFacade,
     this.storyFacade,
     this.storyExportFacade,
     this.tunnelManager,
@@ -132,6 +134,13 @@ class WebServerDeps {
   /// Voice adapter (TTS synthesis + STT transcription) — null until the TTS and
   /// STT services are injected.
   final VoiceFacade? voiceFacade;
+
+  /// Memory search adapter (embedding model choice, re-vectorize) — null
+  /// until the chat service is injected.
+  final MemorySearchFacade? memorySearchFacade;
+
+  /// Visual novel stage adapter — null until the chat service is injected.
+  final ChatStageFacade? chatStageFacade;
 
   /// Porch Stories adapter — null until the story repository + pipeline are
   /// injected.

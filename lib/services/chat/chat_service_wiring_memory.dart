@@ -39,6 +39,7 @@ extension ChatServiceWiringMemory on ChatService {
       // Availability-guarded single-text embedder; null when RAG is off or the
       // sidecar is down, which just disables cold-card recall (no-RAG floor).
       embedText: (text) async => await _memoryService?.embedText(text),
+      embedQuery: (text) async => await _memoryService?.embedQueryText(text),
     );
   }
 

@@ -107,6 +107,12 @@ shelf.Handler buildWebHandler(WebServerDeps deps) {
     );
   }
   if (deps.voiceFacade != null) WebVoiceRoutes(deps.voiceFacade!, router);
+  if (deps.memorySearchFacade != null) {
+    WebMemorySearchRoutes(deps.memorySearchFacade!, router);
+  }
+  if (deps.chatStageFacade != null) {
+    WebChatStageRoutes(deps.chatStageFacade!, router);
+  }
   if (deps.storyFacade != null) {
     // Studio first: its fixed paths must beat the `<id>` params below.
     WebStoryStudioRoutes(deps.storyFacade!, router);

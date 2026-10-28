@@ -5,6 +5,10 @@
 // over the same state and actions the desktop uses, with no business logic
 // of its own. Files inside this directory import each other directly.
 
+export 'chat/chat_panel_sheet.dart';
+export 'chat/composer_tools_sheet.dart';
+export 'chat/phone_chat_chrome.dart';
+export 'chat/phone_composer.dart';
 export 'chats/chats_sheets.dart';
 export 'chats/chats_tab.dart';
 export 'chats/recent_chat_row.dart';

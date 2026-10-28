@@ -130,11 +130,17 @@ class _MemoryPanelState extends State<MemoryPanel> {
                     storage.memorySettings.setRagEnabled(false);
                     return;
                   }
-                  // Turning ON — check if consent was given before
+                  // Turning ON — check if consent was given before. A model
+                  // server downloads nothing, so it needs none.
                   final prefs = await SharedPreferences.getInstance();
                   final consented =
                       prefs.getBool('rag_setup_consented') ?? false;
-                  if (consented) {
+                  if (!context.mounted) return;
+                  final emb = Provider.of<EmbeddingService>(
+                    context,
+                    listen: false,
+                  );
+                  if (consented || emb.usesEndpoint) {
                     // Already consented — just enable
                     storage.memorySettings.setRagEnabled(true);
                     Provider.of<EmbeddingService>(

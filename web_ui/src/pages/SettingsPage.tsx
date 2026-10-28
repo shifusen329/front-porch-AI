@@ -15,6 +15,8 @@ import { PromptSettingsCard } from '../components/PromptSettingsCard';
 import { ModelTransportCard } from '../components/ModelTransportCard';
 import { IdleUnloadSettings } from '../components/IdleUnloadSettings';
 import { KeepRecentChatsSettings } from '../components/KeepRecentChatsSettings';
+import { MemorySearchSettings } from '../components/MemorySearchSettings';
+import { VisualNovelSettings } from '../components/VisualNovelSettings';
 import { applySpellCheckLang } from '../spellCheckLang';
 import {
   StepUpFields,
@@ -375,6 +377,7 @@ export function SettingsPage() {
           <AppearanceSettings />
           <ReadingSizeSettings />
           <ChatColorsSettings />
+          <VisualNovelSettings />
         </div>
 
         <PromptSettingsCard
@@ -575,6 +578,8 @@ export function SettingsPage() {
             onTotpRequired={() => setTotpEnabled(true)}
           />
         </section>
+
+        <MemorySearchSettings />
 
         {/* The desktop has these two in Advanced Launch Options. */}
         {isManagedLocal && (

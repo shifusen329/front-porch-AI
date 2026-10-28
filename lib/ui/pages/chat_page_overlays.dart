@@ -113,6 +113,9 @@ class ChatSurface extends StatelessWidget {
     };
     final bgPath = bgAssets[bgKey];
     final bgPathExists = bgPath != null;
+    // Visual novel: the characters stand on the background and the log
+    // sits in a panel over them; the dimmed expression backdrop gives way.
+    final novel = visualNovelOn(chatService, storageService);
 
     // Check for matching custom background
     Map<String, String>? customEntry;
@@ -162,7 +165,8 @@ class ChatSurface extends StatelessWidget {
                         storage.expressionSettings.expressionDisplayMode;
                     final isEnabled =
                         storage.expressionSettings.expressionEnabled;
-                    if (!isEnabled ||
+                    if (novel ||
+                        !isEnabled ||
                         displayMode == 'sidebar' ||
                         chat.isEvaluatingRealism) {
                       return const SizedBox.shrink();
@@ -235,49 +239,57 @@ class ChatSurface extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (novel) Positioned.fill(child: VisualNovelStageLayer()),
               ],
             ),
           ),
         ),
         // The page skips streamed-text ticks; the transcript takes them.
         Consumer<ChatService>(
-          builder: (context, chatService, _) =>
-              // Suggested-action pills fill the message box instead of sending.
-              ComposerDraftScope(
-                controller: controller,
-                focusNode: focusNode,
-                onSend: (text) => chatService.sendMessage(text),
-                child: ChatMessageList(
-                  key: _transcriptListKey,
-                  sessionId: chatService.currentSessionId,
-                  messages: chatService.messages,
-                  controller: scrollController,
-                  window: window,
-                  onNeedOlderHistory: chatService.hasOlderHistory
-                      ? () => chatService.loadOlderHistory()
-                      : null,
-                  replyStreaming: chatService.isGenerating,
-                  followStreamingReplies:
-                      storageService.uiSettings.followStreamingReplies,
-                  resolveSpeaker: (msg) => resolveSpeaker(chatService, msg),
-                  characterFor: (msg) => isGroup && !msg.isUser
-                      ? resolveGroupSpeakerForMessage(
-                          chatService.groupCharacters,
-                          msg,
-                        )
-                      : character,
-                  chatService: chatService,
-                  bubbleKeyOf: bubbleKeyFor,
-                  jumpFlash: jumpFlash,
-                  generatingImage: chatService.isGeneratingChatImage,
-                  externalImagesAllowed: externalImagesAllowed,
-                  onRequestImagePermission: onRequestImagePermission,
-                ),
+          builder: (context, chatService, _) => _logPanel(
+            novel,
+            // Suggested-action pills fill the message box instead of sending.
+            ComposerDraftScope(
+              controller: controller,
+              focusNode: focusNode,
+              onSend: (text) => chatService.sendMessage(text),
+              child: ChatMessageList(
+                key: _transcriptListKey,
+                sessionId: chatService.currentSessionId,
+                messages: chatService.messages,
+                controller: scrollController,
+                window: window,
+                onNeedOlderHistory: chatService.hasOlderHistory
+                    ? () => chatService.loadOlderHistory()
+                    : null,
+                replyStreaming: chatService.isGenerating,
+                followStreamingReplies:
+                    storageService.uiSettings.followStreamingReplies,
+                resolveSpeaker: (msg) => resolveSpeaker(chatService, msg),
+                characterFor: (msg) => isGroup && !msg.isUser
+                    ? resolveGroupSpeakerForMessage(
+                        chatService.groupCharacters,
+                        msg,
+                      )
+                    : character,
+                chatService: chatService,
+                bubbleKeyOf: bubbleKeyFor,
+                jumpFlash: jumpFlash,
+                generatingImage: chatService.isGeneratingChatImage,
+                externalImagesAllowed: externalImagesAllowed,
+                onRequestImagePermission: onRequestImagePermission,
               ),
+            ),
+          ),
         ),
       ],
     );
   }
+
+  /// The transcript, in the visual-novel log panel when [novel]. The same
+  /// keyed list either way, so switching keeps its scroll position.
+  Widget _logPanel(bool novel, Widget transcript) =>
+      novel ? VisualNovelLogPanel(child: transcript) : transcript;
 }
 
 /// Page-level overlays, laid over the whole chat Scaffold as Stack children.
@@ -317,4 +329,39 @@ List<Widget> buildChatPageOverlays(
       ),
     ),
   ];
+}
+
+/// A TTS failure (an ElevenLabs quota, say), long enough to read.
+void showTtsErrorSnackBar(BuildContext context, String error) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: StatusColors.onFill,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              error,
+              style: const TextStyle(color: StatusColors.onFill),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: StatusColors.errorToast,
+      duration: const Duration(seconds: 6),
+      behavior: SnackBarBehavior.floating,
+      // Opt out of Flutter's persist-when-action default so the 6s duration
+      // is honored (otherwise this error toast never leaves the screen).
+      persist: false,
+      action: SnackBarAction(
+        label: 'OK',
+        textColor: StatusColors.onFillMuted,
+        onPressed: () {},
+      ),
+    ),
+  );
 }
