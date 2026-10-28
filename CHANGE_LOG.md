@@ -3,6 +3,36 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-27 22:40:51 -0500 (CDT)
+
+On the `uiux` branch, from `dev` at `c009330c`.
+
+### Changed
+
+- **On a phone the app no longer draws under the status bar** (`ad5d5269`).
+  It runs edge to edge: the status and navigation bars are transparent, and
+  their icons follow the app's own light or dark theme rather than the
+  phone's setting. Before, the clock sat on top of the "FRONT PORCH AI"
+  title.
+- **The phone opens on the app's dark background** (`ad5d5269`) instead of
+  a white launch screen.
+- **Android's predictive back is switched on** (`ad5d5269`). A slow back
+  swipe previews the page underneath before it commits.
+- The library's view state (search, folder, sort, grid size, selection and
+  each card's last activity) moved out of the Home page into its own
+  controller, and the chat screen's desktop layout into its own widget
+  (`ad5d5269`). Nothing changes on the desktop. This makes room for the
+  phone layouts, since both page files were at the 500-line limit.
+
+### Known gaps
+
+- The phone layout is still the desktop one apart from the status bar: the
+  fixed sidebar, the squeezed chat, Settings rows wrapping a word per line,
+  and Create Character's **Next** off-screen in portrait. The phone shell is
+  the next step.
+- The chat's composer still sits on the gesture bar at the bottom of the
+  screen.
+
 ## 2026-10-27 20:58:54 -0500 (CDT)
 
 ### Added
