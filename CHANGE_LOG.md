@@ -3,6 +3,81 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-28 03:55:27 -0500 (CDT)
+
+On the `uiux` branch.
+
+### Added
+
+- **Memory search on a model server of your own** (`96642bf3`). Settings →
+  Backend → **Memory search** chooses the embedding model behind Memory
+  (RAG), Journal recall and the Data Bank: a model server (Ollama, or any
+  OpenAI-compatible one) or the model that runs on this device.
+  - Type the server's address and press **Load models**: the dropdown lists
+    its embedding models. Ollama says which models embed; for other servers
+    they are picked out by name. The API key is optional.
+  - Search queries and saved text are worded the way each model family
+    expects (nomic, Snowflake Arctic, e5, bge, mxbai, Qwen3), so searches
+    find more.
+  - A new install starts on a model server. One that already set up the
+    on-device model keeps it.
+  - **Clear and re-vectorize everything** gives every saved memory, Journal
+    card and Data Bank entry a new vector from the current model, keeping
+    the text. It can be stopped and finished later with **Vectorize the
+    missing**, and it refuses to start when the model cannot be reached.
+    When the saved vectors came from another model, the card says so: old
+    memories are not found until you re-vectorize.
+  - The phone web app has the same card in its Settings → Backend.
+- **Visual novel mode** (`96642bf3`). Settings → Appearance → Chat
+  Appearance → **Visual novel mode**, and for one chat in its UI Settings
+  (As Settings, On or Off).
+  - The characters stand on stage over the chat's background, each in the
+    expression image for how they feel, or their portrait when they have
+    none. In a group each wears their own feeling and the last speaker
+    stands in front. Animated GIF and WebP expressions play.
+  - The chat sits in a see-through panel over the lower part of the stage.
+    Drag its handle to give it more or less room, or tap it to read the
+    whole chat and tap again to see the stage.
+  - The phone web app has both switches and shows the same stage.
+- **The chat screen on a phone** (`96642bf3`). The side panel opens over the
+  chat as a sheet from **Stats & story** in the app bar, instead of a column
+  squeezing the chat. The message box gets the width: beside it are only
+  **+** and one button, which is Send, Stop while a reply is written, or the
+  mic when voice input is on and the box is empty. **+** holds Persona,
+  Attach photo, Image Studio and Impersonate, and the chat menu moved to the
+  app bar's ⋮. The composer stays clear of the gesture bar.
+
+### Changed
+
+- Long chat names in the app bar end in "…" instead of overflowing
+  (`96642bf3`).
+- The Memory sidebar says which model server memory search uses, and
+  offers the on-device download when no model is set (`96642bf3`).
+
+### Fixed
+
+- **Text-to-speech on your own server says why it is silent** (`0ae8738c`).
+  A self-hosted OpenAI-compatible server (an omnivoice box, say) no longer
+  needs an API key. When it refuses, for an unsupported model such as the
+  default `tts-1` or a voice it does not have, the chat shows its reason,
+  on the desktop, the phone and the phone web app's Speak button.
+- Checking the memory model right after choosing it reports its answer, not
+  "not ready" (`96642bf3`).
+
+### Known gaps
+
+- The phone chat screen and visual novel mode have not been tried on a
+  phone yet; their tests run on the desktop runner and have not run on a
+  device.
+- On a phone the chat bubbles keep the desktop's avatar column and header
+  icons; a sheet for a message's actions is still to come.
+- A chat never opened with Memory on is indexed only once it is opened and
+  a reply arrives; re-vectorizing works on what is already saved.
+- Video expressions (webm, mp4) do not play on the stage. The phone web
+  app's stage follows the chat's turns, so changing the switch on the
+  desktop shows there at the next turn.
+- OpenAI's own TTS server with no API key still fails without a message.
+
 ## 2026-10-28 00:36:03 -0500 (CDT)
 
 On the `uiux` branch.
