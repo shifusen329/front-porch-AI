@@ -206,3 +206,4 @@ macos/Podfile.lock
 # graphify knowledge-graph output (a local tool, not part of the app).
 graphify-out/
 lib/graphify-out/
+.debug/
