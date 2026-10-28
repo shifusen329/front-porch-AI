@@ -20,6 +20,7 @@ import 'package:flutter/widgets.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/web_server_host.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
+import 'package:front_porch_ai/utils/utils.dart' show PlatformCaps;
 import 'package:provider/provider.dart';
 
 /// Post-first-frame chores MyApp starts once its home has built. Each takes
@@ -45,12 +46,15 @@ Future<void> checkForAppUpdates(BuildContext context) async {
 /// installed; it is optional.
 Future<void> checkKoboldEngine(BuildContext context) async {
   final manager = Provider.of<BackendManager>(context, listen: false);
+  if (manager.localUnsupported) return;
   final gate = await manager.updateGate();
   if (gate == KoboldUpdateGate.nothing || !context.mounted) return;
   await KoboldUpdateDialog.show(context, manager, gate);
 }
 
 Future<void> autoStartWebServer(BuildContext context) async {
+  // A phone is the PWA's client, and cannot find its bundle inside the APK.
+  if (!PlatformCaps.current.canHostWebServer) return;
   final storage = Provider.of<StorageService>(context, listen: false);
   await storage.initialized;
   if (!storage.webServerSettings.webServerEnabled) return;

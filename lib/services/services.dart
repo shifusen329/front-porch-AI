@@ -73,6 +73,7 @@ export 'kobold_service.dart';
 export 'kobold_speed_test.dart';
 export 'chat_service.dart';
 export 'backend_manager.dart';
+export 'backend/local_engine_support.dart';
 export 'opencode/opencode.dart';
 export 'open_router_service.dart';
 export 'openrouter_structured_eval.dart';

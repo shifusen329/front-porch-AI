@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain http:// is allowed so a model server on the LAN or a Tailscale
+     address (KoboldCpp, LM Studio, Ollama) can be reached through Custom.
+     Android 9+ blocks cleartext by default, and the config cannot scope it
+     to private IP ranges, so it is allowed app-wide. Cloud hosts are https. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

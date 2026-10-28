@@ -20,6 +20,7 @@ import 'dart:io';
 
 // A leaf, not kobold.dart: the barrel loops back through storage_service.dart.
 import 'package:front_porch_ai/services/kobold/kcpps_codec.dart';
+import 'package:front_porch_ai/utils/utils.dart' show PlatformCaps;
 
 import 'chat_context_fields.dart';
 import 'kobold_launch_fields.dart';
@@ -28,6 +29,11 @@ import 'preset_settings.dart'; // for parseKcppsFile (static)
 import 'remote_api_key_vault.dart';
 import 'remote_model_memory.dart';
 import 'worker_backend_settings.dart';
+
+/// The host a fresh install starts on: the app's own KoboldCpp where it can
+/// run, a REST host (OpenRouter) on a phone.
+String get _defaultBackendType =>
+    PlatformCaps.current.canRunLocalEngine ? 'kobold' : 'openRouter';
 
 /// Backend, remote API, reasoning, Kobold launch flags, model/kcpps paths,
 /// GPU/context etc.
@@ -40,7 +46,7 @@ class BackendSettings
         WorkerBackendFields,
         KoboldLaunchFields,
         ChatContextFields {
-  String _backendType = 'kobold'; // 'kobold' or 'openRouter'
+  String _backendType = _defaultBackendType; // 'kobold' / 'openRouter' / 'omlx'
   bool _backendChoiceDone = false; // first-launch engine choice answered
   String _remoteApiKey = '';
   String _remoteApiUrl = 'https://openrouter.ai/api/v1';
@@ -157,7 +163,7 @@ class BackendSettings
   int get gpuLayers => _gpuLayers;
 
   void load() {
-    _backendType = prefs?.getString(k('backend_type')) ?? 'kobold';
+    _backendType = prefs?.getString(k('backend_type')) ?? _defaultBackendType;
     _remoteApiKey = prefs?.getString(k('remote_api_key')) ?? '';
     _remoteApiUrl =
         prefs?.getString(k('remote_api_url')) ?? 'https://openrouter.ai/api/v1';

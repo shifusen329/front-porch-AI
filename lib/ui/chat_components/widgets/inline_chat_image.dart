@@ -227,7 +227,7 @@ class _InlineChatImageState extends State<InlineChatImage> {
         await Process.run('explorer', ['/select,', widget.path]);
       } else if (Platform.isMacOS) {
         await Process.run('open', ['-R', widget.path]);
-      } else {
+      } else if (Platform.isLinux) {
         await Process.run('xdg-open', [p.dirname(widget.path)]);
       }
     } catch (e) {

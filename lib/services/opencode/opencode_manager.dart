@@ -28,6 +28,7 @@ import 'package:front_porch_ai/services/opencode/opencode_paths.dart';
 import 'package:front_porch_ai/services/opencode/opencode_pin.dart';
 import 'package:front_porch_ai/services/opencode/opencode_process.dart';
 import 'package:front_porch_ai/services/opencode/opencode_version.dart';
+import 'package:front_porch_ai/utils/utils.dart' show PlatformCaps;
 
 /// Downloads, starts, and stops a private OpenCode the way Porch owns Kobold.
 /// Never uses the Homebrew binary or `~/.config/opencode`.
@@ -109,6 +110,10 @@ class OpenCodeManager extends ChangeNotifier {
   /// First-use grab. If a binary is already in the closet, leave it — upgrades
   /// are a tap, same as Kobold's ensureEngineInstalled.
   Future<void> ensureInstalled({void Function(double p)? onProgress}) async {
+    // Never fetch a binary this host will refuse to execute (Android 10+).
+    if (!PlatformCaps.current.canSpawnProcesses) {
+      throw UnsupportedError('Waifu Coder needs the desktop app.');
+    }
     await closet.ensureLayout();
     if (openCodeLooksLikeBrewPath(closet.binaryPath)) {
       throw StateError('OpenCode closet resolved to a brew path');

@@ -43,6 +43,7 @@ export 'output_sanitizer_regex.dart';
 export 'path_exists_memo.dart';
 export 'persona_colors.dart';
 export 'picker_prefs.dart';
+export 'platform_caps.dart';
 export 'png_metadata_utils.dart';
 export 'quoted_speech.dart';
 export 'readable_dialogue_tint.dart';

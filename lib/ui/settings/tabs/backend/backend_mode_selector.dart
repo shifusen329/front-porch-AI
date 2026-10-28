@@ -63,8 +63,8 @@ class BackendModeSelector extends StatelessWidget {
       children: [
         const SectionHeader('Chat speech'),
         const SizedBox(height: 8),
-        // Intel Mac warning banner.
-        if (backendManager.isIntelMac) ...[
+        // No-local-engine banner (Intel Mac, phone).
+        if (backendManager.localUnsupported) ...[
           Container(
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.only(bottom: 8),
@@ -85,7 +85,7 @@ class BackendModeSelector extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    kIntelMacLocalUnsupported,
+                    backendManager.localUnsupportedMessage,
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.taskAccentOf(context),
@@ -108,7 +108,7 @@ class BackendModeSelector extends StatelessWidget {
               RemoteProviderBar(
                 selected: kind,
                 showOmlx: Platform.isMacOS,
-                koboldEnabled: !backendManager.isIntelMac,
+                koboldEnabled: !backendManager.localUnsupported,
                 onSelected: (next) async {
                   await applyRemoteProvider(
                     kind: next,

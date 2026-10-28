@@ -21,9 +21,13 @@ import 'package:flutter/material.dart';
 import 'package:front_porch_ai/services/storage/settings/remote_provider.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 import 'package:front_porch_ai/ui/theme/creator_palette.dart';
+import 'package:front_porch_ai/utils/utils.dart';
 
 /// One-row host switcher (KoboldCpp / OpenRouter / Nano-GPT / xAI /
 /// LM Studio / oMLX / Custom). oMLX is omitted unless [showOmlx] is true (macOS).
+/// On a phone ([PlatformCaps]) KoboldCpp and LM Studio are omitted too: the
+/// app cannot run the one, and the other's `localhost` is the phone itself.
+/// A server on another computer goes in through Custom.
 class RemoteProviderBar extends StatelessWidget {
   const RemoteProviderBar({
     super.key,
@@ -68,9 +72,16 @@ class RemoteProviderBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final source = remoteHostsOnly ? _remoteHosts : _all;
+    final caps = PlatformCaps.current;
     final items = [
       for (final e in source)
-        if (e.$1 != RemoteProviderKind.omlx || showOmlx) e,
+        if (switch (e.$1) {
+          RemoteProviderKind.omlx => showOmlx,
+          RemoteProviderKind.kobold => caps.canRunLocalEngine,
+          RemoteProviderKind.lmStudio => caps.hasLoopbackPresets,
+          _ => true,
+        })
+          e,
     ];
     _Pill pill((RemoteProviderKind, String) e, {bool wrapped = false}) => _Pill(
       label: e.$2,

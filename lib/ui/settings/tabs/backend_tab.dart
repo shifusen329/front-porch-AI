@@ -98,7 +98,7 @@ class BackendTab extends StatelessWidget {
               availableModels: availableModels,
               onModelsFetched: onModelsFetched,
             ),
-          if (llmProvider.hasManagedProcess && !backendManager.isIntelMac)
+          if (llmProvider.hasManagedProcess && !backendManager.localUnsupported)
             EngineRecheck(
               child: ManagedBackendSection(
                 selectedModelPath: selectedModelPath,

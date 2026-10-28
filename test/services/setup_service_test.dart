@@ -16,6 +16,7 @@ import 'package:front_porch_ai/services/kobold_service.dart';
 import 'package:front_porch_ai/services/setup_service.dart';
 import 'package:front_porch_ai/services/storage/settings/backend_settings.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
+import 'package:front_porch_ai/utils/utils.dart';
 
 class FakeStorageService extends ChangeNotifier implements StorageService {
   FakeStorageService({String type = 'kobold', bool choiceDone = false}) {
@@ -169,6 +170,25 @@ void main() {
 
     expect(setup.currentStep, SetupStep.complete);
     expect(storage.backendSettings.backendChoiceDone, isTrue);
+    expect(backend.ensureCalls, 0);
+    expect(backend.downloadCalls, 0);
+  });
+
+  test('a phone starts on a REST host and never fetches an engine', () async {
+    PlatformCaps.debugOverride = const PlatformCaps(isDesktop: false);
+    addTearDown(() => PlatformCaps.debugOverride = PlatformCaps.host());
+
+    final fresh = BackendSettings()..initializeBase(null, () {});
+    fresh.load();
+    expect(fresh.backendType, 'openRouter');
+
+    final storage = FakeStorageService();
+    final backend = FakeBackendManager();
+    final setup = build(storage, backend);
+
+    await setup.runAutoSetup();
+
+    expect(setup.currentStep, SetupStep.complete);
     expect(backend.ensureCalls, 0);
     expect(backend.downloadCalls, 0);
   });

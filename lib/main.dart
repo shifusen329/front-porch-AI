@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
@@ -34,15 +35,20 @@ import 'package:front_porch_ai/services/web/web_server_host.dart';
 import 'package:front_porch_ai/ui/layout/main_layout.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
-import 'package:front_porch_ai/utils/utils.dart' show StartupTrace;
+import 'package:front_porch_ai/utils/utils.dart'
+    show PlatformCaps, StartupTrace;
 
 void _mark(String step) => StartupTrace.mark(step);
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   _mark('binding ready');
-  await windowManager.ensureInitialized();
-  _mark('windowManager.ensureInitialized');
+  // A phone has no window_manager plugin; its activity is the window.
+  final hasWindow = PlatformCaps.current.hasWindowManager;
+  if (hasWindow) {
+    await windowManager.ensureInitialized();
+    _mark('windowManager.ensureInitialized');
+  }
 
   // Ordered startup phases — each lives in lib/app/ (startup_phases.dart,
   // main_window.dart, root_providers.dart). The ORDER of these calls is the
@@ -69,7 +75,7 @@ void main(List<String> args) async {
     await showMainWindow(background: background);
     return;
   }
-  await showMainWindow(background: background);
+  if (hasWindow) await showMainWindow(background: background);
   runApp(root());
 }
 
@@ -108,6 +114,12 @@ class _MyAppState extends State<MyApp>
     if (Platform.isMacOS) {
       _appExitListener = AppLifecycleListener(
         onExitRequested: _onAppExitRequested,
+      );
+    } else if (!PlatformCaps.current.hasWindowManager) {
+      // A phone has no quit: the OS kills a backgrounded app without a
+      // close event, so chat saves are drained each time it leaves view.
+      _appExitListener = AppLifecycleListener(
+        onPause: () => unawaited(AppShutdown.flushChatSaves(context)),
       );
     }
     // Run migration after first frame

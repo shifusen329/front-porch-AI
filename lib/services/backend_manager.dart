@@ -273,12 +273,12 @@ class BackendManager extends ChangeNotifier {
   /// engine (first-launch choice, engine-status chip, model-download trigger,
   /// and every "backend not found" launch path funnel through here). A no-op
   /// whenever downloading would be wrong: engine already installed, download
-  /// already running, a remote/own backend selected, or an Intel Mac.
+  /// already running, a remote/own backend selected, or no engine can run.
   /// Progress rides the existing [isDownloading]/[downloadProgress]/
   /// [statusMessage] notifier fields — callers just fire and forget.
   Future<void> ensureEngineInstalled() async {
     await architectureKnown;
-    if (_isDownloading || _backendPath != null || isIntelMac) return;
+    if (_isDownloading || _backendPath != null || localUnsupported) return;
     await _storageService.initialized;
     final backendType = _storageService.backendSettings.backendType;
     if (backendType == 'openRouter' || backendType == 'omlx') return;
@@ -304,10 +304,9 @@ class BackendManager extends ChangeNotifier {
     if (_isDownloading) return;
     if (_storageService.rootPath == null) return;
 
-    // Intel Macs cannot run KoboldCpp (no Metal GPU acceleration)
-    if (isIntelMac) {
-      _error =
-          'Local inference is not supported on Intel Macs. Please use Remote API mode.';
+    // Intel Macs (no Metal GPU acceleration) and phones cannot run KoboldCpp.
+    if (localUnsupported) {
+      _error = localUnsupportedMessage;
       _statusMessage = 'Unsupported';
       notify();
       return;
@@ -441,7 +440,7 @@ class BackendManager extends ChangeNotifier {
     await _storageService.initialized;
     await engineChecked;
     return decideKoboldUpdateGate(
-      installed: _backendPath != null && !isIntelMac,
+      installed: _backendPath != null && !localUnsupported,
       installedVersion: installedVersion,
       autoCheck: autoCheck,
       awaitVersionCheck: awaitVersionCheck,

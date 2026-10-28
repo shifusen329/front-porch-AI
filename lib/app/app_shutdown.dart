@@ -35,6 +35,26 @@ class AppShutdown {
   bool get started => _started;
   bool _started = false;
 
+  /// Drains the chat save chain and writes the live state once more. The
+  /// last turn's post-generation Needs vector + Realism scalars are applied
+  /// in memory and reach the DB only through _saveChat(); some of those saves
+  /// are fire-and-forget, so one can still be queued or mid-commit when the
+  /// process ends. This is the fix for "the needs deltas from the last
+  /// character message didn't stick after closing and reopening the app."
+  ///
+  /// The desktop runs it on quit. A phone has no quit: the OS kills a
+  /// backgrounded app without warning, so it runs whenever the app pauses.
+  static Future<void> flushChatSaves(BuildContext context) async {
+    try {
+      await Provider.of<ChatService>(
+        context,
+        listen: false,
+      ).flushPendingSaves();
+    } catch (e) {
+      debugPrint('AG_DEBUG: Error flushing chat save: $e');
+    }
+  }
+
   /// [context] must sit below the app's provider graph. Never returns on a
   /// desktop platform: every branch ends the process.
   Future<void> run(BuildContext context, WindowBoundsTracker bounds) async {
@@ -42,22 +62,9 @@ class AppShutdown {
     _started = true;
     await bounds.save();
 
-    // Flush any pending chat save BEFORE tearing anything down. The last turn's
-    // post-generation Needs vector + Realism scalars are applied in memory and
-    // reach the DB only through _saveChat(); some of those saves are
-    // fire-and-forget, so one can still be queued or mid-commit at close time.
-    // Awaiting the flush drains the save chain and writes the live state once
-    // more, so exit(0)/destroy() below can't kill an in-flight write. This is
-    // the fix for "the needs deltas from the last character message didn't
-    // stick after closing and reopening the app."
-    try {
-      await Provider.of<ChatService>(
-        context,
-        listen: false,
-      ).flushPendingSaves();
-    } catch (e) {
-      debugPrint('AG_DEBUG: Error flushing chat save on window close: $e');
-    }
+    // Flush any pending chat save BEFORE tearing anything down, so
+    // exit(0)/destroy() below can't kill an in-flight write.
+    await flushChatSaves(context);
 
     // Stop the managed KoboldCPP backend BEFORE destroying the window. This
     // prevents an orphaned process when the app closes.

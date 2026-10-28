@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:front_porch_ai/services/backend/backend.dart';
 import 'package:front_porch_ai/services/backend_manager.dart';
 import 'package:front_porch_ai/services/kobold/kobold.dart';
 import 'package:front_porch_ai/services/kobold_service.dart';
@@ -40,8 +41,9 @@ class SetupService extends ChangeNotifier {
       return;
     }
 
-    // Intel Macs cannot run KoboldCpp — skip download and autostart entirely
-    if (_backendManager.isIntelMac) {
+    // Intel Macs and phones cannot run KoboldCpp — skip download and
+    // autostart entirely.
+    if (_backendManager.localUnsupported) {
       _currentStep = SetupStep.complete;
       notifyListeners();
       return;

@@ -18,6 +18,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:front_porch_ai/ui/window_size_env.dart';
+import 'package:front_porch_ai/utils/utils.dart' show PlatformCaps;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -35,6 +36,7 @@ class WindowBoundsTracker {
   /// Post-first-frame capture after restore, so tracking is correct even if
   /// the user maximizes without any interactive resize this session.
   Future<void> captureInitial() async {
+    if (!PlatformCaps.current.hasWindowManager) return;
     try {
       if (!await windowManager.isMaximized()) {
         final size = await windowManager.getSize();

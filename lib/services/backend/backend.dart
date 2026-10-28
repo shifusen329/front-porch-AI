@@ -24,5 +24,6 @@ export 'engine_download.dart';
 export 'engine_files.dart';
 export 'engine_naming.dart';
 export 'kobold_release.dart';
+export 'local_engine_support.dart';
 export 'update_snooze.dart';
 export 'wait_while_busy.dart';
