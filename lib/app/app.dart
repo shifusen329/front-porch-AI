@@ -23,6 +23,7 @@
 export 'app_shutdown.dart';
 export 'launch_window.dart';
 export 'main_window.dart';
+export 'phone_system_bars.dart';
 export 'post_frame_tasks.dart';
 export 'root_providers.dart';
 export 'startup_phases.dart';

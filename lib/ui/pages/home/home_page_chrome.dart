@@ -96,8 +96,10 @@ class HomeEmptyLibrary extends StatelessWidget {
               runSpacing: 12,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () =>
-                      Provider.of<AppState>(context, listen: false).setIndex(1),
+                  onPressed: () => Provider.of<AppState>(
+                    context,
+                    listen: false,
+                  ).showCreateCharacter(),
                   icon: const Icon(Icons.add_circle_outline),
                   label: const Text('Create New'),
                   style: _buttonStyle(context),

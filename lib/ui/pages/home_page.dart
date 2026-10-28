@@ -21,7 +21,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:front_porch_ai/database/database.dart';
 import 'package:front_porch_ai/providers/app_state.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/utils/utils.dart';
@@ -29,7 +28,7 @@ import 'package:front_porch_ai/ui/pages/home/cards/library_drag_payload.dart';
 import 'package:front_porch_ai/ui/pages/home/home_actions/home_actions.dart';
 import 'package:front_porch_ai/ui/pages/home/home_drop_zone.dart';
 import 'package:front_porch_ai/ui/pages/home/home_page_chrome.dart';
-import 'package:front_porch_ai/ui/pages/home/library_selection.dart';
+import 'package:front_porch_ai/ui/pages/home/library_controller.dart';
 import 'package:front_porch_ai/ui/pages/home/widgets/home_mode_toggle.dart';
 import 'package:front_porch_ai/ui/pages/story_home_view.dart';
 import 'package:front_porch_ai/ui/theme/studio_colors.dart';
@@ -44,26 +43,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String _searchQuery = '';
-  String? _activeFolderId; // null = top level view
-  // The top level and folders remember separate search scopes (#346): they
-  // offer different choices, and the top level defaults to Everywhere.
-  SearchScope _topSearchScope = SearchScope.allCharacters;
-  SearchScope _folderSearchScope = SearchScope.currentFolder;
-  SearchScope get _searchScope =>
-      _activeFolderId == null ? _topSearchScope : _folderSearchScope;
+  /// Search, folder, sort, grid size, picks and activity: what the library
+  /// shows. This page is its desktop chrome.
+  late final LibraryController _library;
+
   final _searchController = TextEditingController();
-
-  // Multi-select / Organize into folders: mode, picks, Shift anchor, drag.
-  final LibrarySelection _selection = LibrarySelection();
-
-  // Sorting
-  String _sortMode = 'name'; // 'name', 'recent', 'importDate', 'messages'
-  final Map<String, DateTime> _lastActivityCache = {};
-  final Map<String, int> _messageCountCache = {};
-
-  // Grid scale
-  double _gridScale = 300.0;
 
   // Chats / Porch Stories / Waifu Coder
   HomeMode _homeMode = HomeMode.chats;
@@ -84,28 +68,18 @@ class _HomePageState extends State<HomePage> {
       onChatClosed: _refreshLastActivityCache,
     );
     final storage = Provider.of<StorageService>(context, listen: false);
-    _readViewPrefs(storage);
+    _library = LibraryController(storage.uiSettings)
+      ..addListener(_onLibraryChanged);
     // StorageService._init() is async — settings may not be loaded yet.
     // Wait for init to complete so persisted values are reflected.
     storage.initialized.then((_) {
       if (!mounted) return;
-      setState(() => _readViewPrefs(storage));
+      _library.reloadViewPrefs();
     });
-    _selection.addListener(_onSelectionChanged);
     Future.microtask(() => _refreshLastActivityCache());
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _chats.maybeOpenChatFromEnv(),
     );
-  }
-
-  void _readViewPrefs(StorageService storage) {
-    final prefs = storage.uiSettings;
-    final scopes = SearchScope.values.asNameMap();
-    _sortMode = prefs.sortMode;
-    _gridScale = prefs.gridScale;
-    _topSearchScope = scopes[prefs.topSearchScope] ?? SearchScope.allCharacters;
-    _folderSearchScope =
-        scopes[prefs.folderSearchScope] ?? SearchScope.currentFolder;
   }
 
   // The notifiers we subscribed to, held so dispose() can unsubscribe: they
@@ -156,8 +130,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _activityRefreshDebounce?.cancel();
-    _selection
-      ..removeListener(_onSelectionChanged)
+    _library
+      ..removeListener(_onLibraryChanged)
       ..dispose();
     _searchController.dispose();
     _gridScrollController.dispose();
@@ -194,7 +168,7 @@ class _HomePageState extends State<HomePage> {
       final appState = Provider.of<AppState>(context, listen: false);
       if (appState.homeResetTick != _lastHomeResetTick) {
         _lastHomeResetTick = appState.homeResetTick;
-        setState(() => _activeFolderId = null);
+        _library.openFolder(null);
       }
     } catch (_) {}
   }
@@ -222,37 +196,23 @@ class _HomePageState extends State<HomePage> {
     setState(() {}); // Rebuild to update status bar
   }
 
-  /// Picks changed (any gesture, see [LibrarySelection]): redraw the grid.
-  void _onSelectionChanged() {
+  /// The library changed (search, folder, sort, picks, activity): redraw.
+  void _onLibraryChanged() {
     if (mounted) setState(() {});
   }
 
   Future<void> _refreshLastActivityCache() async {
-    try {
-      final db = await AppDatabase.instance();
-      final charRepo = Provider.of<CharacterRepository>(context, listen: false);
-      final activity = await loadHomeLibraryActivity(db, charRepo);
-      if (mounted) {
-        setState(() {
-          _lastActivityCache
-            ..clear()
-            ..addAll(activity.lastActivity);
-          _messageCountCache
-            ..clear()
-            ..addAll(activity.messageCounts);
-        });
-      }
-    } catch (e) {
-      debugPrint('Error refreshing activity cache: $e');
-      if (mounted) setState(() {});
-    }
+    if (!mounted) return;
+    await _library.refreshActivity(
+      Provider.of<CharacterRepository>(context, listen: false),
+    );
   }
 
   /// A drop on a folder tile or on a level of the path (null: the top
   /// level). A dragged selection moves in one go and says so; a single
   /// card moves quietly, as it always has.
   Future<void> _handleDropOnLevel(Object item, String? folderId) async {
-    final moved = await _selection.drop(
+    final moved = await _library.selection.drop(
       item,
       folderId,
       folders: Provider.of<FolderService>(context, listen: false),
@@ -266,56 +226,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// If the user is standing inside the folder being deleted, step back out
-  /// to its parent (top level when the folder was top-level).
-  void _leaveDeletedFolder(CharacterFolder folder) {
-    if (_activeFolderId != folder.id) return;
-    setState(() => _activeFolderId = folder.parentId);
-  }
-
-  /// Up one level. Subfolder cards only render inside their parent, so the
-  /// parent chain IS the navigation history — no stack needed (and the
-  /// breadcrumb trail can jump to any ancestor directly).
-  void _handleFolderNavigateBack() {
-    final folderService = Provider.of<FolderService>(context, listen: false);
-    final current = folderService.folders
-        .where((f) => f.id == _activeFolderId)
-        .firstOrNull;
-    setState(() => _activeFolderId = current?.parentId);
-  }
-
   SelectionTally _selectionTally() => tallyHomeSelection(
     context,
-    _selection,
-    activeFolderId: _activeFolderId,
-    query: _searchQuery,
-    scope: _searchScope,
-    sortMode: _sortMode,
+    _library.selection,
+    activeFolderId: _library.activeFolderId,
+    query: _library.searchQuery,
+    scope: _library.searchScope,
+    sortMode: _library.sortMode,
   );
-
-  void _handleSortChanged(String mode) {
-    setState(() => _sortMode = mode);
-    Provider.of<StorageService>(
-      context,
-      listen: false,
-    ).uiSettings.setSortMode(mode);
-  }
-
-  /// Remembered per level, like the sort: the top level offers Everywhere
-  /// and Top level only, a folder its three choices.
-  void _handleSearchScopeChanged(SearchScope scope) {
-    final prefs = Provider.of<StorageService>(
-      context,
-      listen: false,
-    ).uiSettings;
-    if (_activeFolderId == null) {
-      setState(() => _topSearchScope = scope);
-      prefs.setTopSearchScope(scope.name);
-    } else {
-      setState(() => _folderSearchScope = scope);
-      prefs.setFolderSearchScope(scope.name);
-    }
-  }
 
   /// Desktop PNG/BYAF/.porch drop on the chats library. [context] is the
   /// library view's, which survives the empty → populated switch.
@@ -385,21 +303,23 @@ class _HomePageState extends State<HomePage> {
           );
         }
 
+        final library = _library;
+        final selection = library.selection;
         return _wrapChatsWithDrop(
           context,
           HomeStatusFrame(
             content: CharacterCardGrid(
-              searchQuery: _searchQuery,
-              searchScope: _searchScope,
-              activeFolderId: _activeFolderId,
-              sortMode: _sortMode,
-              lastActivityCache: _lastActivityCache,
-              messageCountCache: _messageCountCache,
-              gridScale: _gridScale,
-              isSelecting: _selection.isSelecting,
-              isOrganizing: _selection.isOrganizing,
-              selectedCharacterIds: _selection.characterIds,
-              selectedGroupIds: _selection.groupIds,
+              searchQuery: library.searchQuery,
+              searchScope: library.searchScope,
+              activeFolderId: library.activeFolderId,
+              sortMode: library.sortMode,
+              lastActivityCache: library.lastActivity,
+              messageCountCache: library.messageCounts,
+              gridScale: library.gridScale,
+              isSelecting: selection.isSelecting,
+              isOrganizing: selection.isOrganizing,
+              selectedCharacterIds: selection.characterIds,
+              selectedGroupIds: selection.groupIds,
               searchController: _searchController,
               gridScrollController: _gridScrollController,
               repo: repo,
@@ -409,17 +329,17 @@ class _HomePageState extends State<HomePage> {
               onTapCharacter: _chats.tapCharacter,
               onTapGroup: _chats.tapGroup,
               onToggleSelect: (c) =>
-                  _selection.toggle(c.stableGroupId, group: false),
-              onToggleSelectGroup: (g) => _selection.toggle(g.id, group: true),
-              onToggleSelectMode: _selection.toggleSelectMode,
-              onToggleOrganizeMode: _selection.toggleOrganizeMode,
+                  selection.toggle(c.stableGroupId, group: false),
+              onToggleSelectGroup: (g) => selection.toggle(g.id, group: true),
+              onToggleSelectMode: selection.toggleSelectMode,
+              onToggleOrganizeMode: selection.toggleOrganizeMode,
               onContextMenuAction: (action, character) =>
                   runHomeCharacterMenuAction(
                     this.context,
                     action,
                     character,
                     chats: _chats,
-                    activeFolderId: _activeFolderId,
+                    activeFolderId: library.activeFolderId,
                   ),
               onImport: (source) => runHomeImportMenu(this.context, source),
               // Both draggable kinds: characters keyed by image filename, group
@@ -432,41 +352,36 @@ class _HomePageState extends State<HomePage> {
                     action,
                     folder: folder,
                     parentId: parentId,
-                    onLeaveFolder: _leaveDeletedFolder,
+                    onLeaveFolder: library.leaveDeletedFolder,
                   ),
-              onFolderTap: (folder) =>
-                  setState(() => _activeFolderId = folder.id),
-              onFolderNavigateBack: _handleFolderNavigateBack,
-              onFolderJump: (id) => setState(() => _activeFolderId = id),
-              onCancelSelection: _selection.cancel,
+              onFolderTap: (folder) => library.openFolder(folder.id),
+              onFolderNavigateBack: () => library.goUp(folderService.folders),
+              onFolderJump: library.openFolder,
+              onCancelSelection: selection.cancel,
               onDeleteSelected: (ids) => massDeleteHomeSelection(
                 this.context,
                 ids,
-                groupIds: _selection.groupIds,
+                groupIds: selection.groupIds,
                 hiddenCount: () => _selectionTally().hidden,
-                onDeleted: _selection.cancel,
+                onDeleted: selection.cancel,
               ),
               // onCreateGroup no longer wired — old select-for-group path deprecated.
               onMoveToFolder: (_) => showHomeMoveSelectionDialog(
                 this.context,
                 picks: _selectionTally(),
-                selection: _selection,
+                selection: selection,
               ),
               onExportSelected: (ids) => exportHomeSelectionPorch(
                 this.context,
                 ids,
-                groupsLeftOut: _selection.groupIds.isNotEmpty,
-                onSaved: _selection.cancel,
+                groupsLeftOut: selection.groupIds.isNotEmpty,
+                onSaved: selection.cancel,
               ),
-              onSortChanged: _handleSortChanged,
-              onGridScaleChanged: (scale) => setState(() => _gridScale = scale),
-              onGridScaleChangeEnd: (scale) => Provider.of<StorageService>(
-                this.context,
-                listen: false,
-              ).uiSettings.setGridScale(scale),
-              onSearchScopeChanged: _handleSearchScopeChanged,
-              onSearchQueryChanged: (query) =>
-                  setState(() => _searchQuery = query),
+              onSortChanged: library.setSortMode,
+              onGridScaleChanged: library.previewGridScale,
+              onGridScaleChangeEnd: library.commitGridScale,
+              onSearchScopeChanged: library.setSearchScope,
+              onSearchQueryChanged: library.setSearchQuery,
               onResolveCharImage: (c) => resolveHomeCardImage(this.context, c),
               onDeleteGroup: (group) =>
                   confirmDeleteHomeGroup(this.context, group),
@@ -477,11 +392,11 @@ class _HomePageState extends State<HomePage> {
                     action,
                     group,
                     chats: _chats,
-                    activeFolderId: _activeFolderId,
+                    activeFolderId: library.activeFolderId,
                   ),
-              onSelectAll: _selection.selectAll,
-              onSelectNone: _selection.selectNone,
-              selection: _selection,
+              onSelectAll: selection.selectAll,
+              onSelectNone: selection.selectNone,
+              selection: selection,
               onDropOnLevel: _handleDropOnLevel,
             ),
           ),

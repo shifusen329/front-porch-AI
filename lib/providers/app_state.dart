@@ -49,4 +49,18 @@ class AppState extends ChangeNotifier {
     _selectedIndex = index;
     notifyListeners();
   }
+
+  // Pages say where they want to go, not which sidebar slot that is, so a
+  // shell without the desktop sidebar can map the same intent its own way.
+  // The numbers are MainLayout's page order.
+  static const _libraryIndex = 0;
+  static const _createCharacterIndex = 1;
+
+  bool get isShowingLibrary => _selectedIndex == _libraryIndex;
+
+  /// The character library (Home). From Home itself this is a Home re-tap:
+  /// it closes the open folder.
+  void showLibrary() => setIndex(_libraryIndex);
+
+  void showCreateCharacter() => setIndex(_createCharacterIndex);
 }

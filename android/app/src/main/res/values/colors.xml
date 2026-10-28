@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppColors.background (Porch dark, the app's default theme), so the
+         window behind Flutter's first frame matches it instead of flashing white. -->
+    <color name="porch_background">#FF1B1611</color>
+</resources>

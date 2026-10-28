@@ -26,8 +26,8 @@ import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
-import 'package:front_porch_ai/ui/chat_components/overlays/absence_recap_banner.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
+import 'package:front_porch_ai/ui/pages/chat_page_chrome.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.image_consent.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.input.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.scene_dialogs.dart';
@@ -346,8 +346,8 @@ class _ChatPageState extends State<ChatPage> {
 
         return Stack(
           children: [
-            Scaffold(
-              backgroundColor: AppColors.backgroundOf(context),
+            DesktopChatChrome(
+              chatService: chatService,
               appBar: ChatPageAppBar(
                 chatService: chatService,
                 coverFor: _speakers.coverFor,
@@ -358,71 +358,31 @@ class _ChatPageState extends State<ChatPage> {
                       : SidebarTokens.widthFromEnvironment(),
                 ),
               ),
-              body: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        // "Previously on…" welcome-back banner (Living Time
-                        // §2). App-voice, dismissible, gated: enabled +
-                        // over-threshold gap + a real session.
-                        Builder(
-                          builder: (context) {
-                            // Subscribe so a settings toggle updates live;
-                            // the gate itself lives once on ChatService.
-                            Provider.of<StorageService>(context);
-                            final phrase = chatService.absenceBannerPhrase;
-                            final sid = chatService.currentSessionId;
-                            if (phrase == null || sid == null) {
-                              return const SizedBox.shrink();
-                            }
-                            return AbsenceRecapBanner(
-                              sessionId: sid,
-                              phrase: phrase,
-                              recap: chatService.summary,
-                            );
-                          },
-                        ),
-                        Expanded(
-                          child: ChatFindLayer(
-                            controller: _find,
-                            transcript: ChatSurface(
-                              transcriptListKey: _transcriptListKey,
-                              character: character,
-                              isGroup: isGroup,
-                              controller: _controller,
-                              focusNode: _chatFocusNode,
-                              scrollController: _scrollController,
-                              window: _transcriptWindow,
-                              bgExistsCache: _bgExistsCache,
-                              resolveSpeaker: _speakers.resolveSpeaker,
-                              bubbleKeyFor: _anchors.keyFor,
-                              jumpFlash: _anchors.jumpFlash,
-                              externalImagesAllowed: _imageConsent.allowed,
-                              onRequestImagePermission: () =>
-                                  _imageConsent.request(this.context),
-                            ),
-                          ),
-                        ),
-                        const LiveGenerationStatusBar(),
-                        ChatEvaluationProgress(
-                          chatService: chatService,
-                          inline: true,
-                        ),
-                        RepaintBoundary(child: _buildInputArea(chatService)),
-                      ],
-                    ),
-                  ),
-                  if (isGroup || character != null)
-                    ChatResizeSidebar(
-                      width: _sidebarWidth,
-                      onWidth: (w) => setState(() => _sidebarWidth = w),
-                      child: RepaintBoundary(
-                        child: _buildRightSidebar(chatService),
-                      ),
-                    ),
-                ],
+              transcript: ChatFindLayer(
+                controller: _find,
+                transcript: ChatSurface(
+                  transcriptListKey: _transcriptListKey,
+                  character: character,
+                  isGroup: isGroup,
+                  controller: _controller,
+                  focusNode: _chatFocusNode,
+                  scrollController: _scrollController,
+                  window: _transcriptWindow,
+                  bgExistsCache: _bgExistsCache,
+                  resolveSpeaker: _speakers.resolveSpeaker,
+                  bubbleKeyFor: _anchors.keyFor,
+                  jumpFlash: _anchors.jumpFlash,
+                  externalImagesAllowed: _imageConsent.allowed,
+                  onRequestImagePermission: () =>
+                      _imageConsent.request(this.context),
+                ),
               ),
+              inputArea: _buildInputArea(chatService),
+              // A 1:1 chat with no character returned above, so there is
+              // always a cast to show here.
+              sidebar: _buildRightSidebar(chatService),
+              sidebarWidth: _sidebarWidth,
+              onSidebarWidth: (w) => setState(() => _sidebarWidth = w),
             ),
             ...buildChatPageOverlays(
               context,

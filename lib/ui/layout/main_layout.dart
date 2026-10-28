@@ -108,29 +108,33 @@ class _MainLayoutState extends State<MainLayout> {
     // Watch AppState to rebuild on index change
     final appState = Provider.of<AppState>(context);
 
+    // No app bar takes the status bar's height on a phone, so the page
+    // keeps clear of it here. A desktop window has no insets.
     return Scaffold(
-      body: Row(
-        children: [
-          if (!appState.sidebarHidden) const Sidebar(),
-          Expanded(
-            child: Stack(
-              children: [
-                _pages[appState.selectedIndex < _pages.length
-                    ? appState.selectedIndex
-                    : 0],
-                // Managed-engine download progress / install affordance —
-                // global so the background first-launch fetch stays visible
-                // wherever the user wanders. Renders nothing when the engine
-                // is installed or a remote/own backend is selected.
-                const Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: EngineStatusChip(),
-                ),
-              ],
+      body: SafeArea(
+        child: Row(
+          children: [
+            if (!appState.sidebarHidden) const Sidebar(),
+            Expanded(
+              child: Stack(
+                children: [
+                  _pages[appState.selectedIndex < _pages.length
+                      ? appState.selectedIndex
+                      : 0],
+                  // Managed-engine download progress / install affordance —
+                  // global so the background first-launch fetch stays visible
+                  // wherever the user wanders. Renders nothing when the engine
+                  // is installed or a remote/own backend is selected.
+                  const Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: EngineStatusChip(),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

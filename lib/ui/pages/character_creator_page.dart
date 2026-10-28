@@ -186,12 +186,12 @@ class _CharacterCreatorPageState extends State<CharacterCreatorPage> {
     if (ok) {
       messenger.showSnackBar(characterCreatedSnackBar(context, name));
       _saved = true;
-      // Already on Home: leave it as it is (a second setIndex(0) would
+      // Already on Home: leave it as it is (a second showLibrary would
       // read as a Home re-tap and close the open folder). The tab underneath
       // may hold its own unsaved draft; keeping it skips the switch.
-      if (appState.selectedIndex != 0 &&
+      if (!appState.isShowingLibrary &&
           await UnsavedChanges.instance.confirmLeave(context)) {
-        appState.setIndex(0);
+        appState.showLibrary();
       }
       navigator.pop();
     } else {

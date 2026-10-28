@@ -138,14 +138,14 @@ class _CreateCharacterPageState extends State<CreateCharacterPage> {
     if (_pushed) {
       // The tab underneath may hold its own unsaved draft.
       final navigator = Navigator.of(context);
-      if (appState.selectedIndex != 0 &&
+      if (!appState.isShowingLibrary &&
           await UnsavedChanges.instance.confirmLeave(context)) {
-        appState.setIndex(0);
+        appState.showLibrary();
       }
       navigator.pop();
       return;
     }
-    appState.setIndex(0);
+    appState.showLibrary();
     setState(() {
       _currentStep = 0;
       _savedCard = null;
@@ -227,7 +227,7 @@ class _CreateCharacterPageState extends State<CreateCharacterPage> {
   Future<void> _backToHome() async {
     final appState = Provider.of<AppState>(context, listen: false);
     if (!await UnsavedChanges.instance.confirmLeave(context)) return;
-    appState.setIndex(0);
+    appState.showLibrary();
   }
 
   Widget _scaffold() {
