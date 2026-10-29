@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:front_porch_ai/app_version.dart';
+import 'package:front_porch_ai/utils/android_document_picker.dart';
 
 // Re-export the file_picker types call sites need. FilePickerResult is gone
 // since file_picker 12; we keep a local shim below.
@@ -92,8 +93,8 @@ class PickerDialogTimeout implements Exception {
 /// facade; modal lock is [WindowsOptions] / [LinuxOptions], multi-file
 /// is [FilePicker.pickFiles] (always multi), single-file is
 /// [FilePicker.pickFile], and bytes come from [PlatformFile.readAsBytes].
-/// Android SAF persistable URI grants are never enabled (we never pass
-/// AndroidOptions).
+/// Android opens files through [AndroidDocumentPicker] (the app chooser, so
+/// file managers can hand over a file); folders and saves stay here.
 ///
 /// Every open/save/directory dialog previously started at the OS default (root
 /// of the drive on macOS), which made repetitive imports from the same folder
@@ -289,6 +290,9 @@ class PickerPrefs {
     final override = testPickFilesOverride;
     if (override != null) {
       return override(category: category, allowedExtensions: allowedExtensions);
+    }
+    if (Platform.isAndroid) {
+      return AndroidDocumentPicker.pick(type, allowedExtensions, allowMultiple);
     }
     final prefs = await SharedPreferences.getInstance();
     final initialDirectory = await _initialDirectory(prefs, category);

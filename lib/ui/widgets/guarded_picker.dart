@@ -63,6 +63,14 @@ enum PickerFailureKind {
         'Nothing was imported.',
     retryLabel: 'Pick another folder',
     icon: Icons.folder_off_outlined,
+  ),
+  wrongType(
+    title: "That file can't be used here",
+    body:
+        "The file you picked isn't the kind this import reads. Nothing was "
+        'imported.',
+    retryLabel: 'Pick another file',
+    icon: Icons.insert_drive_file_outlined,
   );
 
   const PickerFailureKind({
@@ -234,11 +242,12 @@ class GuardedPicker {
       } catch (e, st) {
         debugPrint('[picker] ${kind.name} failed: $e\n$st');
         if (!context.mounted) return null;
+        final wrong = e is WrongPickedFileType ? e : null;
         final again = await showPickerFailure(
           context,
-          kind: kind,
+          kind: wrong != null ? PickerFailureKind.wrongType : kind,
           error: e,
-          tip: tip,
+          tip: wrong?.hint ?? tip,
         );
         if (!again || !context.mounted) return null;
       }

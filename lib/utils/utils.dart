@@ -26,6 +26,7 @@
 //
 // Direct imports of individual utility files remain fully supported.
 
+export 'android_document_picker.dart';
 export 'character_sort.dart';
 export 'cpu_features.dart';
 export 'default_group_name.dart';
