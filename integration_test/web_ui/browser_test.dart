@@ -32,6 +32,7 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/web_server_host.dart';
 import 'package:front_porch_ai/ui/layout/main_layout.dart';
 
+import '../../test/helpers/speech_server.dart';
 import '../support/e2e_local_model.dart';
 import '../support/e2e_sandbox.dart';
 import '../support/fake_backend.dart';
@@ -228,6 +229,9 @@ void main() {
     final sandbox = Directory.systemTemp.createTempSync('fpai_webui_');
     PathProviderPlatform.instance = SandboxPathProvider(sandbox.path);
     final backend = await FakeBackendServer.start(replyPieces: _kReplyPieces);
+    // Text-to-speech stays off (the sandbox's contract), but points at a
+    // loopback speech server, so the narration journey can switch it on.
+    final speech = await SpeechServer.start(voices: {'aisha', 'me'});
     // Keep a goal check visible until the browser uses Skip, so the progress
     // journey can exercise the real app's controls without racing a fast eval.
     backend.holdObjectiveCheck = Completer<void>();
@@ -286,6 +290,10 @@ void main() {
       'remote_api_url': '${backend.baseUrl}/v1',
       'remote_model_name': 'smoke-model',
       'web_server_enabled': false,
+      'tts_engine': 'openai',
+      'openai_tts_base_url': speech.baseUrl,
+      'openai_tts_model': SpeechServer.model,
+      'tts_voice_model': 'aisha',
     });
 
     try {

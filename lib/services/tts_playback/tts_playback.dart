@@ -21,6 +21,7 @@
 // the replay cache and the text helpers.
 export 'tts_context.dart';
 export 'tts_headless.dart';
+export 'tts_narration.dart';
 export 'tts_replay_cache.dart';
 export 'tts_speaker.dart';
 export 'tts_streamer.dart';

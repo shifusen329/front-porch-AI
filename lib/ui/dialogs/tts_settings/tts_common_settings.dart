@@ -21,8 +21,11 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/storage/storage.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 
+import 'user_voice_settings.dart';
+
 /// Settings shared by every TTS engine: speech rate, worker count (not for
-/// Piper), auto-play, narration filters and the Test Voice button. Holds the
+/// Piper), auto-play (and the user's and narrator's voices), narration
+/// filters and the Test Voice button. Holds the
 /// in-flight slider drag values itself.
 class TtsCommonSettings extends StatefulWidget {
   const TtsCommonSettings({
@@ -228,6 +231,7 @@ class _TtsCommonSettingsState extends State<TtsCommonSettings> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) => settings.setTtsAutoPlay(val),
         ),
+        UserVoiceSettings(settings: settings),
 
         const SizedBox(height: 8),
 

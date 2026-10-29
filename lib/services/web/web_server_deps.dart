@@ -58,6 +58,7 @@ class WebServerDeps {
     this.voiceFacade,
     this.memorySearchFacade,
     this.chatStageFacade,
+    this.chatNarrationFacade,
     this.storyFacade,
     this.storyExportFacade,
     this.tunnelManager,
@@ -141,6 +142,10 @@ class WebServerDeps {
 
   /// Visual novel stage adapter — null until the chat service is injected.
   final ChatStageFacade? chatStageFacade;
+
+  /// Narrate All's script for the phone web app — null until the chat
+  /// service is injected.
+  final ChatNarrationFacade? chatNarrationFacade;
 
   /// Porch Stories adapter — null until the story repository + pipeline are
   /// injected.

@@ -32,6 +32,7 @@ export 'character_library_facade.dart';
 export 'chargen_facade.dart';
 export 'chat_facade.dart';
 export 'chat_package_facade.dart';
+export 'chat_narration_facade.dart';
 export 'chat_stage_facade.dart';
 export 'chat_tools_facade.dart';
 export 'group_facade.dart';

@@ -24,3 +24,4 @@ export 'openai_tts_settings.dart';
 export 'piper_tts_settings.dart';
 export 'tts_common_settings.dart';
 export 'tts_engine_selector.dart';
+export 'user_voice_settings.dart';

@@ -193,16 +193,16 @@ class MessageBubbleHeader extends StatelessWidget {
             ),
           ),
         ],
-        // TTS speaker button
-        if (chatService != null &&
-            !message.isUser &&
-            message.sender != 'System' &&
-            !isDirectorNote)
+        // TTS speaker button: on every line that is read aloud (the user's
+        // own and the narrator's too), in the voice the line is read in.
+        if (chatService != null)
           Consumer2<TtsService, StorageService>(
             builder: (context, tts, storage, _) {
               if (!storage.ttsSettings.ttsEnabled) {
                 return const SizedBox.shrink();
               }
+              final voice = chatService!.voiceOf(message, storage.ttsSettings);
+              if (!voice.speak) return const SizedBox.shrink();
               final msgId = 'msg_$index';
               final isThisMsg = tts.currentMessageId == msgId;
               final isGeneratingThis = isThisMsg && tts.isGenerating;
@@ -275,23 +275,9 @@ class MessageBubbleHeader extends StatelessWidget {
                           if (isSpeakingThis) {
                             tts.stop();
                           } else {
-                            final chatService = Provider.of<ChatService>(
-                              context,
-                              listen: false,
-                            );
-                            String? voiceKey;
-                            if (chatService.activeGroup != null) {
-                              final charMatch = resolveGroupSpeakerForMessage(
-                                chatService.groupCharacters,
-                                message,
-                              );
-                              voiceKey = charMatch?.ttsVoice;
-                            } else {
-                              voiceKey = chatService.activeCharacter?.ttsVoice;
-                            }
                             tts.speak(
                               message.displayText,
-                              voiceKey: voiceKey,
+                              voiceKey: voice.voiceKey,
                               messageId: msgId,
                             );
                           }

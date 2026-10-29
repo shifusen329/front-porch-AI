@@ -43,7 +43,7 @@ class TtsService extends ChangeNotifier {
 
   /// In-process sherpa vits engine for Piper voices (phase 4b).
   final SherpaPiperEngine _piperNative = SherpaPiperEngine();
-  final TtsWavPlayer _player = TtsWavPlayer();
+  final TtsWavPlayer _player;
   final TtsReplayCache _cache = TtsReplayCache();
   late final TtsPlaybackState _state = TtsPlaybackState(_notify);
   late final TtsContext _context = TtsContext(
@@ -54,11 +54,21 @@ class TtsService extends ChangeNotifier {
     cache: _cache,
     piper: _piperNative,
     activeEngine: () => activeEngine,
-    stop: () => stop(),
+    // The pipelines' own stop silences the player without ending a
+    // narration: each narrated line is a speak() that stops the last one.
+    stop: _silence,
   );
   late final TtsSpeaker _speaker = TtsSpeaker(_context);
   late final TtsStreamer _streamer = TtsStreamer(_context);
   late final TtsHeadlessGenerator _headless = TtsHeadlessGenerator(_context);
+
+  /// One Narrate All line: [speak] without ending the narration it is part
+  /// of ([TtsServiceNarration.narration]).
+  Future<void> speakNarrationLine(
+    String text, {
+    String? voiceKey,
+    String? messageId,
+  }) => _speaker.speak(text, voiceKey: voiceKey, messageId: messageId);
 
   // Engines
   late final KokoroEngine _kokoroEngine = KokoroEngine(_storageService);
@@ -86,15 +96,38 @@ class TtsService extends ChangeNotifier {
   /// Speak the given text using the active TTS engine.
   ///
   /// Generates audio for the entire message first (buffered), then plays
-  /// it back seamlessly. Shows generation progress.
-  Future<void> speak(String text, {String? voiceKey, String? messageId}) =>
-      _speaker.speak(text, voiceKey: voiceKey, messageId: messageId);
+  /// it back seamlessly. Shows generation progress. Interrupts whatever is
+  /// playing, a narration included.
+  Future<void> speak(String text, {String? voiceKey, String? messageId}) {
+    _narrations[this]?.cancel(silence: false);
+    return _speaker.speak(text, voiceKey: voiceKey, messageId: messageId);
+  }
+
+  /// [speak], but after whatever is playing now has finished, so a reply
+  /// does not cut off the user's own line. Gives up if Stop is pressed
+  /// while it waits.
+  Future<void> speakAfterCurrent(
+    String text, {
+    String? voiceKey,
+    String? messageId,
+  }) async {
+    final stops = _stops;
+    while (isSpeaking && !_disposed) {
+      await (_changed ??= Completer<void>()).future;
+      if (_stops != stops) return;
+    }
+    if (_disposed) return;
+    await speak(text, voiceKey: voiceKey, messageId: messageId);
+  }
 
   /// Speak sentences as they arrive from a stream (for call mode).
   Future<void> speakStreaming(
     Stream<String> sentenceStream, {
     String? voiceKey,
-  }) => _streamer.speakStreaming(sentenceStream, voiceKey: voiceKey);
+  }) {
+    _narrations[this]?.cancel(silence: false);
+    return _streamer.speakStreaming(sentenceStream, voiceKey: voiceKey);
+  }
 
   /// Generate audio for the given text and return the WAV file without playing.
   /// Used by the web server to stream audio to the browser.
@@ -283,7 +316,9 @@ class TtsService extends ChangeNotifier {
   /// Whether the active engine's model files are already downloaded.
   Future<bool> isModelDownloaded() => activeEngine.isAvailable;
 
-  TtsService(this._storageService, this._voiceManager) {
+  /// [player] stands in for the audio device in tests.
+  TtsService(this._storageService, this._voiceManager, {TtsWavPlayer? player})
+    : _player = player ?? TtsWavPlayer() {
     // Prime the voice list for the current engine (important for Piper + custom voices)
     unawaited(refreshAvailableVoices());
   }
@@ -308,6 +343,7 @@ class TtsService extends ChangeNotifier {
     _cache.clear();
     releaseLocalEngine();
     _player.dispose();
+    _narrations[this]?.dispose();
     super.dispose();
   }
 
@@ -321,10 +357,25 @@ class TtsService extends ChangeNotifier {
   // Mac never lost the race).
   void _notify() {
     if (!_disposed) notifyListeners();
+    final changed = _changed;
+    _changed = null;
+    changed?.complete();
   }
 
-  /// Stop any active speech.
-  Future<void> stop() async {
+  /// Completes at the next playback state change ([speakAfterCurrent]).
+  Completer<void>? _changed;
+
+  /// Counts the user's Stops ([speakAfterCurrent] gives up on one).
+  int _stops = 0;
+
+  /// Stop any active speech, a narration included.
+  Future<void> stop() {
+    _stops++;
+    _narrations[this]?.cancel(silence: false);
+    return _silence();
+  }
+
+  Future<void> _silence() async {
     _state.isSpeaking = false;
     _state.isGenerating = false;
     _state.generationProgress = 0.0;
@@ -336,3 +387,17 @@ class TtsService extends ChangeNotifier {
     _notify();
   }
 }
+
+/// Narrate All's state, one per service. An extension rather than a member
+/// so a [TtsService] test double, which implements the class, still answers
+/// it (sending a message cancels any narration).
+extension TtsServiceNarration on TtsService {
+  /// Narrate All: the chat read back line by line, each in its own voice.
+  TtsNarration get narration => _narrations[this] ??= TtsNarration(
+    speak: speakNarrationLine,
+    silence: stop,
+    failed: () => lastError != null,
+  );
+}
+
+final _narrations = Expando<TtsNarration>('narration');

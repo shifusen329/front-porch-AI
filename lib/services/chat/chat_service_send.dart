@@ -259,6 +259,14 @@ extension ChatServiceSend on ChatService {
       _messages.add(userMsg);
       await _saveChat();
       notifyListeners();
+      autoPlaySentLine(
+        _ttsService,
+        _storageService.ttsSettings,
+        line: userMsg,
+        index: _messages.length - 1,
+        voice: voiceOf(userMsg, _storageService.ttsSettings),
+        inCall: _callMode,
+      );
 
       // ── Dreams (Living Time §1) — a night passed, so the dream surfaces
       // before this morning's exchange. The text was PRE-GENERATED at the end

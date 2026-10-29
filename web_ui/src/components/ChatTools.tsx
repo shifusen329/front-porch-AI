@@ -19,6 +19,7 @@ import { MilestonesPanel } from './MilestonesPanel';
 import { ChatToolsMemory, ChatToolsRecap, ChatToolsWiki } from './ChatToolsMemory';
 import { ChatToolsChaos, ChatToolsNsfw, ChatToolsPockets } from './ChatToolsRealism';
 import { ChatToolsAmbitions, ChatToolsObjectives } from './ChatToolsObjectives';
+import { ChatToolsNarration } from './ChatToolsNarration';
 import { Toggle, type ToolsState } from './ChatToolsShared';
 import { NeedsClockOffNote } from './realism/NeedsClockOffNote';
 
@@ -290,6 +291,8 @@ export function ChatTools({
       </details>
 
       <ChatToolsNsfw t={t} toggle={toggle} />
+
+      <ChatToolsNarration />
 
       {t.group && groupId && (
         <GroupSettings

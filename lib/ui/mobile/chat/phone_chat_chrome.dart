@@ -54,6 +54,7 @@ class PhoneChatChrome extends StatelessWidget {
             ChatAbsenceBanner(chatService: chatService),
             Expanded(child: transcript),
             const LiveGenerationStatusBar(),
+            const NarrationStatusBar(),
             ChatEvaluationProgress(chatService: chatService, inline: true),
             RepaintBoundary(child: inputArea),
           ],

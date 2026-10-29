@@ -73,6 +73,8 @@ class ChatStateSnapshot {
       // Living Time §1 dream narration flag — additive; older bundles render
       // the dream as a plain message (same info, no special chrome).
       final bool? isDream = md?['is_dream'] == true ? true : null;
+      // Speak and Narrate All read it in the voice the desktop does.
+      final voice = _chat.voiceForMessage(m);
       return {
         'index': e.key,
         // Stable across prepend (same Dart object). Index shifts and
@@ -94,6 +96,8 @@ class ChatStateSnapshot {
         if (m.isDirectorNarration) 'isNarration': true,
         if (!m.isUser && md?[kReplyContextKey] is Map) 'hasContext': true,
         if (!m.isUser && md?[kTokenAltsKey] is List) 'hasTokenAlts': true,
+        'speakable': voice.speak,
+        'voiceKey': voice.voiceKey,
         'chips': ?chips,
         'image': ?imageName,
         'imagePrompt': ?imagePrompt,

@@ -9,10 +9,11 @@
 import { useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
 
-/** 🔊 Synthesize a message and play it on this device. When there is no
- * audio, the host's reason shows beside the button (a speech server that
- * refused the model or the voice, say), as the desktop shows it. */
-export function SpeakButton({ text }: { text: string }) {
+/** 🔊 Synthesize a message and play it on this device, in [voiceKey] (the
+ * global voice when absent). When there is no audio, the host's reason shows
+ * beside the button (a speech server that refused the model or the voice,
+ * say), as the desktop shows it. */
+export function SpeakButton({ text, voiceKey }: { text: string; voiceKey?: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -22,7 +23,7 @@ export function SpeakButton({ text }: { text: string }) {
     setBusy(true);
     setProblem('');
     try {
-      const blob = await api.postForBlob('/api/tts/speak', { text });
+      const blob = await api.postForBlob('/api/tts/speak', voiceKey ? { text, voiceKey } : { text });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;

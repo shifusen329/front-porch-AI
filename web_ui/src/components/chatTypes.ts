@@ -72,6 +72,11 @@ export interface Message {
   hasContext?: boolean;
   /** KoboldCpp kept the words this reply nearly used (Other words). */
   hasTokenAlts?: boolean;
+  /** Read aloud by Speak and Narrate All: the user's lines and the
+   * narrator's too (additive — older apps omit it). */
+  speakable?: boolean;
+  /** The voice it is read in; null is the global voice. */
+  voiceKey?: string | null;
   thinkingContent?: string;
   characterId?: string;
   /** Living Time §1 dream narration (additive — absent on older facades). */

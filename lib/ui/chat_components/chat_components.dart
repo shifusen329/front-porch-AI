@@ -25,6 +25,7 @@ export 'bubbles/styled_chat_message.dart';
 export 'bubbles/external_image_widget.dart';
 
 // Warm-porch sidebar (grouped accordions; panels are direct-import per policy)
+export 'sidebar/narration_section.dart';
 export 'sidebar/porch_accordion.dart';
 export 'sidebar/sidebar_body.dart';
 export 'sidebar/sidebar_tokens.dart';
@@ -51,6 +52,7 @@ export 'overlays/realism_processing_overlay.dart';
 export 'overlays/frozen_backdrop_blur.dart';
 export 'overlays/objective_check_overlay.dart';
 export 'overlays/generation_status_bar.dart';
+export 'overlays/narration_status_bar.dart';
 export 'overlays/stopped_reply_notice.dart';
 export 'prompt_source_panes.dart';
 export 'prompt_source_picker.dart';

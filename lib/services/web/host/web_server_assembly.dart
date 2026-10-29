@@ -204,6 +204,9 @@ import 'package:front_porch_ai/services/web/web_server_deps.dart';
     chatStageFacade: chatService != null
         ? ChatStageFacade(chatService, storage)
         : null,
+    chatNarrationFacade: chatService != null
+        ? ChatNarrationFacade(chatService)
+        : null,
     storyFacade: storyFacade,
     storyExportFacade: storyExportFacade,
     tunnelManager: tunnelManager,

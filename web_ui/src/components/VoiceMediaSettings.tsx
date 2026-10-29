@@ -11,8 +11,21 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { ExpressionModelSettings, type ExpressionModelStatus } from './ExpressionModelSettings';
 
+interface VoiceOption {
+  id: string;
+  name: string;
+  gender?: string;
+}
+
 interface VoiceStatus extends ExpressionModelStatus {
   ttsEnabled: boolean;
+  /** Speak the user's own messages as they are sent. */
+  ttsAutoPlayUser?: boolean;
+  /** The user's own voice; '' is the global voice. */
+  userVoice?: string;
+  /** Narrator and Director lines' voice; '' is the global voice. */
+  narratorVoice?: string;
+  voices?: VoiceOption[];
   sttEnabled?: boolean;
   sttAvailable: boolean;
   ttsEngine?: string;
@@ -79,7 +92,7 @@ export function VoiceMediaSettings() {
       <h3>Voice &amp; Media</h3>
       <p className="muted small">
         Turn spoken replies and the microphone on for this computer. Pick the
-        engine and voice on the desktop app — this page only enables them.
+        engine and the main voice on the desktop app.
       </p>
       <label className="row-label">
         <span>Enable text-to-speech</span>
@@ -99,6 +112,32 @@ export function VoiceMediaSettings() {
           onChange={(e) => void patch({ sttEnabled: e.target.checked })}
         />
       </label>
+      <label className="row-label">
+        <span>Speak my messages</span>
+        <input
+          type="checkbox"
+          data-testid="speak-my-messages"
+          checked={!!v.ttsAutoPlayUser}
+          disabled={saving}
+          onChange={(e) => void patch({ ttsAutoPlayUser: e.target.checked })}
+        />
+      </label>
+      <VoiceSelect
+        label="Your voice"
+        testId="user-voice"
+        value={v.userVoice ?? ''}
+        status={v}
+        disabled={saving}
+        onChange={(id) => void patch({ userVoice: id })}
+      />
+      <VoiceSelect
+        label="Narrator voice"
+        testId="narrator-voice"
+        value={v.narratorVoice ?? ''}
+        status={v}
+        disabled={saving}
+        onChange={(id) => void patch({ narratorVoice: id })}
+      />
       {!v.sttAvailable && v.sttEnabled && (
         <p className="muted small">
           Speech-to-text is on, but the host has not finished loading a
@@ -122,5 +161,50 @@ export function VoiceMediaSettings() {
         </>
       )}
     </section>
+  );
+}
+
+/** A voice for the user's or the narrator's lines: '' follows the global
+ * voice, as the desktop's picker says. A voice this engine does not list is
+ * still shown, so it can be seen and replaced. */
+function VoiceSelect({
+  label,
+  testId,
+  value,
+  status,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  testId: string;
+  value: string;
+  status: VoiceStatus;
+  disabled: boolean;
+  onChange: (id: string) => void;
+}) {
+  const voices = status.voices ?? [];
+  const nameOf = (id: string) => voices.find((x) => x.id === id)?.name ?? id;
+  const global = status.globalVoice
+    ? `Use the global voice (${nameOf(status.globalVoice)})`
+    : 'Use the global voice (none picked yet)';
+  const unknown = value !== '' && !voices.some((x) => x.id === value);
+  return (
+    <label className="row-label">
+      <span>{label}</span>
+      <select
+        data-testid={testId}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">{global}</option>
+        {unknown && <option value={value}>{value} — not available on this engine</option>}
+        {voices.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

@@ -113,6 +113,9 @@ shelf.Handler buildWebHandler(WebServerDeps deps) {
   if (deps.chatStageFacade != null) {
     WebChatStageRoutes(deps.chatStageFacade!, router);
   }
+  if (deps.chatNarrationFacade != null) {
+    WebChatNarrationRoutes(deps.chatNarrationFacade!, router);
+  }
   if (deps.storyFacade != null) {
     // Studio first: its fixed paths must beat the `<id>` params below.
     WebStoryStudioRoutes(deps.storyFacade!, router);

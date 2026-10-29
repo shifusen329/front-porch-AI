@@ -11,26 +11,31 @@ import 'package:flutter_test/flutter_test.dart';
 /// speech server (an omnivoice box on the LAN). It answers
 /// `POST /v1/audio/speech` the way that server does, its error bodies copied
 /// from it: no API key needed; any model but [model] is a 400 naming the
-/// supported one; a voice it does not have is a 404; otherwise a real WAV
-/// (16-bit mono silence). Every request is recorded.
+/// supported one; a voice it does not have ([voices]) is a 404; otherwise a
+/// real WAV (16-bit mono silence). `GET /v1/audio/voices` lists [voices].
+/// Every speech request is recorded.
 class SpeechServer {
-  SpeechServer._(this._server);
+  SpeechServer._(this._server, this.voices);
 
   final HttpServer _server;
 
   static const model = 'omnivoice';
-  static const voices = {'aisha'};
+
+  /// The voices it has.
+  final Set<String> voices;
 
   final List<({String? authorization, Map<String, dynamic> body})> requests =
       [];
 
-  static Future<SpeechServer> start() async {
+  static Future<SpeechServer> start({
+    Set<String> voices = const {'aisha'},
+  }) async {
     // flutter_test swaps in a client that answers 400 to everything.
     final saved = HttpOverrides.current;
     HttpOverrides.global = null;
     addTearDown(() => HttpOverrides.global = saved);
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final host = SpeechServer._(server);
+    final host = SpeechServer._(server, voices);
     server.listen(host._answer);
     addTearDown(() => server.close(force: true));
     return host;
@@ -41,6 +46,11 @@ class SpeechServer {
 
   Future<void> _answer(HttpRequest request) async {
     final res = request.response;
+    if (request.method == 'GET' && request.uri.path == '/v1/audio/voices') {
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode({'voices': voices.toList()}));
+      return res.close();
+    }
     if (request.method != 'POST' || request.uri.path != '/v1/audio/speech') {
       res.statusCode = HttpStatus.notFound;
       return res.close();

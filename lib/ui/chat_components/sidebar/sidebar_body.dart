@@ -30,6 +30,7 @@ import 'package:front_porch_ai/ui/theme/app_colors.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'character_state/character_state.dart';
 import 'journal_memory/journal_memory_group.dart';
+import 'narration_section.dart';
 import 'porch_accordion.dart';
 import 'sidebar_tokens.dart';
 import 'story_tools/story_tools.dart';
@@ -259,6 +260,16 @@ class _SidebarBodyState extends State<SidebarBody> {
                     ui.setSidebarGroupExpanded('objectives', v),
                 child: ObjectivePanel(chatService: chat),
               ),
+            // Narrate All (hidden while text-to-speech is off).
+            NarrationGroup(
+              chatService: chat,
+              initiallyExpanded: ui.sidebarGroupExpanded(
+                'narration',
+                fallback: false,
+              ),
+              onExpansionChanged: (v) =>
+                  ui.setSidebarGroupExpanded('narration', v),
+            ),
             StoryToolsGroup(
               draft: widget.draft,
               chatService: chat,

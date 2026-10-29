@@ -161,6 +161,33 @@ extension ChatServiceSessionWindow on ChatService {
   }
 }
 
+/// Narrate All's script. Lives beside the backfill it waits on, like find.
+extension ChatServiceNarration on ChatService {
+  /// Whether [m] is read aloud, and in which voice, with this app's TTS
+  /// settings ([voiceFor]).
+  MessageVoice voiceForMessage(ChatMessage m) =>
+      voiceOf(m, _storageService.ttsSettings);
+
+  /// The lines to read from `#[from]` to the end. A long chat opens on its
+  /// newest messages and pages the rest in; this waits for them, so #1 is
+  /// the chat's first message. Null when the chat changed while it waited.
+  Future<List<NarrationLine>?> narrationScript({int from = 1}) async {
+    final epoch = _history.epoch;
+    final sessionId = _currentSessionId;
+    if (sessionId == null) return const [];
+    await _awaitHistoryHydrated();
+    if (epoch != _history.epoch || _currentSessionId != sessionId) return null;
+    final tts = _storageService.ttsSettings;
+    return narrationLines(
+      _messages,
+      base: _history.basePosition,
+      voiceOf: (m) => voiceOf(m, tts),
+      tts: tts,
+      from: from,
+    );
+  }
+}
+
 /// ⌘F find-in-chat over the open session. Lives beside the backfill it
 /// waits on: a count taken mid-backfill would disagree with the list.
 extension ChatServiceFind on ChatService {

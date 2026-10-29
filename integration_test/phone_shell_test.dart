@@ -8,7 +8,9 @@
 // conversation and tapping it reopens that same chat. Then the rest of the
 // bar: Porch's sub-tabs (back closes a persona form), Images opens Image
 // Studio over the tabs, Characters → New → Browse The Stoop, and Settings →
-// Backups writes one backup for a tap-tap. All at 412 wide.
+// Backups writes one backup for a tap-tap. On the way, the chat's panel
+// narrates the chat, each line in its voice, from a loopback speech server.
+// All at 412 wide.
 //
 // On the desktop runner PlatformCaps flips to a phone after boot (the tree
 // rebuilds the way a hot reload does); on an Android device or emulator the
@@ -36,6 +38,7 @@ import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 
 import '../test/helpers/double_tap.dart';
+import '../test/helpers/speech_server.dart';
 import 'support/chat_driver.dart';
 import 'support/e2e_sandbox.dart';
 import 'support/fake_backend.dart';
@@ -54,12 +57,20 @@ void main() {
     PathProviderPlatform.instance = SandboxPathProvider(sandbox.path);
     final backend = await FakeBackendServer.start(replyPieces: _kReplyPieces);
     addTearDown(backend.close);
+    // Text-to-speech on a loopback speech server, for Narrate All.
+    final speech = await SpeechServer.start(voices: {'aisha', 'me'});
     SharedPreferences.setMockInitialValues({
       'update_auto_check': false,
       'import_llmerta_porch_memories': false,
       'backend_type': 'openRouter',
       'remote_api_url': '${backend.baseUrl}/v1',
       'remote_model_name': 'phone-model',
+      'tts_enabled': true,
+      'tts_engine': 'openai',
+      'openai_tts_base_url': speech.baseUrl,
+      'openai_tts_model': SpeechServer.model,
+      'tts_voice_model': 'aisha',
+      'tts_user_voice': 'me',
     });
 
     app.main(const []);
@@ -204,6 +215,41 @@ void main() {
       chatService.messages.where((m) => m.isUser && m.text == _kUserMessage),
       hasLength(1),
     );
+
+    // Narrate All from the panel: the greeting, the user's line in the
+    // user's voice, then the reply, and it ends by itself.
+    final tts = Provider.of<TtsService>(ctx, listen: false);
+    // The reopened chat settles under a loading layer first.
+    await pumpUntilFound(tester, find.byTooltip('Stats & story').hitTestable());
+    await tester.tap(find.byTooltip('Stats & story'));
+    await settleSheet(tester);
+    final panel = find.descendant(
+      of: find.byType(SidebarBody),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Narration'),
+      200,
+      scrollable: panel.first,
+    );
+    await tester.tap(find.text('Narration'));
+    await settleSheet(tester);
+    final narrate = find.byKey(const Key('narration-narrate'));
+    await tester.ensureVisible(narrate);
+    await settleSheet(tester);
+    await tester.tap(narrate);
+    await d.waitFor(
+      () => speech.requests.length >= 3 && !tts.narration.isRunning,
+      () => 'the narration (${speech.requests.length} lines asked)',
+    );
+    expect(
+      [for (final r in speech.requests) r.body['voice']],
+      ['aisha', 'me', 'aisha'],
+    );
+    expect(tts.lastError, isNull);
+    await tester.binding.handlePopRoute();
+    await settleSheet(tester);
+
     await tester.binding.handlePopRoute();
     await pumpUntilTrue(
       tester,

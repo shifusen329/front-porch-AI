@@ -30,6 +30,9 @@ class TtsSettings with SettingsBase {
       ''; // voice key, e.g. 'af_heart' or 'en_US-lessac-medium'
   double _ttsSpeechRate = 1.0;
   bool _ttsAutoPlay = false;
+  bool _ttsAutoPlayUser = false;
+  String _ttsUserVoice = '';
+  String _ttsNarratorVoice = '';
   String _openaiTtsApiKey = '';
   String _openaiTtsModel = 'tts-1'; // 'tts-1' or 'tts-1-hd'
   String _openaiTtsBaseUrl = 'https://api.openai.com/v1';
@@ -52,6 +55,16 @@ class TtsSettings with SettingsBase {
   String get ttsVoiceModel => _ttsVoiceModel;
   double get ttsSpeechRate => _ttsSpeechRate;
   bool get ttsAutoPlay => _ttsAutoPlay;
+
+  /// Speak the user's own messages as they are sent.
+  bool get ttsAutoPlayUser => _ttsAutoPlayUser;
+
+  /// The voice the user's own messages are read in; '' = the global voice.
+  String get ttsUserVoice => _ttsUserVoice;
+
+  /// The voice Narrator and Director lines are read in; '' = the global
+  /// voice.
+  String get ttsNarratorVoice => _ttsNarratorVoice;
   String get openaiTtsApiKey => _openaiTtsApiKey;
   String get openaiTtsModel => _openaiTtsModel;
   String get openaiTtsBaseUrl => _openaiTtsBaseUrl;
@@ -80,6 +93,9 @@ class TtsSettings with SettingsBase {
     _ttsVoiceModel = prefs?.getString(k('tts_voice_model')) ?? '';
     _ttsSpeechRate = prefs?.getDouble(k('tts_speech_rate')) ?? 1.0;
     _ttsAutoPlay = prefs?.getBool(k('tts_auto_play')) ?? false;
+    _ttsAutoPlayUser = prefs?.getBool(k('tts_auto_play_user')) ?? false;
+    _ttsUserVoice = prefs?.getString(k('tts_user_voice')) ?? '';
+    _ttsNarratorVoice = prefs?.getString(k('tts_narrator_voice')) ?? '';
     _openaiTtsApiKey = prefs?.getString(k('openai_tts_api_key')) ?? '';
     _ttsConcurrency =
         (prefs?.getInt(k('tts_concurrency')) ?? Platform.numberOfProcessors)
@@ -133,6 +149,24 @@ class TtsSettings with SettingsBase {
   Future<void> setTtsAutoPlay(bool value) async {
     _ttsAutoPlay = value;
     await prefs?.setBool(k('tts_auto_play'), value);
+    notify();
+  }
+
+  Future<void> setTtsAutoPlayUser(bool value) async {
+    _ttsAutoPlayUser = value;
+    await prefs?.setBool(k('tts_auto_play_user'), value);
+    notify();
+  }
+
+  Future<void> setTtsUserVoice(String value) async {
+    _ttsUserVoice = value;
+    await prefs?.setString(k('tts_user_voice'), value);
+    notify();
+  }
+
+  Future<void> setTtsNarratorVoice(String value) async {
+    _ttsNarratorVoice = value;
+    await prefs?.setString(k('tts_narrator_voice'), value);
     notify();
   }
 

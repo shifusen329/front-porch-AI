@@ -49,6 +49,11 @@ class VoiceFacade {
     // browser needs both the choices and the global's name to label
     // "use the global voice". Older clients ignore the extra keys.
     'globalVoice': _storage.ttsSettings.ttsVoiceModel,
+    // Additive (2026-10-28): the user's own voice and the narrator's ('' is
+    // the global voice), and whether the user's messages are read as sent.
+    'userVoice': _storage.ttsSettings.ttsUserVoice,
+    'narratorVoice': _storage.ttsSettings.ttsNarratorVoice,
+    'ttsAutoPlayUser': _storage.ttsSettings.ttsAutoPlayUser,
     'voices': _tts.activeVoices
         .map(
           (v) => {
@@ -82,7 +87,8 @@ class VoiceFacade {
 
   /// Persist the Voice & Media enable flags from the web Settings page so a
   /// remote/phone user can turn TTS/STT on without opening the desktop tab,
-  /// and the expression classifier's model (`expressionModel`: an
+  /// Speak my messages with the user's and narrator's voices, and the
+  /// expression classifier's model (`expressionModel`: an
   /// `owner/name` id, a huggingface.co link, or '' for the default). Throws
   /// [ArgumentError] when that names no model.
   Future<Map<String, dynamic>> apply(Map<String, dynamic> body) async {
@@ -93,6 +99,18 @@ class VoiceFacade {
     }
     final tts = body['ttsEnabled'];
     if (tts is bool) await _storage.ttsSettings.setTtsEnabled(tts);
+    final speakMine = body['ttsAutoPlayUser'];
+    if (speakMine is bool) {
+      await _storage.ttsSettings.setTtsAutoPlayUser(speakMine);
+    }
+    final userVoice = body['userVoice'];
+    if (userVoice is String) {
+      await _storage.ttsSettings.setTtsUserVoice(userVoice.trim());
+    }
+    final narratorVoice = body['narratorVoice'];
+    if (narratorVoice is String) {
+      await _storage.ttsSettings.setTtsNarratorVoice(narratorVoice.trim());
+    }
     final stt = body['sttEnabled'];
     if (stt is bool) await _storage.sttSettings.setSttEnabled(stt);
     return status();

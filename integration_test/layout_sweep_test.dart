@@ -29,6 +29,7 @@ import 'package:front_porch_ai/main.dart' as app;
 import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/providers/app_state.dart';
 import 'package:front_porch_ai/services/services.dart';
+import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
 import 'package:front_porch_ai/ui/layout/main_layout.dart';
 import 'package:front_porch_ai/ui/mobile/mobile.dart';
 import 'package:front_porch_ai/ui/pages/chat_page.dart';
@@ -88,6 +89,9 @@ void main() {
       'backend_type': 'openRouter',
       'remote_api_url': '${backend.baseUrl}/v1',
       'remote_model_name': 'sweep-model',
+      // Text-to-speech on, so the side panel's Narration section is swept.
+      'tts_enabled': true,
+      'tts_engine': 'openai',
     });
 
     // Packaged builds show the updater rows; a dev run hides them. Show them
@@ -172,6 +176,11 @@ void main() {
 
     appState.setIndex(0);
     final chatService = Provider.of<ChatService>(ctx, listen: false);
+    // The side panel's Narration section open, so the sweep sees it.
+    await Provider.of<StorageService>(
+      ctx,
+      listen: false,
+    ).uiSettings.setSidebarGroupExpanded('narration', true);
     await chatService.setActiveCharacter(character);
     // ignore: use_build_context_synchronously — ctx is the root MainLayout element, alive for the whole test.
     Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => const ChatPage()));
@@ -185,6 +194,25 @@ void main() {
       await tester.pump(const Duration(milliseconds: 800));
       await tester.pump(const Duration(milliseconds: 400));
       scanText();
+      // Where the side panel shows, scroll it down to Narration as well.
+      final panel = find.descendant(
+        of: find.byType(SidebarBody),
+        matching: find.byType(Scrollable),
+      );
+      if (panel.evaluate().isNotEmpty) {
+        where = '${size.key} chat panel (Narration)';
+        final narrate = find.byKey(const Key('narration-narrate'));
+        final list = tester.state<ScrollableState>(panel.first);
+        for (var i = 0; i < 40 && narrate.evaluate().isEmpty; i++) {
+          final at = list.position;
+          at.jumpTo((at.pixels + 200).clamp(0, at.maxScrollExtent));
+          await tester.pump();
+        }
+        expect(narrate, findsOneWidget, reason: '$where: no Narrate button');
+        await tester.ensureVisible(narrate);
+        await tester.pump(const Duration(milliseconds: 400));
+        scanText();
+      }
     }
 
     if (Platform.environment['FPAI_SWEEP_LIST'] == '1') {
@@ -219,6 +247,9 @@ void main() {
       'backend_type': 'openRouter',
       'remote_api_url': '${backend.baseUrl}/v1',
       'remote_model_name': 'sweep-model',
+      // Text-to-speech on, so the panel's Narration section is swept.
+      'tts_enabled': true,
+      'tts_engine': 'openai',
     });
 
     app.main(const []);
@@ -401,7 +432,37 @@ void main() {
         await settle();
         scanText();
         where = '${stop.key} chat panel sheet';
+        // A new chat settles under a loading layer first.
+        await pumpUntilFound(
+          tester,
+          find.byTooltip('Stats & story').hitTestable(),
+        );
         await tester.tap(find.byTooltip('Stats & story'));
+        await settle();
+        scanText();
+        // The Narration section, opened once (it stays open).
+        where = '${stop.key} chat panel sheet (Narration)';
+        final narration = find.text('Narration');
+        // Moved by its position, not dragged: on the short landscape sheet
+        // the list's middle is off screen, where a drag lands on nothing.
+        final panel = tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(SidebarBody),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        for (var i = 0; i < 40 && narration.evaluate().isEmpty; i++) {
+          final at = panel.position;
+          at.jumpTo((at.pixels + 200).clamp(0, at.maxScrollExtent));
+          await tester.pump();
+        }
+        if (find.byKey(const Key('narration-narrate')).evaluate().isEmpty) {
+          await tester.tap(narration);
+          await settle();
+        }
+        await tester.ensureVisible(find.byKey(const Key('narration-narrate')));
         await settle();
         scanText();
         await tester.binding.handlePopRoute();

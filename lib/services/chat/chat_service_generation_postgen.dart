@@ -249,28 +249,15 @@ extension ChatServiceGenerationPostGen on ChatService {
 
       // (Task completion check now runs pre-generation in sendMessage)
 
-      // TTS auto-play: speak the new character message automatically
-      if (_ttsService != null &&
-          _storageService.ttsSettings.ttsEnabled &&
-          _storageService.ttsSettings.ttsAutoPlay &&
-          !t.streamTarget.isUser &&
-          _messages.contains(t.streamTarget)) {
-        final lastMsg = t.streamTarget;
-        final msgId = 'msg_${_messages.indexOf(t.streamTarget)}';
-        // Resolve per-character voice, falling back to global default
-        String? voiceKey;
-        if (_activeGroup != null) {
-          final charMatch = _groupCharacters
-              .where((c) => c.name == lastMsg.sender)
-              .firstOrNull;
-          voiceKey = charMatch?.ttsVoice;
-        } else {
-          voiceKey = _activeCharacter?.ttsVoice;
-        }
-        _ttsService!.speak(
-          lastMsg.displayText,
-          voiceKey: voiceKey,
-          messageId: msgId,
+      final finishedAt = _messages.indexOf(t.streamTarget);
+      if (finishedAt >= 0) {
+        autoPlayFinishedLine(
+          _ttsService,
+          _storageService.ttsSettings,
+          line: t.streamTarget,
+          index: finishedAt,
+          voice: voiceOf(t.streamTarget, _storageService.ttsSettings),
+          inCall: _callMode,
         );
       }
 

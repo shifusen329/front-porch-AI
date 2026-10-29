@@ -245,6 +245,8 @@ class _ChatPageState extends State<ChatPage> {
     _chatService?.pauseDynamicResponses();
     _chatService?.chatScreenClosed();
     _ttsService?.removeListener(_onTtsChanged);
+    // Leaving the chat ends a Narrate All of it.
+    _ttsService?.narration.cancel();
     _chatService?.removeListener(_onChatServiceChanged);
     _chatFocusNode.dispose();
     _scrollController.dispose();
