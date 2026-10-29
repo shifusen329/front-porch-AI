@@ -18,6 +18,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/image/image.dart';
 import 'package:front_porch_ai/services/image_prompt/image_prompt.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_io.dart';
@@ -322,10 +323,13 @@ class ExpressionsSection extends StatelessWidget {
   ) async {
     final zipBytes = await pickZipBytes(context);
     if (zipBytes == null || !context.mounted) return;
-    final (added, unrecognized) = await c.importExpressionZip(zipBytes);
+    final (added, unrecognized, skipped) = await c.importExpressionZip(
+      zipBytes,
+    );
     if (!context.mounted) return;
-    final message = added > 0
+    final message = added > 0 || skipped > 0
         ? 'Imported $added expression image${added == 1 ? '' : 's'}'
+              '${skipped > 0 ? ' · $skipped skipped ($kMaxExpressions expressions)' : ''}'
               '${unrecognized > 0 ? ' · $unrecognized unrecognized' : ''}.'
         : 'No emotion-named images found in that ZIP.';
     ScaffoldMessenger.of(

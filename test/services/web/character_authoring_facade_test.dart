@@ -7,18 +7,23 @@
 // expression (avatars/), avatarFile serves a LOOK from looks/ (was avatars-only),
 // and the ★ favorite round-trips through avatars().isFavorite.
 
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shelf/shelf.dart' as shelf;
+import 'package:shelf_router/shelf_router.dart';
 
 import 'package:front_porch_ai/database/database.dart';
 import 'package:front_porch_ai/services/character_repository.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/services/web/facade/character_authoring_facade.dart';
+import 'package:front_porch_ai/services/web/routes/routes.dart';
 
 void _setupPathProviderMock() {
   const channel = MethodChannel('plugins.flutter.io/path_provider');
@@ -86,69 +91,146 @@ void main() {
 
     tearDown(() async => db.close());
 
-    test('addLook → looks/ (isLook); addAvatar → an expression (label, !isLook)',
-        () async {
-      // First addLook on a portrait-less card fills the portrait only (no look
-      // row — avoids portrait+look dupe). Seed a real portrait, then addLook.
-      expect(await facade.addLook(charId, _png), isTrue);
-      final afterPortrait = await facade.avatars(charId);
-      expect(afterPortrait.where((a) => a['isLook'] == true), isEmpty,
-          reason: 'first image is portrait-only when no prior face');
+    test(
+      'addLook → looks/ (isLook); addAvatar → an expression (label, !isLook)',
+      () async {
+        // First addLook on a portrait-less card fills the portrait only (no look
+        // row — avoids portrait+look dupe). Seed a real portrait, then addLook.
+        expect(await facade.addLook(charId, _png), isTrue);
+        final afterPortrait = await facade.avatars(charId);
+        expect(
+          afterPortrait.where((a) => a['isLook'] == true),
+          isEmpty,
+          reason: 'first image is portrait-only when no prior face',
+        );
 
-      expect(await facade.addLook(charId, _png), isTrue); // now a gallery look
-      expect(await facade.addAvatar(charId, _png, 'happy'), isTrue);
+        expect(
+          await facade.addLook(charId, _png),
+          isTrue,
+        ); // now a gallery look
+        expect(await facade.addAvatar(charId, _png, 'happy'), isTrue);
 
-      final avatars = await facade.avatars(charId);
-      expect(avatars.where((a) => a['isLook'] == true), hasLength(1));
-      expect(avatars.where((a) => a['isLook'] == false), hasLength(1));
-      final look = avatars.firstWhere((a) => a['isLook'] == true);
-      final expr = avatars.firstWhere((a) => a['isLook'] == false);
-      expect(expr['label'], 'happy');
-      expect(look['label'], ''); // looks carry no user label in the payload
-    });
+        final avatars = await facade.avatars(charId);
+        expect(avatars.where((a) => a['isLook'] == true), hasLength(1));
+        expect(avatars.where((a) => a['isLook'] == false), hasLength(1));
+        final look = avatars.firstWhere((a) => a['isLook'] == true);
+        final expr = avatars.firstWhere((a) => a['isLook'] == false);
+        expect(expr['label'], 'happy');
+        expect(look['label'], ''); // looks carry no user label in the payload
+      },
+    );
 
     test('avatarFile serves a LOOK from looks/ (was avatars/-only)', () async {
       await facade.addLook(charId, _png); // portrait bootstrap
       await facade.addLook(charId, _png); // gallery look
       final lookId =
-          (await facade.avatars(charId)).firstWhere((a) => a['isLook'] == true)['id']
+          (await facade.avatars(
+                charId,
+              )).firstWhere((a) => a['isLook'] == true)['id']
               as String;
       final file = await facade.avatarFile(charId, lookId);
       expect(file, isNotNull, reason: 'a look must resolve + serve');
-      expect(file!.path.contains('${Platform.pathSeparator}looks${Platform.pathSeparator}'),
-          isTrue,
-          reason: 'served from looks/, not avatars/: ${file.path}');
+      expect(
+        file!.path.contains(
+          '${Platform.pathSeparator}looks${Platform.pathSeparator}',
+        ),
+        isTrue,
+        reason: 'served from looks/, not avatars/: ${file.path}',
+      );
       expect(file.existsSync(), isTrue);
     });
 
     test('an EXPRESSION still serves from avatars/', () async {
       await facade.addAvatar(charId, _png, 'sad');
-      final id =
-          (await facade.avatars(charId)).first['id'] as String;
+      final id = (await facade.avatars(charId)).first['id'] as String;
       final file = await facade.avatarFile(charId, id);
       expect(file, isNotNull);
       expect(
-        file!.path.contains('${Platform.pathSeparator}avatars${Platform.pathSeparator}'),
+        file!.path.contains(
+          '${Platform.pathSeparator}avatars${Platform.pathSeparator}',
+        ),
         isTrue,
         reason: file.path,
       );
     });
 
-    test('★ favorite round-trips through avatars().isFavorite (set + clear)',
-        () async {
-      await facade.addLook(charId, _png); // portrait
-      await facade.addLook(charId, _png); // gallery look to star
-      final lookId =
-          (await facade.avatars(charId)).firstWhere((a) => a['isLook'] == true)['id']
-              as String;
+    test(
+      '★ favorite round-trips through avatars().isFavorite (set + clear)',
+      () async {
+        await facade.addLook(charId, _png); // portrait
+        await facade.addLook(charId, _png); // gallery look to star
+        final lookId =
+            (await facade.avatars(
+                  charId,
+                )).firstWhere((a) => a['isLook'] == true)['id']
+                as String;
 
-      expect(await facade.setFavorite(charId, lookId), isTrue);
-      var avatars = await facade.avatars(charId);
-      expect(avatars.firstWhere((a) => a['id'] == lookId)['isFavorite'], isTrue);
+        expect(await facade.setFavorite(charId, lookId), isTrue);
+        var avatars = await facade.avatars(charId);
+        expect(
+          avatars.firstWhere((a) => a['id'] == lookId)['isFavorite'],
+          isTrue,
+        );
 
-      expect(await facade.setFavorite(charId, ''), isTrue); // clear → portrait
-      avatars = await facade.avatars(charId);
-      expect(avatars.firstWhere((a) => a['id'] == lookId)['isFavorite'], isFalse);
+        expect(
+          await facade.setFavorite(charId, ''),
+          isTrue,
+        ); // clear → portrait
+        avatars = await facade.avatars(charId);
+        expect(
+          avatars.firstWhere((a) => a['id'] == lookId)['isFavorite'],
+          isFalse,
+        );
+      },
+    );
+
+    test('at 40 expressions an upload for a new one is refused; one more '
+        'image of an expression is not', () async {
+      for (var i = 0; i < 40; i++) {
+        await facade.addAvatar(charId, _png, 'e$i');
+      }
+      await expectLater(
+        facade.addAvatar(charId, _png, 'cowgirl'),
+        throwsA(isA<ExpressionLimitReached>()),
+      );
+      expect(await facade.addAvatar(charId, _png, 'E3'), isTrue);
+      expect(await facade.addAvatar(charId, _png, null), isTrue);
+      final expressions = (await facade.avatars(
+        charId,
+      )).where((a) => a['isLook'] != true);
+      expect(expressions, hasLength(42));
+    });
+
+    test('POST /avatars/zip imports a sprite pack in order, alternates '
+        'included, and refuses a file that is not a ZIP', () async {
+      final archive = Archive();
+      for (final name in ['joy-2.png', 'anger.png', 'joy.png', 'notes.png']) {
+        archive.addFile(ArchiveFile(name, _png.length, _png));
+      }
+      final router = Router();
+      WebCharacterSpritePackRoutes(facade, router);
+      Future<shelf.Response> post(List<int> body) => router.call(
+        shelf.Request(
+          'POST',
+          Uri.parse('http://localhost/api/characters/$charId/avatars/zip'),
+          body: body,
+        ),
+      );
+
+      final res = await post(ZipEncoder().encode(archive));
+      expect(res.statusCode, 200);
+      final json = jsonDecode(await res.readAsString()) as Map;
+      expect(json['added'], 3);
+      expect(json['skipped'], 0);
+      expect(json['unrecognized'], 1);
+      final labels = [
+        for (final a in json['avatars'] as List)
+          if (a['isLook'] != true) a['label'],
+      ];
+      expect(labels, ['anger', 'joy', 'joy']);
+
+      final bad = await post(utf8.encode('not a zip at all'));
+      expect(bad.statusCode, 400);
     });
   });
 }

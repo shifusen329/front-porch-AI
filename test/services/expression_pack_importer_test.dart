@@ -186,5 +186,36 @@ void main() {
       final after = await repo.getAvatarImages(charId);
       expect(after.where((a) => a.label == 'joy'), hasLength(2));
     });
+
+    test('a character at 40 expressions gets only replacements and '
+        'alternates', () async {
+      for (var i = 0; i < 39; i++) {
+        await repo.addAvatar(
+          charId,
+          'Pack Test',
+          Uint8List.fromList([i]),
+          'e$i',
+        );
+      }
+      await repo.addAvatar(charId, 'Pack Test', Uint8List.fromList([7]), 'joy');
+
+      final imported = await ExpressionPackImporter.importPack(
+        repository: repo,
+        storage: storage,
+        characterDbId: charId,
+        characterName: 'Pack Test',
+        slots: [_doneSlot('anger'), _doneSlot('joy'), _doneSlot('fear')],
+        replaceSameLabel: false,
+      );
+      expect(
+        imported,
+        1,
+        reason: 'joy is an alternate; anger and fear are new',
+      );
+      final labels = (await repo.getAvatarImages(charId)).map((a) => a.label);
+      expect(labels.where((l) => l == 'joy'), hasLength(2));
+      expect(labels, isNot(contains('anger')));
+      expect(labels.toSet(), hasLength(40));
+    });
   });
 }

@@ -22,6 +22,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import 'package:front_porch_ai/models/models.dart';
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/portrait_promotion.dart';
 
@@ -53,21 +54,24 @@ class CharacterAuthoringFacade {
     final images = await _repo.getAvatarImages(id);
     final favoriteId = card.frontPorchExtensions?.favoriteAvatarId;
     return images
-        .map((a) => {
-              'id': a.id,
-              // A look's label is the internal '__look__' sentinel — never show
-              // it as a user-facing caption (isLook already marks looks).
-              'label': a.isLook ? '' : (a.label ?? ''),
-              'displayOrder': a.displayOrder,
-              'isPrime': a.displayOrder + 1 == card.primeAvatarIndex,
-              'isLook': a.isLook,
-              'isFavorite': a.id == favoriteId,
-            })
+        .map(
+          (a) => {
+            'id': a.id,
+            // A look's label is the internal '__look__' sentinel — never show
+            // it as a user-facing caption (isLook already marks looks).
+            'label': a.isLook ? '' : (a.label ?? ''),
+            'displayOrder': a.displayOrder,
+            'isPrime': a.displayOrder + 1 == card.primeAvatarIndex,
+            'isLook': a.isLook,
+            'isFavorite': a.id == favoriteId,
+          },
+        )
         .toList();
   }
 
   /// Add an EXPRESSION avatar from uploaded bytes (goes to `avatars/`, labeled).
-  /// Returns false if the character is gone.
+  /// Returns false if the character is gone. Throws [ExpressionLimitReached]
+  /// for a new expression past [kMaxExpressions]; an alternate always fits.
   Future<bool> addAvatar(String id, List<int> bytes, String? label) async {
     final card = await _repo.getCharacterCardById(id);
     if (card == null) return false;
@@ -75,13 +79,54 @@ class CharacterAuthoringFacade {
     // ?label=__look__ would write the file to avatars/ but mark the row a look
     // (AvatarImage.isLook), so it resolves/deletes from the wrong folder: a
     // broken tile + an orphaned PNG. Treat it as unlabeled.
-    final clean = (label == null ||
+    final clean =
+        (label == null ||
             label.trim().isEmpty ||
             label.trim() == AvatarImage.lookLabel)
         ? null
         : label;
+    final used = expressionLabelsOf(await _repo.getAvatarImages(id));
+    if (!admitExpression(used, clean)) throw const ExpressionLimitReached();
     await _repo.addAvatar(id, card.name, Uint8List.fromList(bytes), clean);
     return true;
+  }
+
+  /// The desktop gallery's "Import ZIP sprite pack": emotion-named images
+  /// (`joy.png`, `joy-1.png`) become expression images, in pack order.
+  /// Alternates always go in; a new expression past [kMaxExpressions] is
+  /// skipped. Null when the character is gone; throws [FormatException] for
+  /// bytes that aren't a ZIP.
+  Future<Map<String, dynamic>?> importSpritePack(
+    String id,
+    List<int> zip,
+  ) async {
+    final card = await _repo.getCharacterCardById(id);
+    if (card == null) return null;
+    // The decoder reads arbitrary bytes as an empty archive; say so instead.
+    if (zip.length < 4 || zip[0] != 0x50 || zip[1] != 0x4B) {
+      throw const FormatException('not a ZIP file');
+    }
+    final pack = decodeSpritePack(
+      Uint8List.fromList(zip),
+      labels: _storage.expressionSettings.expressionLabels,
+    );
+    final used = expressionLabelsOf(await _repo.getAvatarImages(id));
+    var added = 0;
+    var skipped = 0;
+    for (final e in pack.entries) {
+      if (!admitExpression(used, e.emotion)) {
+        skipped++;
+        continue;
+      }
+      await _repo.addAvatar(id, card.name, e.bytes, e.emotion);
+      added++;
+    }
+    return {
+      'added': added,
+      'skipped': skipped,
+      'unrecognized': pack.unrecognized,
+      'avatars': await avatars(id),
+    };
   }
 
   /// Add a gallery LOOK from uploaded bytes (goes to `looks/`, look-labeled —
@@ -221,4 +266,15 @@ class CharacterAuthoringFacade {
     await _repo.updateCharacter(card);
     return true;
   }
+}
+
+/// A new expression past [kMaxExpressions]. The relay answers 409 with this
+/// text; an image for an expression the character has still fits.
+class ExpressionLimitReached implements Exception {
+  const ExpressionLimitReached();
+
+  @override
+  String toString() =>
+      'This character already has $kMaxExpressions expressions. Add another '
+      'image for one it has, or remove one first.';
 }

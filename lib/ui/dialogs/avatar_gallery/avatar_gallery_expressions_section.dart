@@ -18,6 +18,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_controller.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_section_header.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_tile.dart';
@@ -62,8 +63,11 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
       return _CollapsedAddRow(onTap: onExpand);
     }
 
-    final atCap =
-        controller.expressions.length >= AvatarGalleryController.maxExpressions;
+    // Distinct expressions count toward the limit; alternates don't, so
+    // adding stays open at the limit (the picker offers only those in use).
+    final used = controller.usedLabels.length;
+    final images = controller.expressions.length;
+    final atCap = used >= kMaxExpressions;
     final tiles = <Widget>[
       for (final e in controller.expressions)
         AvatarTile(
@@ -82,8 +86,7 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
           highlighted: e.displayOrder + 1 == controller.primeIndex,
           badgeColor: AppColors.logWarn,
         ),
-      if (!atCap)
-        GalleryAddTile(label: 'Add expression', onTap: onAddExpression),
+      GalleryAddTile(label: 'Add expression', onTap: onAddExpression),
     ];
 
     return Column(
@@ -107,19 +110,23 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
           children: tiles,
         ),
         const SizedBox(height: 10),
-        Row(
+        // Wraps on a phone: the counter drops under the button.
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
           children: [
             TextButton.icon(
-              onPressed: atCap ? null : onImportZip,
+              onPressed: onImportZip,
               icon: const Icon(Icons.folder_zip_outlined, size: 16),
               label: const Text('Import ZIP sprite pack'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.textSecondary(context),
               ),
             ),
-            const Spacer(),
             Text(
-              '${controller.expressions.length}/${AvatarGalleryController.maxExpressions}',
+              '$used/$kMaxExpressions expressions'
+              '${images > used ? ' · $images images' : ''}',
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
@@ -165,12 +172,17 @@ class _CollapsedAddRow extends StatelessWidget {
                   color: AppColors.textSecondary(context),
                 ),
               ),
-              const Spacer(),
-              Text(
-                'emotion faces, swapped by mood',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textTertiary(context),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'emotion faces, swapped by mood',
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textTertiary(context),
+                  ),
                 ),
               ),
             ],

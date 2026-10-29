@@ -27,6 +27,7 @@ import 'package:front_porch_ai/services/chat/fused_eval_fire.dart';
 import 'package:front_porch_ai/services/chat/pass_support.dart';
 import 'package:front_porch_ai/services/chat/realism_evals/realism_evals.dart';
 import 'package:front_porch_ai/services/chat/realism_verification.dart';
+import 'package:front_porch_ai/utils/emotion_labels.dart';
 
 // The per-eval delta limit constants (kMin/kMaxRelationshipDelta etc.) live in
 // realism_prompt_builder.dart next to the prompt text that interpolates them.
@@ -245,6 +246,16 @@ class RealismEvals {
   // Expression enabled for the "MUST choose label from list" instruction in emotion prompts
   final bool Function() getExpressionEnabled;
 
+  // The labels that list offers: the standard set plus any the installed
+  // expression classifier model adds (ExpressionSettings.expressionLabels).
+  final List<String> Function()? getExpressionLabels;
+
+  /// The labels the emotion evaluation must choose from, on both the
+  /// separate-call and one-shot paths; empty when expression images are off.
+  List<String> get allowedEmotionLabels => getExpressionEnabled()
+      ? getExpressionLabels?.call() ?? EmotionLabels.all
+      : const <String>[];
+
   // Character dossier for the judge prompts (personality + description +
   // evolution growth, budget-capped via RealismPromptBuilder.characterDossier).
   // Wired by god so group impersonation (card = current speaker) and the
@@ -347,6 +358,7 @@ class RealismEvals {
     required this.nsfwService,
     required this.timeService,
     required this.getExpressionEnabled,
+    this.getExpressionLabels,
     required this.getCharacterDossier,
     this.getObjectivesEnabled,
     this.getRecentEndedObjectives,

@@ -43,6 +43,7 @@ export 'expression_pack_service.dart';
 export 'expression_pack_normalizer.dart';
 export 'model_fetch.dart';
 export 'model_manager.dart';
+export 'sprite_pack.dart';
 export 'storage_service.dart';
 // The one settings TYPE consumers need by name (the sidebar's tri-state
 // control, the web facade/routes, the one-shot resolver). The settings

@@ -6,14 +6,15 @@
 //   • Looks       — any image (outfit / scene / seasonal), uploaded as-is (no
 //                   crop), the gallery faces you can swipe between in chat.
 //   • Expressions — emotion-labeled face images (face-cropped on upload), used
-//                   by the expression engine; "expression packs" = several of
-//                   these uploaded together.
+//                   by the expression engine. A ZIP sprite pack imports many
+//                   at once (joy.png, joy-1.png …). Up to 40 expressions;
+//                   alternates of one don't count (the desktop's limit).
 // The ★ favorite (one across BOTH sections) is the default opening face + the
 // image baked into an exported / Stoop card. Upload-only: no in-app editing or
 // generation on the web (that lives on desktop).
 
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
 import { ImageCropModal } from './ImageCropModal';
 
 interface AvatarItem {
@@ -26,14 +27,34 @@ interface AvatarItem {
 }
 
 type Resp = { avatars: AvatarItem[] };
+type ZipResp = Resp & { added: number; skipped: number; unrecognized: number };
+
+/** The desktop's limit (kMaxExpressions): distinct expressions, not images. */
+export const MAX_EXPRESSIONS = 40;
+
+/** Distinct expression labels, the way the host counts them. */
+export function expressionCount(items: AvatarItem[]): number {
+  return new Set(
+    items.filter((a) => !a.isLook).map((a) => (a.label ?? '').trim().toLowerCase()).filter(Boolean),
+  ).size;
+}
+
+/** The host explains a refused upload (the 40 limit, a file that isn't a ZIP). */
+function messageOf(e: unknown): string {
+  return e instanceof ApiError && (e.status === 400 || e.status === 409)
+    ? e.message
+    : 'Action failed.';
+}
 
 export function AvatarManager({ characterId }: { characterId: string }) {
   const [avatars, setAvatars] = useState<AvatarItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [pending, setPending] = useState<File | null>(null); // expression → crop
   const lookRef = useRef<HTMLInputElement>(null);
   const exprRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
   const labelRef = useRef<HTMLInputElement>(null);
 
   const base = `/api/characters/${characterId}`;
@@ -52,10 +73,29 @@ export function AvatarManager({ characterId }: { characterId: string }) {
   const run = (p: Promise<Resp>) => {
     setBusy(true);
     setError('');
+    setNotice('');
     p.then((r) => setAvatars(r.avatars))
-      .catch(() => setError('Action failed.'))
+      .catch((e) => setError(messageOf(e)))
       .finally(() => setBusy(false));
   };
+
+  // The desktop gallery's "Import ZIP sprite pack": emotion-named images,
+  // alternates as joy-1.png, joy-2.png.
+  const importZip = (file: File) =>
+    run(
+      api.upload<ZipResp>(`${base}/avatars/zip`, file).then((r) => {
+        setNotice(
+          [
+            `Imported ${r.added}`,
+            r.skipped > 0 ? `${r.skipped} skipped (${MAX_EXPRESSIONS} expressions)` : '',
+            r.unrecognized > 0 ? `${r.unrecognized} unrecognized` : '',
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        );
+        return r;
+      }),
+    );
 
   // Looks: any image, uploaded as-is (a full outfit/scene shouldn't be square-cropped).
   const uploadLook = (file: File) =>
@@ -80,6 +120,7 @@ export function AvatarManager({ characterId }: { characterId: string }) {
 
   const looks = avatars.filter((a) => a.isLook);
   const expressions = avatars.filter((a) => !a.isLook);
+  const used = expressionCount(avatars);
 
   // Desktop parity: the portrait ✕ is a SWAP — the ★ (else first) look
   // promotes into the portrait slot and the old portrait demotes into the
@@ -170,12 +211,24 @@ export function AvatarManager({ characterId }: { characterId: string }) {
       </div>
       {expressions.length === 0 ? (
         <p className="muted gallery-empty">
-          Upload emotion-labeled face images (a whole expression pack, one at a time).
+          Upload emotion-labeled face images one at a time, or a ZIP sprite pack named by
+          emotion (joy.png, joy-1.png, anger.png …).
         </p>
       ) : (
         <div className="avatar-grid">{expressions.map((a) => tile(a, true))}</div>
       )}
+      {/* Under the tiles, as on the desktop gallery; wraps on a phone. */}
+      <div className="gallery-section-foot">
+        <button className="ghost" disabled={busy} onClick={() => zipRef.current?.click()}>
+          Import ZIP sprite pack
+        </button>
+        <span className={`muted small${used >= MAX_EXPRESSIONS ? ' error' : ''}`}>
+          {used}/{MAX_EXPRESSIONS} expressions
+          {expressions.length > used ? ` · ${expressions.length} images` : ''}
+        </span>
+      </div>
 
+      {notice && <p className="muted">{notice}</p>}
       {error && <p className="error">{error}</p>}
 
       {/* hidden inputs */}
@@ -198,6 +251,17 @@ export function AvatarManager({ characterId }: { characterId: string }) {
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null;
           if (f) setPending(f);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={zipRef}
+        type="file"
+        accept=".zip,application/zip"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) importZip(f);
           e.target.value = '';
         }}
       />

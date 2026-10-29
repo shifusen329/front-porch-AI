@@ -29,7 +29,6 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/expression_pack_qc.dart';
 import 'package:front_porch_ai/services/image_prompt/image_prompt.dart';
 import 'package:front_porch_ai/services/portrait_promotion.dart';
-import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_io.dart';
 
 import 'avatar_creation_controller/avatar_creation_controller.dart';
 import 'package:front_porch_ai/utils/utils.dart';
@@ -217,6 +216,10 @@ class AvatarCreationController extends ChangeNotifier {
         (controls.showImg2img || packEditModeNow);
   }
 
+  /// Tags an upload can carry: past the expression limit, the card's own.
+  List<String> get uploadLabels =>
+      _anchor.uploadLabels(storage.expressionSettings.expressionLabels);
+
   List<String> get chosenSet =>
       fullSet ? kFullExpressionSet : kCuratedExpressionSet;
 
@@ -355,8 +358,8 @@ class AvatarCreationController extends ChangeNotifier {
     if (emotion == null) {
       await repository.addLook(card.dbId!, card.name, bytes);
     } else {
+      if (!_anchor.admit(emotion)) return false;
       await repository.addAvatar(card.dbId!, card.name, bytes, emotion);
-      _anchor.addEmotions([emotion]);
     }
     extraUploads.add((bytes: bytes, emotion: emotion));
     if (!_disposed) notifyListeners();
@@ -364,26 +367,30 @@ class AvatarCreationController extends ChangeNotifier {
   }
 
   /// Emotion-named ZIP sprite pack (the generation alternative). Returns
-  /// (added, unrecognized).
-  Future<(int, int)> importExpressionZip(Uint8List zipBytes) async {
-    if (!await _anchor.ensure()) return (0, 0);
+  /// (added, unrecognized, skipped past the expression limit).
+  Future<(int, int, int)> importExpressionZip(Uint8List zipBytes) async {
+    if (!await _anchor.ensure()) return (0, 0, 0);
     final card = _anchor.card!;
     final result = decodeSpritePack(
       zipBytes,
       labels: storage.expressionSettings.expressionLabels,
     );
     var added = 0;
+    var skipped = 0;
     for (final e in result.entries) {
+      if (!_anchor.admit(e.emotion)) {
+        skipped++;
+        continue;
+      }
       await repository.addAvatar(card.dbId!, card.name, e.bytes, e.emotion);
       extraUploads.add((bytes: e.bytes, emotion: e.emotion));
-      _anchor.addEmotions([e.emotion]);
       added++;
     }
     if (added > 0 && !storage.expressionSettings.expressionEnabled) {
       await storage.expressionSettings.setExpressionEnabled(true);
     }
     if (!_disposed) notifyListeners();
-    return (added, result.unrecognized);
+    return (added, result.unrecognized, skipped);
   }
 
   // ── The run (portrait → veto gate → pack) ─────────────────────────────────

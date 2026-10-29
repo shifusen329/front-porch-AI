@@ -60,6 +60,10 @@ button.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transpar
 }
 .gallery-section-head .tool-row { flex: 0 1 auto; max-width: 260px; }
 .gallery-empty { font-size: 0.8rem; margin: 0 0 4px; }
+.gallery-section-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 6px 12px; margin: 6px 0 2px;
+}
 .avatar-tile.favorite { border-color: var(--porch-honey); }
 .avatar-tile.favorite .avatar-badge { background: var(--porch-honey); color: var(--on-accent); }
 .review .review-val { max-width: 60%; text-align: right; word-break: break-word; }

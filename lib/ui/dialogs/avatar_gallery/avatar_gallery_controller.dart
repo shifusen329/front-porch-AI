@@ -56,8 +56,6 @@ class AvatarGalleryController extends ChangeNotifier {
   /// Non-null only in [WardrobeMode.inChat].
   final ChatService? chat;
 
-  static const int maxExpressions = 30;
-
   List<AvatarImage> looks = const [];
   List<AvatarImage> expressions = const [];
 
@@ -69,6 +67,21 @@ class AvatarGalleryController extends ChangeNotifier {
 
   /// Draft emotion labels, flushed to the repo on Done (matches the old dialog).
   final Map<String, String> tempLabels = {};
+
+  /// The distinct expressions in use, drafted relabels included. Counted
+  /// against [kMaxExpressions]; alternates share a label.
+  Set<String> get usedLabels => _labelsIn(expressions);
+
+  /// The expressions every image but [avatarId] uses: relabelling an
+  /// expression's only image frees its slot.
+  Set<String> usedLabelsExcept(String avatarId) =>
+      _labelsIn(expressions.where((e) => e.id != avatarId));
+
+  Set<String> _labelsIn(Iterable<AvatarImage> images) => {
+    for (final e in images)
+      if ((tempLabels[e.id] ?? e.label ?? '').trim().isNotEmpty)
+        (tempLabels[e.id] ?? e.label)!.trim().toLowerCase(),
+  };
 
   bool saving = false;
 
@@ -291,13 +304,14 @@ class AvatarGalleryController extends ChangeNotifier {
   // ── Expression images ───────────────────────────────────────────────────────
   Future<void> addExpression(Uint8List bytes, String? emotion) =>
       _run(() async {
-        if (dbId == null || expressions.length >= maxExpressions) return;
+        if (dbId == null || !admitExpression(usedLabels, emotion)) return;
         await repository.addAvatar(dbId!, libraryCard.name, bytes, emotion);
         await _reload();
       });
 
-  /// Import an emotion-named ZIP sprite pack. Returns (added, unrecognized,
-  /// skippedForCap) for the caller's snackbar.
+  /// Import an emotion-named ZIP sprite pack. Alternates of an expression
+  /// already here always go in; a new expression past [kMaxExpressions] is
+  /// skipped. Returns (added, unrecognized, skippedForCap) for the snackbar.
   Future<(int, int, int)> importSpritePack(
     List<({Uint8List bytes, String emotion})> entries,
     int unrecognized,
@@ -306,8 +320,9 @@ class AvatarGalleryController extends ChangeNotifier {
     var added = 0;
     var skippedForCap = 0;
     await _run(() async {
+      final used = usedLabels;
       for (final e in entries) {
-        if (expressions.length + added >= maxExpressions) {
+        if (!admitExpression(used, e.emotion)) {
           skippedForCap++;
           continue;
         }

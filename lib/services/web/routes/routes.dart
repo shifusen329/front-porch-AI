@@ -17,6 +17,7 @@ export 'chat_routes.dart';
 export 'chat_tools_routes.dart';
 export 'chat_narration_routes.dart';
 export 'chat_stage_routes.dart';
+export 'character_sprite_pack_routes.dart';
 export 'group_routes.dart';
 export 'memory_search_routes.dart';
 export 'persona_convert_routes.dart';

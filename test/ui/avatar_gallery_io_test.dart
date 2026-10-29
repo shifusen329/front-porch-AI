@@ -47,9 +47,7 @@ void main() {
   });
 
   test('ignores non-image files entirely', () {
-    final result = decodeSpritePack(
-      _zip({'joy.png': png, 'readme.txt': png}),
-    );
+    final result = decodeSpritePack(_zip({'joy.png': png, 'readme.txt': png}));
     expect(result.entries.length, 1);
     expect(result.unrecognized, 0);
   });
@@ -104,5 +102,39 @@ void main() {
     await tester.scrollUntilVisible(find.text('reversecowgirl'), 80);
     await tester.tap(find.text('reversecowgirl'));
     expect(picked, 'reversecowgirl');
+  });
+
+  test('alternates import base first, then by number', () {
+    Uint8List tagged(int n) => Uint8List.fromList([n]);
+    final result = decodeSpritePack(
+      _zip({
+        'joy-10.png': tagged(10),
+        'anger.png': tagged(99),
+        'joy-2.png': tagged(2),
+        'joy.png': tagged(0),
+        'joy-1.png': tagged(1),
+      }),
+    );
+    // Grouped in label order (anger before joy), base before -1, -2, -10.
+    expect(result.entries.map((e) => e.emotion), [
+      'anger',
+      'joy',
+      'joy',
+      'joy',
+      'joy',
+    ]);
+    expect(result.entries.map((e) => e.bytes.single), [99, 0, 1, 2, 10]);
+  });
+
+  test('the longest matching label wins', () {
+    const labels = ['reverse', 'reverse-cowgirl'];
+    final result = decodeSpritePack(
+      _zip({'reverse-cowgirl-1.png': png, 'reverse-2.png': png}),
+      labels: labels,
+    );
+    expect(result.entries.map((e) => e.emotion), [
+      'reverse',
+      'reverse-cowgirl',
+    ]);
   });
 }

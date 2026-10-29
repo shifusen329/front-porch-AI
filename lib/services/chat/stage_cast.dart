@@ -78,8 +78,19 @@ List<StageSprite> stageSpritesFor(ChatService chat, StorageService storage) {
       final groupFeeling = chat.isGroupMode
           ? chat.getEmotionForGroupCharacter(card)
           : null;
-      final avatar = groupFeeling != null
-          ? expressionForLabel(card, standardExpressionLabel(groupFeeling))
+      final followsChat = followsChatExpression(
+        speaking: speaking,
+        mode: storage.expressionSettings.expressionClassificationMode,
+        manualLabel: chat.expressionService.manualExpressionLabel,
+      );
+      final avatar = groupFeeling != null && !followsChat
+          ? expressionForLabel(
+              card,
+              standardExpressionLabel(
+                groupFeeling,
+                storage.expressionSettings.expressionLabels,
+              ),
+            )
           : (cast.length == 1 || speaking)
           ? chat.resolveExpressionAvatar(
               card,
@@ -109,12 +120,27 @@ List<StageSprite> stageSpritesFor(ChatService chat, StorageService storage) {
   return sprites;
 }
 
-/// A feeling as one of the expression labels images are tagged with.
-String standardExpressionLabel(String feeling) {
+/// A feeling as one of the expression labels images are tagged with:
+/// [labels] (the standard set plus any the classifier model adds) as they
+/// are, any other feeling word through the nuanced table.
+String standardExpressionLabel(
+  String feeling, [
+  List<String> labels = EmotionLabels.all,
+]) {
   final lower = feeling.toLowerCase().trim();
-  if (EmotionLabels.all.contains(lower)) return lower;
+  if (labels.contains(lower)) return lower;
   return EmotionLabels.nuancedToStandard[lower] ?? 'neutral';
 }
+
+/// Whether a group member's picture follows the chat's own expression (the
+/// ONNX model's label, or `/expression`) instead of their Realism feeling.
+/// Both read the last reply, which is the speaker's, so only the speaker
+/// does; everyone else keeps their own feeling.
+bool followsChatExpression({
+  required bool speaking,
+  required String mode,
+  String? manualLabel,
+}) => speaking && (mode == 'onnx' || (manualLabel ?? '').isNotEmpty);
 
 /// The first expression image tagged [label], else neutral, else the
 /// card's chosen one. The same answer every time, so a figure does not

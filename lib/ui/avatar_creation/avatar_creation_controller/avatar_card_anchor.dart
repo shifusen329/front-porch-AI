@@ -21,6 +21,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:front_porch_ai/models/models.dart';
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/services.dart';
 
 /// The card the creator works on and the emotion labels it already has.
@@ -53,6 +54,19 @@ class AvatarCardAnchor {
   void addEmotions(Iterable<String> emotions) {
     _existingEmotions = {..._existingEmotions, ...emotions};
   }
+
+  /// Whether an image tagged [label] fits the expression limit beside the
+  /// card's expressions (alternates always do); one that fits joins them.
+  bool admit(String label) {
+    final used = {..._existingEmotions};
+    final fits = admitExpression(used, label);
+    _existingEmotions = used;
+    return fits;
+  }
+
+  /// The [labels] an upload can carry: past the limit, only the card's own.
+  List<String> uploadLabels(List<String> labels) =>
+      labelsThatFit(labels, _existingEmotions);
 
   /// Single-flight: two quick user actions before the first persist lands
   /// (upload + ZIP, say) must NOT both see a null dbId and addCharacter

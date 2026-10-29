@@ -18,16 +18,19 @@
 
 import 'dart:typed_data';
 
-import 'package:archive/archive_io.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/utils/utils.dart';
 
-/// IO helpers for the Avatar Gallery add flows — file/ZIP picking and
-/// sprite-pack decoding. No repository, no state: keeps the controller +
-/// shell under the size cap. The pickers take a [BuildContext] only so a
-/// failed file window can explain itself ([GuardedPicker]).
+// The decoder moved to services so the web relay can import packs too.
+export 'package:front_porch_ai/services/sprite_pack.dart';
+
+/// IO helpers for the Avatar Gallery add flows — file and ZIP picking (the
+/// sprite-pack decoder is `services/sprite_pack.dart`). No repository, no
+/// state: keeps the controller + shell under the size cap. The pickers take a
+/// [BuildContext] only so a failed file window can explain itself
+/// ([GuardedPicker]).
 
 /// Pick a single image and return its bytes, or null if cancelled. Handles the
 /// macOS desktop quirk where `.bytes` is null and only `.path` is populated.
@@ -55,62 +58,4 @@ Future<Uint8List?> pickZipBytes(BuildContext context) async {
 
 Future<Uint8List?> _firstBytes(FilePickerResult? result) async {
   return result?.firstBytes();
-}
-
-/// One recognized emotion sprite from a pack.
-class SpritePackEntry {
-  const SpritePackEntry(this.bytes, this.emotion);
-  final Uint8List bytes;
-  final String emotion;
-}
-
-/// The result of decoding a sprite pack: the recognized (emotion-named) entries
-/// plus a count of files whose name matched no emotion label.
-class SpritePackResult {
-  const SpritePackResult(this.entries, this.unrecognized);
-  final List<SpritePackEntry> entries;
-  final int unrecognized;
-}
-
-/// Decode a ZIP sprite pack: image files whose base name matches an emotion
-/// label (`joy.png`, `anger-1.png`, `sad_2.png`, …) become [SpritePackEntry]s;
-/// others are counted as [SpritePackResult.unrecognized]. Same matching as the
-/// old expression dialog. [labels] are the names recognized: the standard
-/// set plus any the expression classifier model adds.
-SpritePackResult decodeSpritePack(
-  Uint8List zipBytes, {
-  List<String> labels = EmotionLabels.all,
-}) {
-  const imageExts = {'png', 'jpg', 'jpeg', 'webp', 'gif'};
-  final entries = <SpritePackEntry>[];
-  var unrecognized = 0;
-
-  final archive = ZipDecoder().decodeBytes(zipBytes);
-  for (final entry in archive) {
-    if (!entry.isFile) continue;
-    // Match on the file's BASENAME so packs with folders ("sprites/joy.png")
-    // still resolve — matching the full path silently failed every foldered pack.
-    final name = entry.name.split('/').last.split(r'\').last;
-    final ext = name.split('.').last.toLowerCase();
-    if (!imageExts.contains(ext)) continue;
-
-    final base = name.replaceAll(RegExp(r'\.\w+$'), '').toLowerCase();
-    String? emotion;
-    for (final label in labels) {
-      if (base == label ||
-          base.startsWith('$label-') ||
-          base.startsWith('$label.') ||
-          base.startsWith('${label}_')) {
-        emotion = label;
-        break;
-      }
-    }
-    final data = entry.content as Uint8List?;
-    if (emotion == null || data == null) {
-      unrecognized++;
-      continue;
-    }
-    entries.add(SpritePackEntry(data, emotion));
-  }
-  return SpritePackResult(entries, unrecognized);
 }

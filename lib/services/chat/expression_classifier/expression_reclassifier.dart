@@ -37,6 +37,7 @@ class ExpressionReclassifier {
     this.fireToolEval,
     this.probe,
     this.getBackendIdentity,
+    this.getLabels,
   });
 
   final bool Function() getIsEvaluatingRealism;
@@ -45,6 +46,10 @@ class ExpressionReclassifier {
   final Object? fireToolEval;
   final ToolTransportProbe? probe;
   final String Function()? getBackendIdentity;
+
+  /// The labels offered and accepted: the standard set plus any the installed
+  /// expression classifier model adds. The standard set when absent.
+  final List<String> Function()? getLabels;
 
   /// Fire-and-forget: ask the LLM to map an unknown emotion word to a standard label.
   /// Uses JSON output so thinking models can reason first then return the label.
@@ -68,7 +73,8 @@ class ExpressionReclassifier {
     }
 
     try {
-      final labels = EmotionLabels.all.join(', ');
+      final allowed = getLabels?.call() ?? EmotionLabels.all;
+      final labels = allowed.join(', ');
       String buildPrompt({required bool toolsMode}) =>
           'Classify the emotion "$unknownEmotion" into exactly ONE of these labels: "$labels".\n'
           '${toolsMode ? 'Report by calling the $kExpressionTool tool with your choice as "label". Use ONLY the tool — no plain-text reply.' : 'Return ONLY a JSON object with one key "label" containing your choice.\n'
@@ -110,7 +116,7 @@ class ExpressionReclassifier {
                   probe: probe!,
                   backendIdentity: getBackendIdentity?.call() ?? '',
                   debugLabel: kExpressionTool,
-                  tools: kExpressionEvalTools,
+                  tools: expressionEvalTools(allowed),
                   buildPrompt: buildPrompt,
                   callToText: (resp) =>
                       realismToolCallToJson(kExpressionTool, resp.calls),
@@ -150,8 +156,7 @@ class ExpressionReclassifier {
         debugPrint('[Expression] reclassify JSON parse failed: $e');
       }
 
-      if (extractedLabel != null &&
-          EmotionLabels.all.contains(extractedLabel)) {
+      if (extractedLabel != null && allowed.contains(extractedLabel)) {
         debugPrint(
           '[Expression] reclassify: mapped "$unknownEmotion" -> "$extractedLabel"',
         );

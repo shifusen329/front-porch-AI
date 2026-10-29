@@ -47,16 +47,19 @@ void main() {
       expect(legacy.subfolder, 'avatars');
     });
 
-    test('resolveFile picks looks/ vs avatars/ off the character base folder', () {
-      expect(
-        _look('a').resolveFile('/chars/Carly').path,
-        '/chars/Carly/looks/a.png',
-      );
-      expect(
-        _expr('b', 'joy').resolveFile('/chars/Carly').path,
-        '/chars/Carly/avatars/b.png',
-      );
-    });
+    test(
+      'resolveFile picks looks/ vs avatars/ off the character base folder',
+      () {
+        expect(
+          _look('a').resolveFile('/chars/Carly').path,
+          '/chars/Carly/looks/a.png',
+        );
+        expect(
+          _expr('b', 'joy').resolveFile('/chars/Carly').path,
+          '/chars/Carly/avatars/b.png',
+        );
+      },
+    );
   });
 
   group('looksFrom / expressionsFrom partitioning', () {
@@ -114,14 +117,17 @@ void main() {
       expect(ring, ['l2', kPortraitFaceId, 'l1']);
     });
 
-    test('favorite EXPRESSION joins the ring at slot 0 (reachable + default)', () {
-      final ring = buildFaceRing(
-        looks: looks,
-        hasImagePath: true,
-        favorite: _expr('joy1', 'joy'),
-      );
-      expect(ring, ['joy1', kPortraitFaceId, 'l1', 'l2']);
-    });
+    test(
+      'favorite EXPRESSION joins the ring at slot 0 (reachable + default)',
+      () {
+        final ring = buildFaceRing(
+          looks: looks,
+          hasImagePath: true,
+          favorite: _expr('joy1', 'joy'),
+        );
+        expect(ring, ['joy1', kPortraitFaceId, 'l1', 'l2']);
+      },
+    );
 
     test('single look + portrait → ring of 2', () {
       final ring = buildFaceRing(
@@ -144,7 +150,11 @@ void main() {
 
   group('resolveFaceDisplay (plain-chat face resolution)', () {
     final looks = [_look('l1', order: 0), _look('l2', order: 1)];
-    final ring = buildFaceRing(looks: looks, hasImagePath: true, favorite: null);
+    final ring = buildFaceRing(
+      looks: looks,
+      hasImagePath: true,
+      favorite: null,
+    );
     // ring == [portrait, l1, l2]
 
     test('valid selection → that image; chevrons when ring > 1', () {
@@ -218,14 +228,17 @@ void main() {
       expect(encodeSelectedLooks(const {}), isNull);
     });
 
-    test('null / empty / garbage / non-map all decode to empty, never throw', () {
-      expect(decodeSelectedLooks(null), isEmpty);
-      expect(decodeSelectedLooks(''), isEmpty);
-      expect(decodeSelectedLooks('not json at all'), isEmpty);
-      expect(decodeSelectedLooks('["a","b"]'), isEmpty); // a list, not a map
-      expect(decodeSelectedLooks('"bare-string"'), isEmpty);
-      expect(decodeSelectedLooks('42'), isEmpty);
-    });
+    test(
+      'null / empty / garbage / non-map all decode to empty, never throw',
+      () {
+        expect(decodeSelectedLooks(null), isEmpty);
+        expect(decodeSelectedLooks(''), isEmpty);
+        expect(decodeSelectedLooks('not json at all'), isEmpty);
+        expect(decodeSelectedLooks('["a","b"]'), isEmpty); // a list, not a map
+        expect(decodeSelectedLooks('"bare-string"'), isEmpty);
+        expect(decodeSelectedLooks('42'), isEmpty);
+      },
+    );
 
     test('drops malformed entries (non-string / empty keys or values)', () {
       // Mixed value types + empty strings — only the clean entry survives.
@@ -258,6 +271,43 @@ void main() {
 
     test('empty ring → null', () {
       expect(flipFace(const [], 'x', 1), isNull);
+    });
+  });
+
+  group('the 40-expression limit', () {
+    final forty = {for (var i = 0; i < kMaxExpressions; i++) 'e$i'};
+
+    test(
+      'alternates and unlabelled images fit; a 41st expression does not',
+      () {
+        expect(kMaxExpressions, 40);
+        final used = {...forty};
+        expect(admitExpression(used, 'E3 '), isTrue); // an alternate of e3
+        expect(admitExpression(used, null), isTrue);
+        expect(admitExpression(used, ''), isTrue);
+        expect(admitExpression(used, 'cowgirl'), isFalse);
+        expect(used.length, 40);
+
+        final room = {'joy'};
+        expect(admitExpression(room, 'Cowgirl'), isTrue);
+        expect(room, {'joy', 'cowgirl'});
+      },
+    );
+
+    test('labels come from expressions only, trimmed and lowercased', () {
+      final labels = expressionLabelsOf([
+        _expr('a', ' Joy'),
+        _expr('b', 'joy', order: 1),
+        _expr('c', 'cowgirl', order: 2),
+        _look('d'),
+      ]);
+      expect(labels, {'joy', 'cowgirl'});
+    });
+
+    test('at 40, a picker offers only expressions already there', () {
+      const offered = ['joy', 'e1', 'cowgirl'];
+      expect(labelsThatFit(offered, {'joy'}), offered);
+      expect(labelsThatFit(offered, forty), ['e1']);
     });
   });
 }

@@ -21,6 +21,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'package:front_porch_ai/models/models.dart';
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/portrait_promotion.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_controller.dart';
@@ -118,13 +119,13 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
   Future<void> _addExpression() async {
     final bytes = await pickImageBytes(context);
     if (bytes == null || !mounted) return;
-    final emotion = await _pickEmotion(preview: bytes);
+    final emotion = await _pickEmotion(_c.usedLabels, preview: bytes);
     if (emotion == null) return;
     await _c.addExpression(bytes, emotion);
   }
 
   Future<void> _relabel(String avatarId) async {
-    final emotion = await _pickEmotion();
+    final emotion = await _pickEmotion(_c.usedLabelsExcept(avatarId));
     if (emotion != null) _c.setLabelDraft(avatarId, emotion);
   }
 
@@ -141,7 +142,7 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
     if (!mounted) return;
     final parts = <String>[
       'Imported $added',
-      if (skipped > 0) '$skipped skipped (30 cap)',
+      if (skipped > 0) '$skipped skipped ($kMaxExpressions expressions)',
       if (unrecognized > 0) '$unrecognized unrecognized',
     ];
     ScaffoldMessenger.of(
@@ -149,7 +150,8 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
     ).showSnackBar(SnackBar(content: Text(parts.join(' · '))));
   }
 
-  Future<String?> _pickEmotion({Uint8List? preview}) {
+  /// Past the expression limit only the expressions in [used] are offered.
+  Future<String?> _pickEmotion(Set<String> used, {Uint8List? preview}) {
     return showDialog<String>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.5),
@@ -162,7 +164,10 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
             padding: const EdgeInsets.all(18),
             child: EmotionPicker(
               previewBytes: preview,
-              labels: _c.storage.expressionSettings.expressionLabels,
+              labels: labelsThatFit(
+                _c.storage.expressionSettings.expressionLabels,
+                used,
+              ),
               onPick: (e) => Navigator.pop(dctx, e),
               onCancel: () => Navigator.pop(dctx),
             ),

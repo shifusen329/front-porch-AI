@@ -146,8 +146,10 @@ class ExpressionService {
       return _cachedExpressionLabel;
     }
 
-    // Direct match
-    if (EmotionLabels.all.contains(lower)) {
+    // Direct match: a standard label or one the classifier model adds.
+    if (getStorageService().expressionSettings.expressionLabels.contains(
+      lower,
+    )) {
       debugPrint('[Expression] emotion=$lower -> label=$lower (direct match)');
       _cachedForEmotion = lower;
       _cachedExpressionLabel = lower;
@@ -315,6 +317,8 @@ class ExpressionService {
         fireToolEval: fireToolEval,
         probe: probe,
         getBackendIdentity: getBackendIdentity,
+        getLabels: () =>
+            getStorageService().expressionSettings.expressionLabels,
       ).reclassify(
         unknownEmotion,
         onLabel: (label) {

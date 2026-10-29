@@ -27,7 +27,6 @@ import 'package:front_porch_ai/services/chat/realism_evals/realism_eval_support.
 import 'package:front_porch_ai/services/chat/realism_evals.dart';
 import 'package:front_porch_ai/services/chat/realism_prompt_builder.dart';
 import 'package:front_porch_ai/services/chat/realism_tools.dart';
-import 'package:front_porch_ai/utils/utils.dart';
 
 /// The fused one-shot realism eval call (Cluster E) for [RealismEvals].
 /// PUBLIC (not `_private`) — invoked from the chat_service library's god
@@ -91,9 +90,7 @@ class RealismEvalOneShot {
       emotionHeldTurns: evals.getEmotionHeldTurns?.call() ?? 0,
     );
     final arousalEnabled = evals.nsfwService.nsfwCooldownEnabled;
-    final labels = evals.getExpressionEnabled()
-        ? EmotionLabels.all
-        : const <String>[];
+    final labels = evals.allowedEmotionLabels;
     final primary = evals.getPrimaryObjective();
     final openGoals = [
       for (final o in evals.getActiveObjectives()) o.objective,

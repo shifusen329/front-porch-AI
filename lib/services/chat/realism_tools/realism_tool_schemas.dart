@@ -332,22 +332,32 @@ final List<Map<String, dynamic>> kSceneTimeOnlyEvalToolsWithToday = [
 /// by the post-generation time-only call, not the fused pre-gen judges.
 final List<Map<String, dynamic>> kOneShotEvalToolsWithToday = kOneShotEvalTools;
 
-final Map<String, Map<String, dynamic>> _expressionFields = {
+Map<String, Map<String, dynamic>> _expressionFieldsFor(List<String> labels) => {
   'label': {
     'type': 'string',
-    'enum': EmotionLabels.all,
-    'description': 'The standard expression label the emotion maps to.',
+    'enum': labels,
+    'description': 'The expression label the emotion maps to.',
   },
 };
 
-final List<Map<String, dynamic>> kExpressionEvalTools = [
+final Map<String, Map<String, dynamic>> _expressionFields =
+    _expressionFieldsFor(EmotionLabels.all);
+
+/// The expression-label tool over [labels]: the standard set plus any the
+/// installed expression classifier model adds.
+List<Map<String, dynamic>> expressionEvalTools(List<String> labels) => [
   _tool(
     kExpressionTool,
-    'Classify the emotion into exactly one standard expression label.',
-    _expressionFields,
+    'Classify the emotion into exactly one expression label.',
+    _expressionFieldsFor(labels),
     const ['label'],
   ),
 ];
+
+/// [expressionEvalTools] over the standard labels.
+final List<Map<String, dynamic>> kExpressionEvalTools = expressionEvalTools(
+  EmotionLabels.all,
+);
 
 final Map<String, Map<String, dynamic>> _castDetectFields = {
   'name': _strField(

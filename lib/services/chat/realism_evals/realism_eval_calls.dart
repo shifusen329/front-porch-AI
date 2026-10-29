@@ -25,7 +25,6 @@ import 'package:front_porch_ai/services/chat/realism_evals/realism_batch_collect
 import 'package:front_porch_ai/services/chat/realism_evals/realism_eval_support.dart';
 import 'package:front_porch_ai/services/chat/realism_prompt_builder.dart';
 import 'package:front_porch_ai/services/chat/realism_tools.dart';
-import 'package:front_porch_ai/utils/utils.dart';
 
 /// The 4 multi-call realism eval calls (Cluster D) for [RealismEvals]:
 /// relationship, emotional state, physical state, narrative. PUBLIC (not
@@ -200,9 +199,7 @@ class RealismEvalCalls {
       emotionHeldTurns: evals.getEmotionHeldTurns?.call() ?? 0,
     );
     final arousalEnabled = evals.nsfwService.nsfwCooldownEnabled;
-    final labels = evals.getExpressionEnabled()
-        ? EmotionLabels.all
-        : const <String>[];
+    final labels = evals.allowedEmotionLabels;
 
     String buildPrompt({required bool toolsMode}) =>
         RealismPromptBuilder.emotionalEvalPrompt(

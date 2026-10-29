@@ -49,6 +49,39 @@ List<AvatarImage> looksFrom(List<AvatarImage>? avatarImages) =>
 List<AvatarImage> expressionsFrom(List<AvatarImage>? avatarImages) =>
     (avatarImages ?? const <AvatarImage>[]).where((a) => !a.isLook).toList();
 
+/// The most distinct expressions (emotion labels) a character can carry.
+/// Alternates of one expression (`joy.png`, `joy-1.png`, `joy-2.png`) share
+/// its label and don't count. Restores and `.porch` imports never apply it.
+const int kMaxExpressions = 40;
+
+/// The distinct expression labels among [avatarImages], trimmed and
+/// lowercased. Looks and unlabelled images carry none.
+Set<String> expressionLabelsOf(List<AvatarImage>? avatarImages) => {
+  for (final a in expressionsFrom(avatarImages))
+    if ((a.label ?? '').trim().isNotEmpty) a.label!.trim().toLowerCase(),
+};
+
+/// Whether an image tagged [label] fits beside the labels in [used], which
+/// it then joins. Unlabelled images and alternates of an expression already
+/// in [used] always fit; a new expression fits below [kMaxExpressions].
+bool admitExpression(Set<String> used, String? label) {
+  final l = (label ?? '').trim().toLowerCase();
+  if (l.isEmpty || used.contains(l)) return true;
+  if (used.length >= kMaxExpressions) return false;
+  used.add(l);
+  return true;
+}
+
+/// The [labels] a new image can be tagged with beside [used]: all of them
+/// below [kMaxExpressions], else only the expressions already there.
+List<String> labelsThatFit(List<String> labels, Set<String> used) =>
+    used.length < kMaxExpressions
+    ? labels
+    : [
+        for (final l in labels)
+          if (used.contains(l.trim().toLowerCase())) l,
+      ];
+
 /// Sentinel face id for the character's library portrait (`imagePath`) inside
 /// the plain-chat face ring / per-chat selection. A real avatar id references a
 /// gallery look or (when starred) an expression image; this marks "the portrait".

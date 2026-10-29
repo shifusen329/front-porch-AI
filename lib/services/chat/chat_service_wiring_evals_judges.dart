@@ -159,6 +159,8 @@ extension ChatServiceWiringEvalJudges on ChatService {
       timeService: _timeService,
       getExpressionEnabled: () =>
           _storageService.expressionSettings.expressionEnabled,
+      getExpressionLabels: () =>
+          _storageService.expressionSettings.expressionLabels,
       // Judge dossier: same identity the generation sees (personality +
       // description + growth-ring lines when enabled), budget-capped in the
       // builder. Under group impersonation `card` is the current speaker, so

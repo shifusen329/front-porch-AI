@@ -20,6 +20,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/image_prompt/image_prompt.dart';
 
@@ -382,19 +383,34 @@ class ExpressionPackImporter {
     required List<ExpressionSlot> slots,
     bool replaceSameLabel = true,
   }) async {
-    final kept = slots
+    final done = slots
         .where(
           (s) =>
               s.state == ExpressionSlotState.done && s.keep && s.bytes != null,
         )
         .toList();
+    if (done.isEmpty) return 0;
+
+    // A new expression past kMaxExpressions is left out. Replacements and
+    // alternates are labels the character already has, so they always fit.
+    final existing = await repository.getAvatarImages(characterDbId);
+    final used = expressionLabelsOf(existing);
+    final kept = [
+      for (final s in done)
+        if (admitExpression(used, s.emotion)) s,
+    ];
+    if (kept.length < done.length) {
+      debugPrint(
+        '[ExpressionPack] ${done.length - kept.length} new expression(s) '
+        'past the $kMaxExpressions limit left out',
+      );
+    }
     if (kept.isEmpty) return 0;
 
     // Which existing same-label avatars a "replace" would supersede. Captured
     // now but NOT deleted yet — see the write-then-delete ordering below.
     var toRemove = const <String>[];
     if (replaceSameLabel) {
-      final existing = await repository.getAvatarImages(characterDbId);
       final labels = kept.map((s) => s.emotion.toLowerCase()).toSet();
       toRemove = [
         for (final a in existing)

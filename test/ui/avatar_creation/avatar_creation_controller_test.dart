@@ -33,6 +33,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show ChangeNotifier, Uint8List;
 import 'package:flutter/services.dart';
@@ -220,18 +221,20 @@ void main() {
   }
 
   group('defaults & gating', () {
-    test('engine configured → generate + pack on; unconfigured → upload only',
-        () {
-      final c = controller();
-      expect(c.source, PortraitSource.generate);
-      expect(c.packEnabled, isTrue);
+    test(
+      'engine configured → generate + pack on; unconfigured → upload only',
+      () {
+        final c = controller();
+        expect(c.source, PortraitSource.generate);
+        expect(c.packEnabled, isTrue);
 
-      gen.configured = false;
-      final c2 = controller();
-      expect(c2.source, PortraitSource.upload);
-      expect(c2.packEnabled, isFalse);
-      expect(c2.canRun, isFalse);
-    });
+        gen.configured = false;
+        final c2 = controller();
+        expect(c2.source, PortraitSource.upload);
+        expect(c2.packEnabled, isFalse);
+        expect(c2.canRun, isFalse);
+      },
+    );
 
     test('remote backend without an edit model cannot generate a pack '
         '(no img2img floor remotely)', () async {
@@ -242,7 +245,9 @@ void main() {
       expect(c.packEnabled, isFalse, reason: 'setter must respect the gate');
 
       // An allowlisted edit model in the EDIT slot flips it on.
-      await storage.imageGenSettings.setImageGenEditModel('qwen-image-max-edit');
+      await storage.imageGenSettings.setImageGenEditModel(
+        'qwen-image-max-edit',
+      );
       expect(c.packPossible, isTrue);
     });
 
@@ -284,18 +289,19 @@ void main() {
       expect(c.qcVisible, isFalse);
     });
 
-    test('known-supported → shown, default OFF, flips without resolving',
-        () async {
-      final c = controller(
-        peek: () async =>
-            const VisionSupport(true, VisionSource.apiMetadata),
-      );
-      await c.initQcGate();
-      expect(c.qcVisible, isTrue);
-      expect(c.qcEnabled, isFalse);
-      await c.setQcEnabled(true);
-      expect(c.qcEnabled, isTrue);
-    });
+    test(
+      'known-supported → shown, default OFF, flips without resolving',
+      () async {
+        final c = controller(
+          peek: () async => const VisionSupport(true, VisionSource.apiMetadata),
+        );
+        await c.initQcGate();
+        expect(c.qcVisible, isTrue);
+        expect(c.qcEnabled, isFalse);
+        await c.setQcEnabled(true);
+        expect(c.qcEnabled, isTrue);
+      },
+    );
 
     test('unknown → toggling ON resolves; failure reverts', () async {
       var resolves = 0;
@@ -349,107 +355,122 @@ void main() {
   });
 
   group('run orchestration', () {
-    test('img2img path: portrait → review gate → pack, everything imported',
-        () async {
-      // DT backend, EMPTY edit slot → packEditMode false → img2img.
-      final c = controller();
-      final stages = <AvatarRunStage>[];
-      c.addListener(() {
-        if (stages.isEmpty || stages.last != c.stage) stages.add(c.stage);
-      });
-      await c.run();
+    test(
+      'img2img path: portrait → review gate → pack, everything imported',
+      () async {
+        // DT backend, EMPTY edit slot → packEditMode false → img2img.
+        final c = controller();
+        final stages = <AvatarRunStage>[];
+        c.addListener(() {
+          if (stages.isEmpty || stages.last != c.stage) stages.add(c.stage);
+        });
+        await c.run();
 
-      // Pauses at the veto gate: only the portrait is generated so far.
-      expect(c.stage, AvatarRunStage.portraitReview);
-      expect(gen.calls.length, 1);
-      expect(gen.calls.first['isPortrait'], isTrue);
-      expect(c.portraitBytes, isNotNull);
+        // Pauses at the veto gate: only the portrait is generated so far.
+        expect(c.stage, AvatarRunStage.portraitReview);
+        expect(gen.calls.length, 1);
+        expect(gen.calls.first['isPortrait'], isTrue);
+        expect(c.portraitBytes, isNotNull);
 
-      // Accept → the pack runs and everything imports.
-      await c.continueFromReview();
-      expect(c.stage, AvatarRunStage.done);
-      expect(stages, isNot(contains(AvatarRunStage.switching)),
-          reason: 'no edit model → no switching stage');
-      // 1 portrait + 8 curated slots.
-      expect(gen.calls.length, 9);
-      for (final call in gen.calls.skip(1)) {
-        expect(call['intent'], StudioIntent.create);
-        expect(call['hasReference'], isTrue);
-      }
-      // Shared seed across every slot (Studio doctrine).
-      final seeds = gen.calls.skip(1).map((c) => c['seed']).toSet();
-      expect(seeds.length, 1);
-      expect(c.importedCount, 8);
-      final avatars = await repo.getAvatarImages(card.dbId!);
-      expect(avatars.length, 8);
-    });
+        // Accept → the pack runs and everything imports.
+        await c.continueFromReview();
+        expect(c.stage, AvatarRunStage.done);
+        expect(
+          stages,
+          isNot(contains(AvatarRunStage.switching)),
+          reason: 'no edit model → no switching stage',
+        );
+        // 1 portrait + 8 curated slots.
+        expect(gen.calls.length, 9);
+        for (final call in gen.calls.skip(1)) {
+          expect(call['intent'], StudioIntent.create);
+          expect(call['hasReference'], isTrue);
+        }
+        // Shared seed across every slot (Studio doctrine).
+        final seeds = gen.calls.skip(1).map((c) => c['seed']).toSet();
+        expect(seeds.length, 1);
+        expect(c.importedCount, 8);
+        final avatars = await repo.getAvatarImages(card.dbId!);
+        expect(avatars.length, 8);
+      },
+    );
 
-    test('edit-first path: switching stage + edit intent + comfy-safe nudge',
-        () async {
-      await storage.imageGenSettings.setImageGenEditModel('flux1-kontext-dev');
-      final c = controller();
-      final stages = <AvatarRunStage>[];
-      c.addListener(() {
-        if (stages.isEmpty || stages.last != c.stage) stages.add(c.stage);
-      });
-      await c.run();
-      expect(c.stage, AvatarRunStage.portraitReview);
-      await c.continueFromReview();
+    test(
+      'edit-first path: switching stage + edit intent + comfy-safe nudge',
+      () async {
+        await storage.imageGenSettings.setImageGenEditModel(
+          'flux1-kontext-dev',
+        );
+        final c = controller();
+        final stages = <AvatarRunStage>[];
+        c.addListener(() {
+          if (stages.isEmpty || stages.last != c.stage) stages.add(c.stage);
+        });
+        await c.run();
+        expect(c.stage, AvatarRunStage.portraitReview);
+        await c.continueFromReview();
 
-      expect(stages, contains(AvatarRunStage.switching));
-      expect(gen.comfyNudges, 1);
-      for (final call in gen.calls.skip(1)) {
-        expect(call['intent'], StudioIntent.edit);
-        expect(call['editStrength'], kCreatorPackDenoise);
-      }
-      expect(c.importedCount, 8);
-    });
+        expect(stages, contains(AvatarRunStage.switching));
+        expect(gen.comfyNudges, 1);
+        for (final call in gen.calls.skip(1)) {
+          expect(call['intent'], StudioIntent.edit);
+          expect(call['editStrength'], kCreatorPackDenoise);
+        }
+        expect(c.importedCount, 8);
+      },
+    );
 
-    test('review gate: regenerate re-runs the portrait with the edited prompt',
-        () async {
-      final c = controller();
-      await c.run();
-      expect(c.stage, AvatarRunStage.portraitReview);
-      expect(gen.calls.length, 1);
+    test(
+      'review gate: regenerate re-runs the portrait with the edited prompt',
+      () async {
+        final c = controller();
+        await c.run();
+        expect(c.stage, AvatarRunStage.portraitReview);
+        expect(gen.calls.length, 1);
 
-      // Veto: change the prompt and regenerate — a second portrait call, still
-      // paused at the gate, no pack yet.
-      c.promptController.text = 'golden armor, different face';
-      expect(c.canRegeneratePortrait, isTrue);
-      await c.regeneratePortrait();
-      expect(c.stage, AvatarRunStage.portraitReview);
-      expect(gen.calls.length, 2);
-      expect(gen.calls.last['isPortrait'], isTrue);
-      expect(gen.calls.last['prompt'], 'golden armor, different face');
-      expect(c.importedCount, 0);
-    });
+        // Veto: change the prompt and regenerate — a second portrait call, still
+        // paused at the gate, no pack yet.
+        c.promptController.text = 'golden armor, different face';
+        expect(c.canRegeneratePortrait, isTrue);
+        await c.regeneratePortrait();
+        expect(c.stage, AvatarRunStage.portraitReview);
+        expect(gen.calls.length, 2);
+        expect(gen.calls.last['isPortrait'], isTrue);
+        expect(gen.calls.last['prompt'], 'golden armor, different face');
+        expect(c.importedCount, 0);
+      },
+    );
 
-    test('review gate: continue still works with an emptied prompt (not stuck)',
-        () async {
-      final c = controller();
-      await c.run();
-      expect(c.stage, AvatarRunStage.portraitReview);
-      // Emptying the prompt only disables Regenerate — continue is unguarded.
-      c.promptController.text = '';
-      expect(c.canRegeneratePortrait, isFalse);
-      await c.regeneratePortrait(); // no-op with empty prompt
-      expect(gen.calls.length, 1);
-      await c.continueFromReview();
-      expect(c.stage, AvatarRunStage.done);
-      expect(c.importedCount, 8);
-    });
+    test(
+      'review gate: continue still works with an emptied prompt (not stuck)',
+      () async {
+        final c = controller();
+        await c.run();
+        expect(c.stage, AvatarRunStage.portraitReview);
+        // Emptying the prompt only disables Regenerate — continue is unguarded.
+        c.promptController.text = '';
+        expect(c.canRegeneratePortrait, isFalse);
+        await c.regeneratePortrait(); // no-op with empty prompt
+        expect(gen.calls.length, 1);
+        await c.continueFromReview();
+        expect(c.stage, AvatarRunStage.done);
+        expect(c.importedCount, 8);
+      },
+    );
 
-    test('review gate: "skip expressions" finishes with just the portrait',
-        () async {
-      final c = controller();
-      await c.run();
-      expect(c.stage, AvatarRunStage.portraitReview);
-      await c.continueFromReview(withPack: false);
-      expect(c.stage, AvatarRunStage.done);
-      expect(c.importedCount, 0);
-      expect(gen.calls.length, 1); // portrait only
-      expect((await repo.getAvatarImages(card.dbId!)), isEmpty);
-    });
+    test(
+      'review gate: "skip expressions" finishes with just the portrait',
+      () async {
+        final c = controller();
+        await c.run();
+        expect(c.stage, AvatarRunStage.portraitReview);
+        await c.continueFromReview(withPack: false);
+        expect(c.stage, AvatarRunStage.done);
+        expect(c.importedCount, 0);
+        expect(gen.calls.length, 1); // portrait only
+        expect((await repo.getAvatarImages(card.dbId!)), isEmpty);
+      },
+    );
 
     test('no review gate when there is no pack (portrait-only)', () async {
       final c = controller();
@@ -459,17 +480,19 @@ void main() {
       expect(gen.calls.length, 1);
     });
 
-    test('no review gate for a pack-only run off an uploaded portrait',
-        () async {
-      final c = controller();
-      c.setSource(PortraitSource.upload);
-      await c.applyPortrait(_realPng());
-      c.setPackEnabled(true);
-      await c.run();
-      expect(c.stage, AvatarRunStage.done);
-      expect(gen.calls.where((x) => x['isPortrait'] == true), isEmpty);
-      expect(c.importedCount, 8);
-    });
+    test(
+      'no review gate for a pack-only run off an uploaded portrait',
+      () async {
+        final c = controller();
+        c.setSource(PortraitSource.upload);
+        await c.applyPortrait(_realPng());
+        c.setPackEnabled(true);
+        await c.run();
+        expect(c.stage, AvatarRunStage.done);
+        expect(gen.calls.where((x) => x['isPortrait'] == true), isEmpty);
+        expect(c.importedCount, 8);
+      },
+    );
 
     test('portrait failure fails loudly and loses nothing', () async {
       gen.failPortrait = true;
@@ -590,6 +613,43 @@ void main() {
       // The pack can build straight off the persona's picture.
       expect(c.ctaLabel, 'Generate 8 expressions');
       expect(c.canRun, isTrue);
+      c.dispose();
+    });
+  });
+
+  group('the 40-expression limit', () {
+    test('a ZIP past 40 skips the new expressions, keeps every alternate, and '
+        'the tag list narrows to the expressions there', () async {
+      // A classifier model's own labels take the recognized set past 40.
+      final model = storage.expressionSettings.expressionOnnxModel;
+      final own = [for (var i = 0; i < 12; i++) 'pose$i'];
+      await storage.expressionSettings.setExpressionModelLabels(model, own);
+      final labels = storage.expressionSettings.expressionLabels;
+      expect(labels, hasLength(42));
+
+      final archive = Archive();
+      final png = _realPng(w: 8, h: 8);
+      for (final name in [
+        for (final l in labels) '$l.png',
+        'joy-1.png',
+        'joy-2.png',
+      ]) {
+        archive.addFile(ArchiveFile(name, png.length, png));
+      }
+      final zip = Uint8List.fromList(ZipEncoder().encode(archive));
+
+      final c = controller();
+      final (added, unrecognized, skipped) = await c.importExpressionZip(zip);
+      expect(skipped, 2, reason: 'the 41st and 42nd expressions');
+      expect(added, 42, reason: '40 expressions and joy\'s two alternates');
+      expect(unrecognized, 0);
+      final saved = await repo.getAvatarImages(card.dbId!);
+      expect(saved.map((a) => a.label).toSet(), hasLength(40));
+
+      expect(c.uploadLabels, hasLength(40));
+      expect(c.uploadLabels, isNot(contains(labels.last)));
+      expect(await c.addExtraUpload(png, labels.last), isFalse);
+      expect(await c.addExtraUpload(png, 'joy'), isTrue);
       c.dispose();
     });
   });

@@ -28,6 +28,7 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/facade/chat_stage_facade.dart';
 import 'package:front_porch_ai/services/web/routes/routes.dart';
 import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
+import 'package:front_porch_ai/utils/utils.dart';
 
 import '../../helpers/chat_db_teardown.dart';
 
@@ -242,5 +243,30 @@ void main() {
     expect(picture.headers['content-type'], 'image/png');
     final bytes = await picture.read().expand((c) => c).toList();
     expect(bytes, joy.readAsBytesSync());
+  });
+
+  test("a group's speaker follows ONNX mode and /expression; the others "
+      'keep their own feeling', () {
+    // ONNX mode's label and /expression both describe the last reply,
+    // which is the speaker's.
+    expect(followsChatExpression(speaking: true, mode: 'onnx'), isTrue);
+    expect(followsChatExpression(speaking: false, mode: 'onnx'), isFalse);
+    expect(followsChatExpression(speaking: true, mode: 'llm'), isFalse);
+    expect(
+      followsChatExpression(speaking: true, mode: 'llm', manualLabel: 'joy'),
+      isTrue,
+    );
+    expect(
+      followsChatExpression(speaking: false, mode: 'llm', manualLabel: 'joy'),
+      isFalse,
+    );
+  });
+
+  test("a group member's feeling can be one of the classifier model's own "
+      'labels', () {
+    const withModel = [...EmotionLabels.all, 'cowgirl'];
+    expect(standardExpressionLabel('Cowgirl', withModel), 'cowgirl');
+    expect(standardExpressionLabel('cowgirl'), 'neutral');
+    expect(standardExpressionLabel('flustered', withModel), 'embarrassment');
   });
 }

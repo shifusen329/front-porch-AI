@@ -403,11 +403,16 @@ class WebCharacterRoutes {
       return JsonResponse.error(413, 'File too large');
     }
     if (bytes.isEmpty) return JsonResponse.badRequest('Empty upload');
-    final ok = await auth.addAvatar(
-      id,
-      bytes,
-      request.url.queryParameters['label'],
-    );
+    final bool ok;
+    try {
+      ok = await auth.addAvatar(
+        id,
+        bytes,
+        request.url.queryParameters['label'],
+      );
+    } on ExpressionLimitReached catch (e) {
+      return JsonResponse.error(409, '$e');
+    }
     if (!ok) return JsonResponse.error(404, 'Character not found');
     return JsonResponse.ok({'avatars': await auth.avatars(id)});
   }

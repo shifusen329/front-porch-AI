@@ -1517,3 +1517,79 @@ test('the theme follows the desktop, and a device can keep its own mode', { tag:
     expect(back.ok(), `restoring Dark Mode: ${back.status()}`).toBe(true);
   }
 });
+
+// The desktop gallery's "Import ZIP sprite pack" on the phone: alternates
+// named joy-1.png come in beside joy.png and never count toward the 40.
+test('import a ZIP sprite pack on the edit page, alternates included', async ({ page }) => {
+  const name = `Sprite Pack ${test.info().project.name}`;
+  const created = await page.request.post('/api/characters/create', {
+    data: { name, firstMessage: 'The porch light is on.' },
+  });
+  expect(created.ok(), `create: ${created.status()}`).toBe(true);
+  const id = String(((await created.json()) as { id: string | number }).id);
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  try {
+    await openRoute(page, `/edit/${id}`);
+    await page.locator('input[accept=".zip,application/zip"]').setInputFiles({
+      name: 'sprites.zip',
+      mimeType: 'application/zip',
+      buffer: storedZip({ 'joy-1.png': png, 'anger.png': png, 'joy.png': png, 'readme.png': png }),
+    });
+    const gallery = page.locator('.avatar-manager');
+    await expect(gallery).toContainText('Imported 3 · 1 unrecognized');
+    await expect(gallery).toContainText('2/40 expressions · 3 images');
+    await expect(gallery.locator('.avatar-label', { hasText: /^joy$/ })).toHaveCount(2);
+  } finally {
+    const gone = await page.request.post(`/api/characters/${id}/delete`);
+    expect(gone.ok(), `deleting the journey character: ${gone.status()}`).toBe(true);
+  }
+});
+
+/** A ZIP with each file stored uncompressed, as a sprite pack would be. */
+function storedZip(files: Record<string, Buffer>): Buffer {
+  const crc32 = (data: Buffer) => {
+    let crc = 0xffffffff;
+    for (const byte of data) {
+      crc ^= byte;
+      for (let k = 0; k < 8; k++) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  };
+  const parts: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+  for (const [fileName, data] of Object.entries(files)) {
+    const nameBytes = Buffer.from(fileName);
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(20, 4);
+    entry.writeUInt16LE(20, 6);
+    entry.writeUInt32LE(crc, 16);
+    entry.writeUInt32LE(data.length, 20);
+    entry.writeUInt32LE(data.length, 24);
+    entry.writeUInt16LE(nameBytes.length, 28);
+    entry.writeUInt32LE(offset, 42);
+    parts.push(local, nameBytes, data);
+    central.push(entry, nameBytes);
+    offset += local.length + nameBytes.length + data.length;
+  }
+  const directory = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(files).length, 8);
+  end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, directory, end]);
+}

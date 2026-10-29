@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/painting.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/character_repository.dart';
 import 'package:front_porch_ai/services/portrait_promotion.dart';
 import 'package:front_porch_ai/services/image/image.dart';
@@ -160,6 +161,13 @@ class ImageBatchReview {
           );
         } else if (target.kind == 'expressions') {
           final previous = await repository.getAvatarImages(target.characterId);
+          if (!admitExpression(expressionLabelsOf(previous), target.label)) {
+            debugPrint(
+              '[ImageBatch] ${target.characterName}: "${target.label}" left '
+              'out, past the $kMaxExpressions-expression limit',
+            );
+            continue;
+          }
           final added = await repository.batchMedia.addAvatar(
             target.characterId,
             card.name,
