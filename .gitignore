@@ -146,6 +146,11 @@ aur_key.pub
 !web_ui/public/icon-*.png
 !assets/web_app/icon-*.png
 
+# Allow the Android launcher icon (the *.png rule above would block them, and
+# the adaptive icon's XML points at the drawable-nodpi layers, so a clone
+# without them fails to link its resources).
+!android/app/src/main/res/**/*.png
+
 # Allow background images for theme presets (the *.png rule above would block
 # them, but the theme system needs real background images checked in).
 !assets/backgrounds/*.png
@@ -207,3 +212,23 @@ macos/Podfile.lock
 graphify-out/
 lib/graphify-out/
 .debug/
+# App update publishing (tools/publish_update.dart): the server address stays
+# local, and the installer it builds is uploaded, not committed.
+tools/publish_update.env
+installers/windows/*.exe
+
+# Large build outputs wherever a copy lands. Builds write them under build/,
+# but a 300 MB APK or an installer copied anywhere else must not ride along
+# in a commit. Agent worktrees are whole second checkouts of the repo.
+*.apk
+*.aab
+*.msix
+installers/**/*.exe
+.claude/worktrees/
+
+# Reference material kept beside the code, not shipped: the icon pack the
+# Android launcher icon was copied from (its res/ lives in android/ now),
+# the icon candidates, and local to-do notes.
+assets/front_porch_android_icon_pack/
+assets/side-patio-gemini.jpg
+/TODO.md
