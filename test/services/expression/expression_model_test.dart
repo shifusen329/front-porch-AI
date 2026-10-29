@@ -296,4 +296,28 @@ void main() {
       );
     },
   );
+  test('naming a model learns its own labels from config.json alone, in LLM '
+      'mode, with no weights downloaded', () async {
+    final hub = await _Hub.start();
+    hub.serveRepo(_model);
+    final storage = await _storage();
+    final settings = storage.expressionSettings;
+    expect(settings.expressionClassificationMode, 'llm');
+    final service = ExpressionClassifierService(storage, hubBaseUrl: hub.url);
+    service.learnModelLabels(); // the default model adds no labels
+    expect(hub.asked, isEmpty);
+
+    await settings.setExpressionOnnxModel(_model);
+    service.learnModelLabels();
+    for (var i = 0; i < 50; i++) {
+      if (settings.expressionModelLabels != null) break;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+
+    expect(settings.expressionLabels, containsAll(['cowgirl', 'bj', 'joy']));
+    expect(hub.asked, ['/$_model/resolve/main/config.json']);
+    expect(service.isModelCached, isFalse, reason: 'the weights stay put');
+    service.learnModelLabels();
+    expect(hub.asked, hasLength(1), reason: 'once per model');
+  });
 }

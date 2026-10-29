@@ -84,7 +84,7 @@ export function ExpressionModelSettings<T extends ExpressionModelStatus>({
       <p className="muted small" role="status">
         {error ||
           (labels == null
-            ? 'The desktop downloads it the next time it reads a reply; its labels show here then.'
+            ? 'The desktop reads its labels from its config.json in a moment; they show here then.'
             : own.length === 0
               ? `${labels.length} labels, all standard ones.`
               : `${labels.length} labels. Its own, for tagging images: ${own.join(', ')}`)}

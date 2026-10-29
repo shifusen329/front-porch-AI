@@ -181,6 +181,17 @@ class OnnxEmotionClassifier implements ExpressionClassifier {
     onModelReady?.call();
   }
 
+  /// Fetches only config.json when it isn't on disk, then reports its
+  /// labels: a model's own labels are known before its weights download.
+  Future<void> fetchLabels() async {
+    final config = File(_files.config);
+    if (!await config.exists()) {
+      await Directory(_files.downloadDir).create(recursive: true);
+      await _fetchFirst(['config.json', 'onnx/config.json'], config);
+    }
+    await reportLabels();
+  }
+
   /// Reads the labels in the model's config.json and hands them to
   /// [onLabels]; nothing when the model has no readable config.json yet.
   Future<void> reportLabels() async {

@@ -183,15 +183,10 @@ class VoiceMediaExpressionSection extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (storage
-                            .expressionSettings
-                            .expressionClassificationMode ==
-                        'onnx') ...[
-                      const SizedBox(height: 8),
-                      ExpressionModelField(
-                        settings: storage.expressionSettings,
-                      ),
-                    ],
+                    // In every mode: the model's own labels are what images
+                    // can be tagged with and what the Realism Engine picks.
+                    const SizedBox(height: 8),
+                    ExpressionModelField(settings: storage.expressionSettings),
                     const SizedBox(height: 8),
                     // Display mode dropdown
                     Row(

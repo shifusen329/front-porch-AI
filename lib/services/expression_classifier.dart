@@ -205,6 +205,28 @@ class ExpressionClassifierService extends ChangeNotifier {
     );
   }
 
+  String? _labelsTriedFor;
+
+  /// Learns the chosen model's own labels from its config.json alone, in
+  /// every mode: they name what images can be tagged with and what the
+  /// Realism Engine may choose, so they can't wait for the weights or a
+  /// chat in ONNX mode. Once per model; the default model adds none.
+  void learnModelLabels() {
+    final model = _model;
+    if (model == kDefaultExpressionModel ||
+        _storage.rootPath == null ||
+        _labelsTriedFor == model ||
+        _storage.expressionSettings.expressionModelLabels != null) {
+      return;
+    }
+    _labelsTriedFor = model;
+    unawaited(
+      _onnxClassifier(onProgress: (_) {}).fetchLabels().catchError((Object e) {
+        debugPrint('[ExpressionClassifierService] $model labels unread: $e');
+      }),
+    );
+  }
+
   /// Initialize or re-initialize the classifier based on current settings.
   Future<void> ensureInitialized({
     required String Function() getCurrentEmotion,

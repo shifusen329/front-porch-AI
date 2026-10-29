@@ -361,8 +361,10 @@ Widget buildRootWidget(
           create: (context) => ExpressionClassifierService(
             Provider.of<StorageService>(context, listen: false),
           ),
+          // Every settings change: a newly named model's labels are read.
           update: (context, storage, previous) =>
-              previous ?? ExpressionClassifierService(storage),
+              (previous ?? ExpressionClassifierService(storage))
+                ..learnModelLabels(),
         ),
         ChangeNotifierProxyProvider3<
           StorageService,

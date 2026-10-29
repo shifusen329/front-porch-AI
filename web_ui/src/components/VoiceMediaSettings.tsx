@@ -144,9 +144,9 @@ export function VoiceMediaSettings() {
           recogniser yet. Try the mic again in a moment.
         </p>
       )}
-      {v.expressionEnabled && v.expressionMode === 'onnx' && (
-        <ExpressionModelSettings status={v} onSaved={setV} />
-      )}
+      {/* Every mode: the model's own labels are what images can be tagged
+          with and what the Realism Engine may choose. */}
+      {v.expressionEnabled && <ExpressionModelSettings status={v} onSaved={setV} />}
       {v.listsVoices && (
         <>
           <div className="row-label">

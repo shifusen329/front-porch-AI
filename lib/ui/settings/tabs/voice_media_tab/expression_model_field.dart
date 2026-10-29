@@ -125,7 +125,8 @@ class _ExpressionModelFieldState extends State<ExpressionModelField> {
           child: Text(
             labels == null
                 ? 'An ONNX text classifier with onnx/model.onnx, vocab.txt and '
-                      'config.json. Its labels show here once it downloads.'
+                      'config.json. Its labels show here once it downloads '
+                      'that config.json, in any mode.'
                 : own.isEmpty
                 ? '${labels.length} labels, all standard ones.'
                 : '${labels.length} labels. Its own, for tagging images: '
