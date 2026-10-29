@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The only folder the update FileProvider shares: where UpdateService
+     downloads the APK (getTemporaryDirectory()/updates). -->
+<paths>
+    <cache-path name="updates" path="updates/"/>
+</paths>

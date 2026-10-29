@@ -12,8 +12,14 @@
 // is Process.run plumbing, exercised only on a real Linux install — this
 // suite pins the validation half).
 
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:front_porch_ai/services/update/update.dart';
 import 'package:front_porch_ai/services/update_service.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   test('truncated download is rejected', () {
@@ -26,16 +32,18 @@ void main() {
     );
   });
 
-  test('tiny body (an HTML error page) is rejected even with matching length',
-      () {
-    expect(
-      UpdateService.validateInstallerDownload(
-        receivedBytes: 5 * 1024,
-        expectedBytes: 5 * 1024,
-      ),
-      contains('implausibly small'),
-    );
-  });
+  test(
+    'tiny body (an HTML error page) is rejected even with matching length',
+    () {
+      expect(
+        UpdateService.validateInstallerDownload(
+          receivedBytes: 5 * 1024,
+          expectedBytes: 5 * 1024,
+        ),
+        contains('implausibly small'),
+      );
+    },
+  );
 
   test('a real installer passes', () {
     expect(
@@ -53,5 +61,76 @@ void main() {
       ),
       isNull,
     );
+  });
+
+  // The update feed names each file's size and sha256; a download that is
+  // not that file (a corrupted copy, an upload replaced mid-download) is
+  // thrown away and the reason is kept for the dialog. A real listening
+  // server serves the feed and a real 2 MB file.
+  group('a download from the update server', () {
+    const name = 'Front_Porch_AI_update_test.bin';
+    final payload = List<int>.generate(
+      2 * 1024 * 1024,
+      (i) => (i * 31 + 7) & 0xff,
+    );
+    late HttpServer server;
+    late String advertisedHash;
+
+    setUp(() async {
+      HttpOverrides.global = null;
+      advertisedHash = sha256.convert(payload).toString();
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) {
+        final response = request.response;
+        if (request.uri.path.endsWith('latest.json')) {
+          response.write(
+            jsonEncode({
+              'version': '99.0.0',
+              for (final key in UpdateFeed.platforms)
+                key: {
+                  'file': name,
+                  'size': payload.length,
+                  'sha256': advertisedHash,
+                },
+            }),
+          );
+        } else {
+          response.add(payload);
+        }
+        response.close();
+      });
+      UpdateService.debugIsSupportedOverride = true;
+      UpdateService.debugFeedUrlOverride =
+          'http://${server.address.host}:${server.port}/app/latest.json';
+    });
+
+    tearDown(() async {
+      UpdateService.debugIsSupportedOverride = null;
+      UpdateService.debugFeedUrlOverride = null;
+      await server.close(force: true);
+      final left = File(p.join(Directory.systemTemp.path, name));
+      if (left.existsSync()) left.deleteSync();
+    });
+
+    test('a file that does not match its checksum is thrown away', () async {
+      advertisedHash = 'c' * 64;
+      final service = UpdateService();
+      expect(await service.checkForUpdate(), isTrue);
+
+      await service.downloadUpdate();
+      expect(service.downloadComplete, isFalse);
+      expect(service.hasPendingInstaller, isFalse);
+      expect(service.downloadError, contains('checksum'));
+    });
+
+    test('the file the feed describes is kept for install', () async {
+      final service = UpdateService();
+      expect(await service.checkForUpdate(), isTrue);
+
+      await service.downloadUpdate();
+      expect(service.downloadError, isNull);
+      expect(service.downloadComplete, isTrue);
+      expect(service.hasPendingInstaller, isTrue);
+    });
   });
 }

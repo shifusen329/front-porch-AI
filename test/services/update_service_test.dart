@@ -17,128 +17,114 @@
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:front_porch_ai/services/update_service.dart';
+import 'package:front_porch_ai/services/update/update.dart';
 
-// Regression coverage for the nightly update-ordering bug: the updater used to
-// take the FIRST channel-matching release GitHub returned and stop. Because the
-// Rawhide version string (rawhide.YYYYMMDD.<sha>) has no orderable field below
-// the day and GitHub's list order is not reliably newest-first, a newer
-// same-day manual build listed below an older release was never offered.
-// selectTargetRelease must instead pick the channel match with the newest
-// publish timestamp, and keep stable/nightly strictly isolated.
-Map<String, dynamic> _rel({
-  required String tag,
-  required bool prerelease,
-  String? publishedAt,
-  String? createdAt,
-}) => {
-  'tag_name': tag,
-  'prerelease': prerelease,
-  'published_at': publishedAt,
-  'created_at': createdAt ?? publishedAt,
+// The update feed (latest.json) tools/publish_update.dart writes on the
+// app's own server: what it reads, what it refuses, and how versions
+// compare. This file used to pin the choice of a release out of GitHub's
+// release list; the app no longer reads GitHub's releases, so that choice
+// is gone and the feed's parsing is what decides what gets offered.
+
+final _hash = 'a' * 64;
+final _base = Uri.parse('https://example.test/app/latest.json');
+
+Map<String, dynamic> _entry(String file) => {
+  'file': file,
+  'size': 2048,
+  'sha256': _hash,
 };
 
 void main() {
-  group('UpdateService.selectTargetRelease', () {
-    test(
-      'picks the later-published same-day nightly even when GitHub lists it '
-      'below an older one (the reported bug)',
-      () {
-        // GitHub returned the OLDER build first; the newer manual build (later
-        // published_at) is lower in the list. The tags differ only by SHA, so
-        // nothing in the string can rank them.
-        final releases = [
-          _rel(
-            tag: 'nightly-rawhide.20260718.b503c85',
-            prerelease: true,
-            publishedAt: '2026-07-18T09:32:53Z',
-          ),
-          _rel(
-            tag: 'nightly-rawhide.20260718.aaaaaaa',
-            prerelease: true,
-            publishedAt: '2026-07-18T14:05:00Z', // manual rebuild, published later
-          ),
-        ];
+  group('UpdateFeed.parse', () {
+    test('reads each platform\'s file, resolved against the feed', () {
+      final feed = UpdateFeed.parse({
+        'version': 'v1.0.1',
+        'notes': '- Updates from the porch',
+        'windows': _entry('Front_Porch_AI_Setup_1.0.1.exe'),
+        'android': {
+          ..._entry('https://cdn.example.test/Front_Porch_AI_1.0.1.apk'),
+          'versionCode': 1000100,
+        },
+      }, _base);
 
-        final chosen = UpdateService.selectTargetRelease(releases, true);
-        expect(chosen?['tag_name'], 'nightly-rawhide.20260718.aaaaaaa');
+      expect(feed.version, '1.0.1');
+      expect(feed.notes, '- Updates from the porch');
+      final windows = feed.files['windows']!;
+      expect(
+        windows.url.toString(),
+        'https://example.test/app/Front_Porch_AI_Setup_1.0.1.exe',
+      );
+      expect(windows.name, 'Front_Porch_AI_Setup_1.0.1.exe');
+      expect(windows.size, 2048);
+      expect(windows.sha256, _hash);
+      expect(feed.files['android']!.url.host, 'cdn.example.test');
+      expect(feed.files.containsKey('linux'), isFalse);
+    });
+
+    test(
+      'a feed that is not whole is refused, never read as nothing newer',
+      () {
+        final bad = <Object?>[
+          [],
+          'latest',
+          <String, dynamic>{},
+          {'version': ''},
+          {
+            'version': '1.0.1',
+            'windows': {'file': 'a.exe'},
+          },
+          {
+            'version': '1.0.1',
+            'windows': {'file': 'a.exe', 'size': 10, 'sha256': 'not-a-hash'},
+          },
+          {'version': '1.0.1', 'android': 'a.apk'},
+        ];
+        for (final json in bad) {
+          expect(
+            () => UpdateFeed.parse(json, _base),
+            throwsFormatException,
+            reason: '$json',
+          );
+        }
       },
     );
 
-    test('stable build never selects a pre-release', () {
-      final releases = [
-        _rel(
-          tag: 'nightly-rawhide.20260718.aaaaaaa',
-          prerelease: true,
-          publishedAt: '2026-07-18T14:05:00Z',
-        ),
-        _rel(
-          tag: 'v0.9.8',
-          prerelease: false,
-          publishedAt: '2026-07-10T00:00:00Z',
-        ),
-      ];
-      final chosen = UpdateService.selectTargetRelease(releases, false);
-      expect(chosen?['tag_name'], 'v0.9.8');
+    test('a file name that would leave the download folder is refused', () {
+      // The last path segment, decoded, becomes the downloaded file's name.
+      for (final file in [
+        '..%2F..%2Fshared_prefs%2Fprefs.xml',
+        '..%5C..%5CFront_Porch_AI.exe',
+        '..',
+        'releases/',
+      ]) {
+        expect(
+          () => UpdateFeed.parse({
+            'version': '1.0.1',
+            'android': _entry(file),
+          }, _base),
+          throwsFormatException,
+          reason: file,
+        );
+      }
     });
+  });
 
-    test('nightly build skips stable and unflagged betas, picks newest nightly', () {
-      final releases = [
-        _rel(
-          tag: 'v0.9.8',
-          prerelease: false,
-          publishedAt: '2026-07-19T00:00:00Z', // newest overall, but wrong channel
-        ),
-        _rel(
-          tag: 'nightly-rawhide.20260717.4360257',
-          prerelease: true,
-          publishedAt: '2026-07-17T06:07:24Z',
-        ),
-        _rel(
-          tag: 'nightly-rawhide.20260718.b503c85',
-          prerelease: true,
-          publishedAt: '2026-07-18T09:32:53Z',
-        ),
-        // prerelease flag not set but tag carries "beta" — must still count as
-        // pre-release for a nightly channel (both are "effectively beta").
-        _rel(
-          tag: '0.9.9-beta1',
-          prerelease: false,
-          publishedAt: '2026-07-16T00:00:00Z',
-        ),
-      ];
-      final chosen = UpdateService.selectTargetRelease(releases, true);
-      expect(chosen?['tag_name'], 'nightly-rawhide.20260718.b503c85');
-    });
-
-    test('falls back to created_at when published_at is null', () {
-      final releases = [
-        _rel(
-          tag: 'nightly-rawhide.20260718.older',
-          prerelease: true,
-          publishedAt: '2026-07-18T01:00:00Z',
-        ),
-        _rel(
-          tag: 'nightly-rawhide.20260718.newer',
-          prerelease: true,
-          publishedAt: null,
-          createdAt: '2026-07-18T23:00:00Z',
-        ),
-      ];
-      final chosen = UpdateService.selectTargetRelease(releases, true);
-      expect(chosen?['tag_name'], 'nightly-rawhide.20260718.newer');
-    });
-
-    test('returns null when no release matches the channel', () {
-      final releases = [
-        _rel(
-          tag: 'v0.9.8',
-          prerelease: false,
-          publishedAt: '2026-07-10T00:00:00Z',
-        ),
-      ];
-      expect(UpdateService.selectTargetRelease(releases, true), isNull);
-      expect(UpdateService.selectTargetRelease(const [], false), isNull);
-    });
+  test('isNewerVersion orders releases', () {
+    expect(isNewerVersion('1.0.1', '1.0.0'), isTrue);
+    expect(isNewerVersion('1.0.10', '1.0.9'), isTrue);
+    expect(isNewerVersion('1.0.9', '1.0.10'), isFalse);
+    expect(isNewerVersion('1.0.0', '1.0.0'), isFalse);
+    expect(isNewerVersion('v1.1.0', '1.0.9'), isTrue);
+    expect(isNewerVersion('1.0.0', '1.0.0-beta3'), isTrue);
+    expect(isNewerVersion('1.0.0-beta3', '1.0.0'), isFalse);
+    expect(isNewerVersion('0.9.8-beta10', '0.9.8-beta9'), isTrue);
+    expect(
+      isNewerVersion('nightly-rawhide.20260720.abc', 'rawhide.20260719.def'),
+      isTrue,
+    );
+    expect(
+      isNewerVersion('rawhide.20260718.abc', 'rawhide.20260719.def'),
+      isFalse,
+    );
   });
 }

@@ -24,6 +24,12 @@ extension UpdateServiceInstall on UpdateService {
   Future<void> _installNowImpl() async {
     if (_pendingInstallerPath == null) return;
     try {
+      // Android's installer asks, then closes and replaces the app itself;
+      // there are no child processes and nothing to exit.
+      if (Platform.isAndroid) {
+        await ApkInstaller.install(_pendingInstallerPath!);
+        return;
+      }
       // Stop child processes (KoboldCPP, etc.) before exit(0) which
       // bypasses the window close handler entirely.
       if (_shutdownCallback != null) {
@@ -50,7 +56,9 @@ extension UpdateServiceInstall on UpdateService {
   /// Run the pending update on app close.
   /// Call this from the window close handler.
   Future<void> _installOnCloseImpl() async {
-    if (_pendingInstallerPath == null) return;
+    // An Android app is not closed by the user; "Later" there means the
+    // next start asks again.
+    if (_pendingInstallerPath == null || Platform.isAndroid) return;
     try {
       // Ensure child processes are stopped even if onWindowClose didn't
       // reach stopKobold() (e.g. crash or early return).

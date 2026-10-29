@@ -20,15 +20,32 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:front_porch_ai/app_version.dart';
+import 'package:front_porch_ai/services/update/update.dart';
 import 'package:front_porch_ai/services/update_service.dart';
 
 // Regression coverage for the in-app updater claiming "You are up to date"
-// during a GitHub outage. A failed check used to return false exactly like a
-// successful "nothing newer" check, so the UI could not tell them apart. The
-// KoboldCpp and OpenCode updaters already say "check failed" here; this one
-// must expose the failure through [UpdateService.checkError].
+// when the update server is down. A failed check used to return false
+// exactly like a successful "nothing newer" check, so the UI could not tell
+// them apart. The KoboldCpp and OpenCode updaters already say "check failed"
+// here; this one must expose the failure through [UpdateService.checkError].
+// The check reads the feed tools/publish_update.dart writes (it used to read
+// GitHub's release list, which is why these cases changed shape).
 //
 // Every case talks real HTTP to a real listening server the test controls.
+
+String _feed(String version, {bool withFiles = true}) => jsonEncode({
+  'version': version,
+  'notes': '- Updates from the porch',
+  if (withFiles)
+    for (final key in UpdateFeed.platforms)
+      key: {
+        'file': 'Front_Porch_AI_$version.bin',
+        'size': 4096,
+        'sha256': 'b' * 64,
+      },
+});
+
 void main() {
   late HttpServer server;
   late int status;
@@ -39,7 +56,7 @@ void main() {
     // the real HTTP stack against the real server below.
     HttpOverrides.global = null;
     status = 200;
-    body = '[]';
+    body = _feed(appVersion);
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) {
       request.response
@@ -48,17 +65,17 @@ void main() {
         ..close();
     });
     UpdateService.debugIsSupportedOverride = true;
-    UpdateService.debugApiBaseOverride =
-        'http://${server.address.host}:${server.port}';
+    UpdateService.debugFeedUrlOverride =
+        'http://${server.address.host}:${server.port}/app/latest.json';
   });
 
   tearDown(() async {
     UpdateService.debugIsSupportedOverride = null;
-    UpdateService.debugApiBaseOverride = null;
+    UpdateService.debugFeedUrlOverride = null;
     await server.close(force: true);
   });
 
-  test('a GitHub 5xx is reported as a failed check, not up to date', () async {
+  test('a server 5xx is reported as a failed check, not up to date', () async {
     status = 503;
     body = 'unicorn';
     final service = UpdateService();
@@ -76,12 +93,17 @@ void main() {
     expect(service.checkError, isNotNull);
   });
 
-  test('an error object instead of a release list is a failed check', () async {
-    body = jsonEncode({'message': 'Server Error'});
-    final service = UpdateService();
+  test('a reply that is not a feed is a failed check', () async {
+    for (final garbled in [
+      '[]',
+      jsonEncode({'message': 'Server Error'}),
+    ]) {
+      body = garbled;
+      final service = UpdateService();
 
-    expect(await service.checkForUpdate(), isFalse);
-    expect(service.checkError, isNotNull);
+      expect(await service.checkForUpdate(), isFalse, reason: garbled);
+      expect(service.checkError, isNotNull, reason: garbled);
+    }
   });
 
   test('a good reply with nothing newer clears a previous failure', () async {
@@ -91,8 +113,31 @@ void main() {
     expect(service.checkError, isNotNull);
 
     status = 200;
-    body = '[]';
     expect(await service.checkForUpdate(), isFalse);
     expect(service.checkError, isNull);
+    expect(service.updateAvailable, isFalse);
   });
+
+  test('a newer version with a file for this platform is offered', () async {
+    body = _feed('99.0.0');
+    final service = UpdateService();
+
+    expect(await service.checkForUpdate(), isTrue);
+    expect(service.updateAvailable, isTrue);
+    expect(service.latestVersion, '99.0.0');
+    expect(service.releaseNotes, '- Updates from the porch');
+    expect(service.checkError, isNull);
+  });
+
+  test(
+    'a newer version with no file for this platform is not offered',
+    () async {
+      body = _feed('99.0.0', withFiles: false);
+      final service = UpdateService();
+
+      expect(await service.checkForUpdate(), isFalse);
+      expect(service.updateAvailable, isFalse);
+      expect(service.checkError, isNull);
+    },
+  );
 }

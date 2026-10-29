@@ -24,6 +24,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
+import 'package:front_porch_ai/utils/utils.dart' show PlatformCaps;
 
 /// Dialog shown when a new version is available.
 /// Three stages: prompt → downloading → ready to install.
@@ -60,6 +61,8 @@ class UpdateDialog extends StatelessWidget {
   /// Stage 1: "A new version is available, would you like to download?"
   Widget _buildPromptDialog(BuildContext context, UpdateService service) {
     return AlertDialog(
+      // A phone on its side is too short for the notes; it scrolls.
+      scrollable: PlatformCaps.current.usesMobileShell,
       backgroundColor: AppColors.surfaceOf(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
@@ -119,41 +122,8 @@ class UpdateDialog extends StatelessWidget {
               fontSize: 14,
             ),
           ),
-          const SizedBox(height: 16),
-          Divider(color: AppColors.borderOf(context)),
-          const SizedBox(height: 12),
-          Text(
-            '☕ Enjoying Front Porch AI?',
-            style: TextStyle(
-              color: AppColors.textPrimary(context),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'This project is free, open source, and built with love. If you enjoy this program please consider buying me a coffee. It helps keep development going!',
-            style: TextStyle(
-              color: AppColors.textTertiary(context),
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () =>
-                  launchUrl(Uri.parse('https://ko-fi.com/sosukeaizen37411')),
-              icon: const Icon(Icons.coffee_outlined, size: 18),
-              label: Text('Support on Ko-fi'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AccentColors.kofiOf(context),
-                side: BorderSide(color: AccentColors.kofiOf(context), width: 1),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
+          // A phone carries no community links (app_destinations.dart).
+          if (!PlatformCaps.current.usesMobileShell) ..._kofi(context),
         ],
       ),
       actions: [
@@ -165,7 +135,18 @@ class UpdateDialog extends StatelessWidget {
           ),
         ),
         ElevatedButton.icon(
-          onPressed: () => service.downloadUpdate(),
+          onPressed: () async {
+            await service.downloadUpdate();
+            final error = service.downloadError;
+            if (error == null || !context.mounted) return;
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Download failed: $error'),
+                backgroundColor: StatusColors.errorFill,
+              ),
+            );
+          },
           icon: const Icon(Icons.download, size: 18),
           label: Text('Download'),
           style: ElevatedButton.styleFrom(
@@ -177,42 +158,55 @@ class UpdateDialog extends StatelessWidget {
     );
   }
 
-  /// Renders the non-technical "What's New" changelog from the GitHub release body.
-  /// Uses flutter_markdown_plus inside a constrained scroll area so long release
-  /// notes do not blow out the AlertDialog.
-  /// Empty state gracefully falls back to a GitHub link (covers the case where
-  /// the release body has not yet been populated with friendly text).
+  List<Widget> _kofi(BuildContext context) {
+    return [
+      const SizedBox(height: 16),
+      Divider(color: AppColors.borderOf(context)),
+      const SizedBox(height: 12),
+      Text(
+        '☕ Enjoying Front Porch AI?',
+        style: TextStyle(
+          color: AppColors.textPrimary(context),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'This project is free, open source, and built with love. If you enjoy this program please consider buying me a coffee. It helps keep development going!',
+        style: TextStyle(
+          color: AppColors.textTertiary(context),
+          fontSize: 13,
+          height: 1.4,
+        ),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () =>
+              launchUrl(Uri.parse('https://ko-fi.com/sosukeaizen37411')),
+          icon: const Icon(Icons.coffee_outlined, size: 18),
+          label: Text('Support on Ko-fi'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AccentColors.kofiOf(context),
+            side: BorderSide(color: AccentColors.kofiOf(context), width: 1),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// Renders the non-technical "What's New" changelog from the update feed's
+  /// notes. Uses flutter_markdown_plus inside a constrained scroll area so
+  /// long release notes do not blow out the AlertDialog.
   Widget _buildChangelogSection(BuildContext context, UpdateService service) {
     final notes = service.releaseNotes.trim();
     if (notes.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Full release notes are available on GitHub.',
-            style: TextStyle(
-              color: AppColors.textSecondary(context),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                final url = service.releaseUrl;
-                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-              },
-              icon: const Icon(Icons.open_in_browser, size: 16),
-              label: Text('View on GitHub'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textSecondary(context),
-                side: BorderSide(color: InkColors.fieldEdgeOf(context)),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-            ),
-          ),
-        ],
+      return Text(
+        'No release notes for this version.',
+        style: TextStyle(color: AppColors.textSecondary(context), fontSize: 13),
       );
     }
 
@@ -349,7 +343,10 @@ class UpdateDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'The update has been downloaded. Would you like to install it now?',
+            Platform.isAndroid
+                ? 'The update has been downloaded. Android will ask you to '
+                      'confirm installing it.'
+                : 'The update has been downloaded. Would you like to install it now?',
             style: TextStyle(
               color: AppColors.textSecondary(context),
               fontSize: 14,
@@ -357,7 +354,10 @@ class UpdateDialog extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            Platform.isLinux
+            Platform.isAndroid
+                ? 'If you choose "Later", you\'ll be asked again the next time '
+                      'the app starts.'
+                : Platform.isLinux
                 ? 'If you choose "Later", the update will be applied when you close the app.'
                 : 'If you choose "Later", the update will install automatically when you close the app.',
             style: TextStyle(
@@ -380,6 +380,21 @@ class UpdateDialog extends StatelessWidget {
             // Installing quits the app, so unsaved edits are asked about
             // first, as on the window close.
             if (!await UnsavedChanges.instance.confirmLeave(context)) return;
+            // The first time, Android must be told this app may install
+            // apps; its settings page opens, and Install is tapped again.
+            if (Platform.isAndroid && !await ApkInstaller.canInstall()) {
+              await ApkInstaller.openInstallPermission();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Allow Front Porch AI to install apps, then tap '
+                    'Install again.',
+                  ),
+                ),
+              );
+              return;
+            }
             try {
               await service.installNow();
             } catch (e) {
@@ -394,8 +409,11 @@ class UpdateDialog extends StatelessWidget {
               }
             }
           },
-          icon: const Icon(Icons.install_desktop, size: 18),
-          label: Text('Install Now'),
+          icon: Icon(
+            Platform.isAndroid ? Icons.install_mobile : Icons.install_desktop,
+            size: 18,
+          ),
+          label: Text(Platform.isAndroid ? 'Install' : 'Install Now'),
           style: ElevatedButton.styleFrom(
             backgroundColor: StatusColors.successFillOf(context),
             foregroundColor: StatusColors.onFill,

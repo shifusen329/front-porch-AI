@@ -18,46 +18,35 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:front_porch_ai/app_version.dart';
+import 'package:front_porch_ai/services/update/update.dart';
 import 'package:front_porch_ai/utils/native_exit.dart';
 
 part 'update_service_download.dart';
 part 'update_service_install.dart';
 
-// Note: app_version.dart was already imported — UpdateService already used
-// appVersion for _currentVersion. The isPreRelease getter now also guards
-// the update channel so stable builds can never be offered a beta update.
+/// Where installed copies look for a newer version. tools/publish_update.dart
+/// uploads the files and writes this feed beside them.
+const kUpdateFeedUrl = 'https://www.gofigstudios.com/app/latest.json';
 
 /// Cross-platform self-update service.
-/// Checks GitHub Releases for new versions and downloads/runs the update.
-/// Supports Windows (Inno Setup), Linux (AppImage), and macOS (.pkg —
-/// signed+notarized+stapled, the only macOS asset since the unsigned shim
-/// DMG was retired 2026-07-27; binaries old enough to predate the .pkg
-/// updater must manually download once).
+/// Reads the update feed ([kUpdateFeedUrl]) and downloads/runs the update.
+/// Supports Windows (Inno Setup), Android (the system package installer),
+/// Linux (AppImage), and macOS (.pkg) — each only once the feed lists a file
+/// for it.
 class UpdateService extends ChangeNotifier {
-  static const String _repoOwner = 'linux4life1';
-  static const String _repoName = 'front-porch-AI';
-  static const String _windowsAssetStable = 'Front_Porch_AI_Setup.exe';
-  static const String _windowsAssetBeta = 'Front_Porch_AI_Beta_Setup.exe';
-  static const String _windowsAssetNightly = 'Front_Porch_AI_Nightly_Setup.exe';
-  static const String _linuxAsset = 'Front_Porch_AI-Linux.AppImage';
-  static const String _linuxAssetNightly =
-      'Front_Porch_AI_Nightly-Linux.AppImage';
-  // Primary (new canonical) asset names for macOS .pkg releases (signed+notarized).
-  static const String _macosAssetPkg = 'Front_Porch_AI.pkg';
-  static const String _macosAssetBetaPkg = 'Front_Porch_AI_MacOS.pkg';
-  static const String _macosAssetNightlyPkg = 'Front_Porch_AI_Nightly.pkg';
   static const String _prefsKeyAutoCheck = 'update_auto_check';
 
-  String _currentVersion = '';
+  String _currentVersion = appVersion;
   String _latestVersion = '';
-  String _latestReleaseTag = '';
-  String _downloadUrl = '';
+  UpdateFile? _file;
   String _releaseNotes = '';
   bool _updateAvailable = false;
   bool _checking = false;
@@ -65,37 +54,28 @@ class UpdateService extends ChangeNotifier {
   bool _downloading = false;
   bool _downloadComplete = false;
   double _downloadProgress = 0.0;
+  String? _downloadError;
   bool _autoCheckEnabled = true;
   String? _pendingInstallerPath;
-  // The actual asset filename chosen. Used so download names the temp file
-  // after the real remote asset (the extension drives the platform install
-  // dispatch at install time).
-  String _selectedAssetName = '';
 
   String get currentVersion => _currentVersion;
   String get latestVersion => _latestVersion;
   String get releaseNotes => _releaseNotes;
-
-  /// URL to the GitHub release page for the latest version found by checkForUpdate().
-  /// Used by the update dialog for the "View on GitHub" fallback and for links inside
-  /// rendered release notes.
-  /// Uses the actual tag (e.g. "nightly-rawhide.20250519.xxx" or "v0.9.8") so links
-  /// are always correct for nightly, beta, and stable channels.
-  String get releaseUrl => _latestReleaseTag.isNotEmpty
-      ? 'https://github.com/$_repoOwner/$_repoName/releases/tag/$_latestReleaseTag'
-      : 'https://github.com/$_repoOwner/$_repoName/releases';
   bool get updateAvailable => _updateAvailable;
   bool get checking => _checking;
 
-  /// Why the last [checkForUpdate] could not reach a verdict (GitHub down,
-  /// rate-limited, offline, garbled reply), or null when it got one. A false
-  /// return from [checkForUpdate] only means "up to date" when this is null —
-  /// otherwise the UI must say the check failed, the way the KoboldCpp and
-  /// OpenCode updaters do, instead of claiming there is nothing newer.
+  /// Why the last [checkForUpdate] could not reach a verdict (server down,
+  /// offline, garbled reply), or null when it got one. A false return from
+  /// [checkForUpdate] only means "up to date" when this is null — otherwise
+  /// the UI must say the check failed, the way the KoboldCpp and OpenCode
+  /// updaters do, instead of claiming there is nothing newer.
   String? get checkError => _checkError;
   bool get downloading => _downloading;
   bool get downloadComplete => _downloadComplete;
   double get downloadProgress => _downloadProgress;
+
+  /// Why the last [downloadUpdate] was thrown away, or null.
+  String? get downloadError => _downloadError;
   bool get autoCheckEnabled => _autoCheckEnabled;
   bool get hasPendingInstaller => _pendingInstallerPath != null;
 
@@ -120,21 +100,24 @@ class UpdateService extends ChangeNotifier {
     _shutdownCallback = callback;
   }
 
-  /// Whether this platform supports self-update.
-  /// Windows: true when installed via the Inno Setup installer (.installed marker).
-  /// Linux: true when running as an AppImage ($APPIMAGE env var is set).
   /// Test seam: forces [isSupported] so [checkForUpdate] runs under test.
   @visibleForTesting
   static bool? debugIsSupportedOverride;
 
   /// Test seam: points [checkForUpdate] at a local server instead of
-  /// api.github.com, so failure paths are pinned against real HTTP.
+  /// [kUpdateFeedUrl], so every path is pinned against real HTTP.
   @visibleForTesting
-  static String? debugApiBaseOverride;
+  static String? debugFeedUrlOverride;
 
+  /// Whether this platform supports self-update.
+  /// Windows: true when installed via the Inno Setup installer (.installed marker).
+  /// Android: always (the system installer takes the APK).
+  /// Linux: true when running as an AppImage ($APPIMAGE env var is set).
+  /// macOS: true when running as an .app bundle.
   static bool get isSupported {
     final override = debugIsSupportedOverride;
     if (override != null) return override;
+    if (Platform.isAndroid) return true;
     if (Platform.isWindows) {
       final exeDir = File(Platform.resolvedExecutable).parent.path;
       return File('$exeDir\\.installed').existsSync();
@@ -149,28 +132,6 @@ class UpdateService extends ChangeNotifier {
       return exe.contains('.app/Contents/MacOS/');
     }
     return false;
-  }
-
-  /// The correct asset name for this platform's update package.
-  /// Nightly (Rawhide), Beta, and Stable each use distinct filenames so the
-  /// three update channels never cross-pollinate (prevents data dir disasters).
-  static String get _platformAsset {
-    if (Platform.isWindows) {
-      if (isNightlyBuild) return _windowsAssetNightly;
-      return isPreRelease ? _windowsAssetBeta : _windowsAssetStable;
-    }
-    if (Platform.isLinux) {
-      if (isNightlyBuild) return _linuxAssetNightly;
-      return _linuxAsset;
-    }
-    if (Platform.isMacOS) {
-      // .pkg is the only macOS asset (the legacy shim DMG and its fallback
-      // probe were retired 2026-07-27).
-      if (isNightlyBuild) return _macosAssetNightlyPkg;
-      if (isPreRelease) return _macosAssetBetaPkg;
-      return _macosAssetPkg;
-    }
-    return '';
   }
 
   Future<void> initialize() async {
@@ -194,8 +155,8 @@ class UpdateService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Check GitHub Releases API for a newer version.
-  /// Returns true if an update is available.
+  /// Read the update feed for a newer version with a file for this
+  /// platform. Returns true if an update is available.
   Future<bool> checkForUpdate() async {
     if (!isSupported || _checking) return false;
 
@@ -204,90 +165,47 @@ class UpdateService extends ChangeNotifier {
     notifyListeners();
 
     final client = http.Client();
-    final apiBase = debugApiBaseOverride ?? 'https://api.github.com';
+    final feedUrl = Uri.parse(debugFeedUrlOverride ?? kUpdateFeedUrl);
     try {
-      // Use the general /releases endpoint to find both stable and pre-releases.
-      // GitHub's /releases/latest endpoint ignores everything marked as pre-release.
-      //
-      // per_page=100 (GitHub's maximum) is load-bearing, not a tidy-up. The
-      // endpoint defaults to 30 and orders by the tag's created_at, and a
-      // nightly is published every day — so 30 entries is barely a month of
-      // history. A stable release would fall off the first page about a month
-      // after it shipped, and from then on [selectTargetRelease] would see no
-      // stable entry at all and offer the user nothing. Silently: a stable
-      // build that skipped one month of updates would simply stop being told
-      // that updates exist. 100 turns "one month" into "a few months"; a
-      // release cadence that ever outruns THAT needs real pagination here.
-      //
-      // The timeout matches the KoboldCpp check: during a GitHub outage the
-      // request can hang rather than fail, which would leave the button
-      // stuck on "Checking..." indefinitely.
+      // The timeout matches the KoboldCpp check: a server that hangs rather
+      // than fails would leave the button stuck on "Checking..." forever.
       final response = await client
-          .get(
-            Uri.parse(
-              '$apiBase/repos/$_repoOwner/$_repoName/releases'
-              '?per_page=100',
-            ),
-            headers: {'Accept': 'application/vnd.github.v3+json'},
-          )
+          .get(feedUrl)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         debugPrint('Update check failed: ${response.statusCode}');
-        _checkError = 'GitHub API: HTTP ${response.statusCode}';
+        _checkError = 'update server: HTTP ${response.statusCode}';
         return false;
       }
 
-      final decoded = jsonDecode(response.body);
-      if (decoded is! List) {
-        debugPrint('Update check failed: unexpected response shape');
-        _checkError = 'Unexpected response from GitHub';
-        return false;
-      }
-      final List<dynamic> allReleases = decoded;
-      if (allReleases.isEmpty) return false;
-
-      final targetRelease = selectTargetRelease(allReleases, isPreRelease);
-      if (targetRelease == null) return false;
-
-      final originalTag = (targetRelease['tag_name'] as String? ?? '');
-      final tagNameStripped = originalTag.replaceFirst(RegExp(r'^[vV]'), '');
-      final normalizedVersion = _normalizeForCompare(tagNameStripped);
-      final assets = targetRelease['assets'] as List<dynamic>? ?? [];
-
-      // Find the platform-specific update asset (now correctly picks Nightly/Beta/Stable)
-      final targetAsset = _platformAsset;
-      String? installerUrl;
-      String? resolvedAssetName;
-      for (final asset in assets) {
-        if (asset['name'] == targetAsset) {
-          installerUrl = asset['browser_download_url'] as String?;
-          resolvedAssetName = targetAsset;
-          break;
-        }
-      }
-
-      if (installerUrl == null) {
-        debugPrint(
-          'No update asset ($targetAsset) found in release $originalTag',
+      final UpdateFeed feed;
+      try {
+        // bodyBytes: nginx sends JSON without a charset, and the notes are
+        // UTF-8.
+        feed = UpdateFeed.parse(
+          jsonDecode(utf8.decode(response.bodyBytes)),
+          feedUrl,
         );
+      } on FormatException catch (e) {
+        debugPrint('Update check failed: $e');
+        _checkError = 'unexpected reply from the update server';
         return false;
       }
 
-      _latestReleaseTag = originalTag;
-      _latestVersion = normalizedVersion;
-      _downloadUrl = installerUrl;
-      _selectedAssetName = resolvedAssetName ?? targetAsset;
-      _releaseNotes = targetRelease['body'] as String? ?? '';
-      // The friendly "What's New" (including the macOS .pkg+shim transition note)
-      // comes from docs/<Branch>.md (e.g. docs/Rawhide.md) via the CI release_notes
-      // step; it is rendered in the in-app Update Available dialog.
-      _updateAvailable = _isNewerVersion(normalizedVersion, _currentVersion);
-
+      final file = feed.forThisPlatform;
+      _latestVersion = feed.version;
+      _releaseNotes = feed.notes;
+      _file = file;
+      if (file == null) {
+        debugPrint('The update feed has no ${UpdateFeed.platformKey} file');
+      }
+      _updateAvailable =
+          file != null && isNewerVersion(feed.version, _currentVersion);
       return _updateAvailable;
     } catch (e) {
       debugPrint('Update check error: $e');
-      _checkError = 'Could not check for updates';
+      _checkError = 'could not reach the update server';
       return false;
     } finally {
       client.close();
@@ -321,173 +239,11 @@ class UpdateService extends ChangeNotifier {
     return null;
   }
 
-  /// Run the update immediately and exit (or relaunch on Linux/macOS).
+  /// Run the update immediately and exit (or relaunch on Linux/macOS; on
+  /// Android, hand it to the system installer).
   Future<void> installNow() => _installNowImpl();
 
   /// Run the pending update on app close.
   /// Call this from the window close handler.
   Future<void> installOnClose() => _installOnCloseImpl();
-
-  /// Picks the release this build's channel should be offered, out of the
-  /// full GitHub `/releases` list.
-  ///
-  /// Two invariants, both learned from field bugs:
-  ///  * **Channel isolation.** Stable and Beta/Nightly install to different
-  ///    paths and data dirs, so a stable build must never be handed a
-  ///    pre-release and vice-versa (`wantPrerelease` is this build's channel).
-  ///  * **"Newest" cannot depend on GitHub's list order OR on the Rawhide
-  ///    version string.** GitHub's `/releases` ordering is not reliably
-  ///    newest-published-first, and `rawhide.YYYYMMDD.<sha>` has no orderable
-  ///    field below the day — the trailing short SHA is a commit hash, not a
-  ///    monotonic build counter. The old code took the FIRST channel match and
-  ///    stopped, so a newer same-day manual build that GitHub listed *below* an
-  ///    older release was invisible (you couldn't distinguish or rank them by
-  ///    the tag, and index 0 was never revisited). We instead scan every
-  ///    channel match and keep the one with the newest publish timestamp, which
-  ///    is a true monotonic recency signal the version string can't provide.
-  @visibleForTesting
-  static Map<String, dynamic>? selectTargetRelease(
-    List<dynamic> releases,
-    bool wantPrerelease,
-  ) {
-    Map<String, dynamic>? best;
-    DateTime? bestStamp;
-    for (final release in releases) {
-      if (release is! Map<String, dynamic>) continue;
-
-      final tagLower = (release['tag_name'] as String? ?? '')
-          .replaceFirst(RegExp(r'^[vV]'), '')
-          .toLowerCase();
-      final isPrerelease = release['prerelease'] as bool? ?? false;
-      // Manual string check catches pre-releases whose `prerelease` flag was
-      // never set. contains('rawhide') (no leading -) matches both
-      // "nightly-rawhide..." tags and raw "rawhide.YYYY..." versions.
-      final hasBetaString =
-          tagLower.contains('beta') ||
-          tagLower.contains('alpha') ||
-          tagLower.contains('-rc') ||
-          tagLower.contains('-dev') ||
-          tagLower.contains('nightly') ||
-          tagLower.contains('rawhide');
-      final effectivelyBeta = isPrerelease || hasBetaString;
-      if (wantPrerelease != effectivelyBeta) continue;
-
-      // published_at is the real publication time; created_at (the tag's
-      // commit date) is the fallback for the rare release with a null
-      // published_at. An unparseable/missing pair sinks to the epoch so a
-      // dated release always outranks it.
-      final stamp =
-          DateTime.tryParse(
-            (release['published_at'] ?? release['created_at'] ?? '') as String,
-          ) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      if (best == null || stamp.isAfter(bestStamp!)) {
-        best = release;
-        bestStamp = stamp;
-      }
-    }
-    return best;
-  }
-
-  /// Normalizes a version/tag string for comparison and display:
-  /// strips leading v/V, and the "nightly-" wrapper used on GitHub tags for Rawhide
-  /// so that "nightly-rawhide.20250519.abc" becomes "rawhide.20250519.abc" (matching
-  /// the appVersion string baked into the binary by the nightly CI).
-  String _normalizeForCompare(String v) {
-    v = v.toLowerCase().replaceFirst(RegExp(r'^[vV]'), '');
-    if (v.startsWith('nightly-')) {
-      v = v.substring(8);
-    }
-    return v;
-  }
-
-  /// Compare version strings (e.g. "0.9.8-Beta6" vs "0.9.8-Beta5", or rawhide dates).
-  /// Returns true if remote is newer than local.
-  bool _isNewerVersion(String remote, String local) {
-    final rClean = _normalizeForCompare(remote);
-    final lClean = _normalizeForCompare(local);
-
-    if (rClean == lClean) return false;
-
-    // Special handling for Rawhide nightlies: the version format is
-    // "rawhide.YYYYMMDD.SHA". We compare the date numeric first (correctly
-    // orders 20250519 > 20250517), then fall back for same-day builds.
-    if (rClean.startsWith('rawhide.') && lClean.startsWith('rawhide.')) {
-      final rParts = rClean.split('.');
-      final lParts = lClean.split('.');
-      if (rParts.length >= 2 && lParts.length >= 2) {
-        final rDate = int.tryParse(rParts[1]) ?? 0;
-        final lDate = int.tryParse(lParts[1]) ?? 0;
-        if (rDate > lDate) return true;
-        if (rDate < lDate) return false;
-        // Same calendar day: any distinct build from the latest published
-        // release should be offered (the GH list order is authoritative).
-        return true;
-      }
-    }
-
-    // Standard semver path for stable / beta / etc.
-    // Split at the first hyphen (e.g. "0.9.8-beta6" -> ["0.9.8", "beta6"])
-    final rSplit = rClean.split('-');
-    final lSplit = lClean.split('-');
-
-    final rBase = rSplit[0]
-        .split('.')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-    final lBase = lSplit[0]
-        .split('.')
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
-
-    // Normalize lengths for the numeric base
-    while (rBase.length < lBase.length) {
-      rBase.add(0);
-    }
-    while (lBase.length < rBase.length) {
-      lBase.add(0);
-    }
-
-    // 1. Compare numeric base parts
-    for (int i = 0; i < rBase.length; i++) {
-      if (rBase[i] > lBase[i]) return true;
-      if (rBase[i] < lBase[i]) return false;
-    }
-
-    // 2. Base version is identical, compare suffixes (e.g. "-beta6" vs "-beta5")
-    final rSuffix = rSplit.length > 1 ? rSplit[1] : '';
-    final lSuffix = lSplit.length > 1 ? lSplit[1] : '';
-
-    if (rSuffix.isEmpty && lSuffix.isNotEmpty) {
-      return true; // Stable is newer than beta
-    }
-    if (rSuffix.isNotEmpty && lSuffix.isEmpty) {
-      return false; // Beta is older than stable
-    }
-
-    // Both have suffixes, do a natural comparison
-    return _compareAlphanumeric(rSuffix, lSuffix) > 0;
-  }
-
-  /// Helper for natural string comparison (handles "beta10" > "beta9")
-  int _compareAlphanumeric(String a, String b) {
-    final re = RegExp(r'(\d+)|(\D+)');
-    final aMatches = re.allMatches(a).toList();
-    final bMatches = re.allMatches(b).toList();
-
-    for (int i = 0; i < min(aMatches.length, bMatches.length); i++) {
-      final aVal = aMatches[i].group(0)!;
-      final bVal = bMatches[i].group(0)!;
-
-      final aNum = int.tryParse(aVal);
-      final bNum = int.tryParse(bVal);
-
-      if (aNum != null && bNum != null) {
-        if (aNum != bNum) return aNum.compareTo(bNum);
-      } else {
-        if (aVal != bVal) return aVal.compareTo(bVal);
-      }
-    }
-    return aMatches.length.compareTo(bMatches.length);
-  }
 }

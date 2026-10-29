@@ -206,7 +206,8 @@ class BackendManager extends ChangeNotifier {
     await checkBackendAvailability();
     if (_storageService.rootPath != null) await _readLocalVersion();
     if (looked && !_engineChecked.isCompleted) _engineChecked.complete();
-    if (UpdateService.isSupported) {
+    // The app updating itself (a phone does) is not KoboldCpp running here.
+    if (UpdateService.isSupported && !localUnsupported) {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('update_auto_check') ?? true) {
         checkForUpdates();
@@ -353,7 +354,7 @@ class BackendManager extends ChangeNotifier {
       print('AG_DEBUG: Checking backend availability...');
       await Future.delayed(const Duration(milliseconds: 500)); // Brief pause
       await checkBackendAvailability();
-      if (UpdateService.isSupported) {
+      if (UpdateService.isSupported && !localUnsupported) {
         final prefs = await SharedPreferences.getInstance();
         if (prefs.getBool('update_auto_check') ?? true) {
           checkForUpdates();

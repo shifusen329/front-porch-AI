@@ -18,32 +18,28 @@
 
 part of 'update_service.dart';
 
-/// Download the chosen GitHub asset to a temp file.
+/// Download the feed's file for this platform to a temp file.
 extension UpdateServiceDownload on UpdateService {
   /// Download the installer to a temp directory.
   /// Does NOT run it — call installNow() or let installOnClose() handle it.
   Future<void> _downloadUpdateImpl() async {
-    if (!UpdateService.isSupported || _downloadUrl.isEmpty || _downloading) {
+    final target = _file;
+    if (!UpdateService.isSupported || target == null || _downloading) {
       return;
     }
 
     _downloading = true;
     _downloadComplete = false;
     _downloadProgress = 0.0;
+    _downloadError = null;
     notify();
 
     try {
-      final tempDir = Directory.systemTemp;
-      // Use the resolved asset name so the temp file has the correct
-      // extension for the later install dispatch.
-      final assetName = _selectedAssetName.isNotEmpty
-          ? _selectedAssetName
-          : UpdateService._platformAsset;
-      final sep = Platform.isWindows ? '\\' : '/';
-      final installerPath = '${tempDir.path}$sep$assetName';
+      // The file's own name: its extension drives the install dispatch.
+      final installerPath = p.join((await _downloadDir()).path, target.name);
       final file = File(installerPath);
 
-      final request = http.Request('GET', Uri.parse(_downloadUrl));
+      final request = http.Request('GET', target.url);
       final client = http.Client();
       try {
         final response = await client.send(request);
@@ -54,7 +50,7 @@ extension UpdateServiceDownload on UpdateService {
           throw Exception('installer download HTTP ${response.statusCode}');
         }
 
-        final totalBytes = response.contentLength ?? 0;
+        final totalBytes = response.contentLength ?? target.size;
         int receivedBytes = 0;
         final sink = file.openWrite();
         try {
@@ -75,16 +71,17 @@ extension UpdateServiceDownload on UpdateService {
           expectedBytes: totalBytes,
         );
         if (invalid != null) throw Exception(invalid);
-        // A complete fake 200 (a captive portal / CDN error page big enough
-        // to pass the size floor) must still not become the installer: an
-        // HTML body is text, real installers are binary. First byte '<' (or
-        // a leading doctype after whitespace) = not an installer.
-        final head = await file
-            .openRead(0, 64)
-            .fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-        final headText = String.fromCharCodes(head).trimLeft().toLowerCase();
-        if (headText.startsWith('<')) {
-          throw Exception('installer download is an HTML page, not a binary');
+        // The feed says what the file is; anything else (a captive portal's
+        // page, a half-replaced upload, a corrupted copy) is thrown away.
+        if (receivedBytes != target.size) {
+          throw Exception(
+            'installer download is $receivedBytes bytes, '
+            'the update server says ${target.size}',
+          );
+        }
+        final digest = await sha256.bind(file.openRead()).first;
+        if (digest.toString() != target.sha256) {
+          throw Exception('installer download does not match its checksum');
         }
 
         _pendingInstallerPath = installerPath;
@@ -96,9 +93,21 @@ extension UpdateServiceDownload on UpdateService {
       }
     } catch (e) {
       debugPrint('Download error: $e');
+      _downloadError = '$e'.replaceFirst('Exception: ', '');
       _downloading = false;
       _downloadProgress = 0.0;
       notify();
     }
+  }
+
+  /// Android hands the APK over through the FileProvider, which shares only
+  /// the cache's `updates/` folder (android/app/src/main/res/xml).
+  Future<Directory> _downloadDir() async {
+    if (!Platform.isAndroid) return Directory.systemTemp;
+    final dir = Directory(
+      p.join((await getTemporaryDirectory()).path, 'updates'),
+    );
+    await dir.create(recursive: true);
+    return dir;
   }
 }
