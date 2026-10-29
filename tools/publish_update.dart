@@ -36,6 +36,7 @@ const _setupOutput = 'installers/windows/Front_Porch_AI_Setup.exe';
 const _windowsBuild = 'build/windows/x64/runner/Release';
 const _vcRedist = 'build/windows/x64/runner/vc_redist.x64.exe';
 const _apkOutput = 'build/app/outputs/flutter-apk/app-debug.apk';
+const _gradleApk = 'build/app/outputs/apk/debug/app-debug.apk';
 final _ours = RegExp(
   r'^Front_Porch_AI_(?:Setup_)?(\d+\.\d+\.\d+)\.(?:exe|apk)$',
 );
@@ -128,6 +129,13 @@ Future<void> _publish(List<String> args) async {
       '/DMyAppIconFile=${p.absolute('windows/runner/resources/app_icon.ico')}',
       _setupScript,
     ]);
+    // Debug packaging rewrites the last APK in place and leaves the old
+    // kernel's bytes behind as dead space (about 54 MB every phone would
+    // download); starting from no APK packages only what is in it.
+    for (final old in [_gradleApk, _apkOutput]) {
+      final apk = File(old);
+      if (apk.existsSync()) apk.deleteSync();
+    }
     // Debug-signed, like the phone builds already installed: Android only
     // updates an app signed with the same key.
     await _run(_flutter(), ['build', 'apk', '--debug', ...buildArgs]);
