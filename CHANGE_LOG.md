@@ -3,6 +3,66 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-29 15:41:20 -0500 (CDT)
+
+On the `dev` branch.
+
+### Added
+
+- **Your own voice, a narrator voice and Narrate All** (`8ee6f0ba`).
+  Settings → text to speech has a voice for your own messages with
+  **Speak my messages**, and a narrator voice for narrator and Director
+  lines. The chat's side panel has a **Narrate All** section that reads the
+  chat aloud from any message, each line in its own voice. Each bubble's
+  speaker button uses the voice its line is read in. The phone web app has
+  all three.
+- **Updates from the app's own server** (`9a4d22ee`). Windows and Android
+  check for a newer version at startup and ask; Settings → General checks
+  by hand. A download that does not match its size and checksum is thrown
+  away and the app says why. On Android, Android's installer asks once to
+  allow installing apps. `tools/publish_update.dart` builds and publishes a
+  release. This is 1.0.1.
+- **Import from any file app on Android** (`9cd65519`). Every Import opens
+  Android's Files screen with **Browse files in other apps**, so file
+  managers such as Cx File Explorer, and the network drives they reach,
+  can hand over a file. A file of the wrong kind gets a plain message
+  saying what to pick instead.
+- **Up to 40 expressions, with any number of alternates** (`6bd1d9a5`).
+  The Avatar Gallery counts expressions, not images: `joy.png`,
+  `joy-1.png` and `joy-2.png` are one expression. The limit applies
+  wherever images are added (the gallery, the creator, Image Studio packs,
+  Image Batches, the phone web app); restores and `.porch` imports never
+  drop images.
+  - ZIP sprite packs import the plain `joy.png` first, then its alternates
+    by number.
+  - The phone web app's character page has **Import ZIP sprite pack** and
+    the same counter.
+  - A classifier model's own expression labels can be chosen by the
+    Realism Engine too, so LLM mode can show them.
+  - On a group's visual novel stage, the member who just spoke follows
+    ONNX mode and `/expression`.
+
+### Changed
+
+- The Android launcher icon is the Front Porch icon instead of Flutter's
+  logo, with a themed-icon layer for Android 13 (`ca745d21`).
+- The updater no longer reads GitHub releases; it reads the app's own
+  update server (`9a4d22ee`).
+
+### Fixed
+
+- A sprite pack's file names can no longer let one label take another's
+  images (`reverse-cowgirl-1.png` was read as `reverse`) (`6bd1d9a5`).
+- The Avatar Gallery's expression row no longer overflows on a phone
+  (`6bd1d9a5`).
+
+### Known gaps
+
+- Android's silent self-update, periodic update checks and voice cloning
+  from a clip are planned, not built.
+- Cx File Explorer and NAS shares are verified on the emulator's Files
+  screen only, not yet on a physical phone.
+
 ## 2026-10-28 14:07:15 -0500 (CDT)
 
 On the `uiux` branch.
