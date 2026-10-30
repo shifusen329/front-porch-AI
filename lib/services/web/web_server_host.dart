@@ -53,6 +53,9 @@ class WebServerHost extends ChangeNotifier {
   AuthService? _auth;
   StreamHub? _streamHub;
   TunnelManager? _tunnelManager;
+
+  /// Held across a database bounce so ngrok and Tailscale stay up.
+  TunnelManager? _keptTunnels;
   String? _lanIp;
 
   /// Bumped by every [start] and every [stop]. `startSafely` time-boxes start
@@ -150,7 +153,9 @@ class WebServerHost extends ChangeNotifier {
     // swallowed: the server ends up stopped with lastStartError set.
     unawaited(() async {
       try {
-        await stop();
+        // Keep the tunnels and the phone's client lock: a library Get from
+        // the phone swaps the database under the page that asked for it.
+        await stop(keepTunnels: true);
         await start(port);
         _lastStartError = null;
         _lastStartPortConflict = false;
@@ -170,6 +175,7 @@ class WebServerHost extends ChangeNotifier {
 
   /// Chat service for live token streaming over the WebSocket hub.
   void setChatService(ChatService chatService) => _services.chat = chatService;
+  void setLibrarySync(LibrarySyncService sync) => _services.sync = sync;
 
   void setCharacterRepository(CharacterRepository repo) =>
       _services.characters = repo;
@@ -294,7 +300,7 @@ class WebServerHost extends ChangeNotifier {
     return 'Start failed: $e';
   }
 
-  Future<void> stop() async {
+  Future<void> stop({bool keepTunnels = false}) async {
     // Disown any start still in flight FIRST — before the early return below,
     // which is exactly the case a start that has not reached its bind yet hits
     // (nothing wired, no server): otherwise its socket would surface after we
@@ -318,13 +324,19 @@ class WebServerHost extends ChangeNotifier {
     _relays.detach();
     await _streamHub?.dispose();
     _streamHub = null;
-    await _tunnelManager?.dispose();
+    if (keepTunnels) {
+      _keptTunnels = _tunnelManager;
+    } else {
+      await _tunnelManager?.dispose();
+    }
     _tunnelManager = null;
     await server?.close(force: true);
     _lanIp = null;
-    _hasActiveClient = false;
-    _connectedClientIp = null;
-    _connectedClientInfo = null;
+    if (!keepTunnels) {
+      _hasActiveClient = false;
+      _connectedClientIp = null;
+      _connectedClientInfo = null;
+    }
     debugPrint('[WebServerHost] Stopped');
     notifyListeners();
   }
@@ -378,10 +390,9 @@ class WebServerHost extends ChangeNotifier {
       _relays.attachSettings(streamHub);
     }
 
-    final tunnelManager = _tunnelManager = TunnelManager(
-      bindPort,
-      tailscale: tailscale,
-    );
+    final tunnelManager = _tunnelManager =
+        _keptTunnels ?? TunnelManager(bindPort, tailscale: tailscale);
+    _keptTunnels = null;
 
     final assembled = assembleWebServerDeps(
       services: _services,

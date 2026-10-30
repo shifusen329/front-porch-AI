@@ -66,6 +66,18 @@ class AppShutdown {
     // exit(0)/destroy() below can't kill an in-flight write.
     await flushChatSaves(context);
 
+    // Send on close (Settings → Sync): after the last chat save, before an
+    // update installs. It skips when anything is busy or another device sent
+    // a newer library, and gives up after a minute.
+    try {
+      await Provider.of<LibrarySyncService>(
+        context,
+        listen: false,
+      ).sendIfWanted();
+    } on ProviderNotFoundException {
+      // A graph built without boot prefs has no sync.
+    }
+
     // Stop the managed KoboldCPP backend BEFORE destroying the window. This
     // prevents an orphaned process when the app closes.
     try {

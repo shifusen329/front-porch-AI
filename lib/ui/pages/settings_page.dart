@@ -238,6 +238,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'Voice & Media',
       'Backend',
       'Advanced',
+      'Sync',
       if (backupsTab) 'Backups',
     ];
     return Stack(
@@ -306,6 +307,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       onScanAndClean: _openDatabaseCleanup,
                     ),
                   ),
+                  const SyncTab(),
                   if (backupsTab) const BackupsPage(embedded: true),
                 ],
               ),

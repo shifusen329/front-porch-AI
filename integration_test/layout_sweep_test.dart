@@ -173,6 +173,16 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       scanText();
     }
+    // Settings → Sync (library sync) at every size too.
+    await tester.tap(find.text('Sync'));
+    await tester.pump(const Duration(milliseconds: 800));
+    for (final size in {..._sizes, 'tiny': const Size(360, 800)}.entries) {
+      where = '${size.key} sync';
+      tester.view.physicalSize = size.value;
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump(const Duration(milliseconds: 400));
+      scanText();
+    }
 
     appState.setIndex(0);
     final chatService = Provider.of<ChatService>(ctx, listen: false);
@@ -380,7 +390,7 @@ void main() {
 
       await tester.tap(tab('Settings'));
       await settle();
-      for (final view in ['General', 'Backups']) {
+      for (final view in ['General', 'Sync', 'Backups']) {
         where = '${stop.key} Settings/$view';
         await tester.ensureVisible(settingsTab(view));
         await tester.tap(settingsTab(view));

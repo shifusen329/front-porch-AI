@@ -130,11 +130,16 @@ shelf.Handler buildWebHandler(WebServerDeps deps) {
   if (deps.tunnelManager != null) {
     WebRemoteRoutes(deps, deps.tunnelManager!, router);
   }
+  final sync = deps.syncFacade;
+  if (sync != null) WebSyncRoutes(sync, deps.auth, router);
 
   return shelf.Pipeline()
       .addMiddleware(const CorsMiddleware().middleware)
       .addMiddleware(SecurityHeaders(deps).middleware)
       .addMiddleware(WebAuthMiddleware(deps).middleware)
+      .addMiddleware(
+        sync == null ? (inner) => inner : librarySyncGate(sync.sync),
+      )
       // Innermost: compress the handler's response (JSON/text) before the outer
       // header middlewares annotate it. Skips WebSocket upgrades + binary.
       .addMiddleware(const GzipMiddleware().middleware)

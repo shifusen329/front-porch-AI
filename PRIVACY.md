@@ -19,6 +19,8 @@ Stored locally, in a folder you choose, and never collected or transmitted to us
 
 **Text-to-speech / speech-to-text** runs locally (Kokoro, Piper, Whisper). No audio is collected by us.
 
+**Sync** (Settings → Sync, off until you set it up) uploads your library, chats included, to the WebDAV server or folder **you** choose. It goes nowhere else, and nothing is sent to us.
+
 **Remote AI / TTS APIs** (OpenRouter, Nano-GPT, OpenAI, etc.) are opt-in: if you configure one, your prompts/audio go to *that provider* — not to us. Review the chosen provider's own privacy policy.
 
 ## The Stoop (optional community hub) — what we collect, and why

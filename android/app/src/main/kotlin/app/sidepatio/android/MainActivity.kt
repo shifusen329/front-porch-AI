@@ -57,6 +57,17 @@ class MainActivity : FlutterActivity() {
                 if (call.method == "pickFiles") pickFiles(call.arguments as? Map<*, *>, result)
                 else result.notImplemented()
             }
+        // Which phone this is, for library sync (lib/services/sync/sync_state_store.dart).
+        // ANDROID_ID differs per device and per signing key, so prefs restored
+        // onto a new phone by Android's backup don't make it send as the old one.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.sidepatio.android/device")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "deviceId") {
+                    result.success(Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
+                } else {
+                    result.notImplemented()
+                }
+            }
     }
 
     /** Android's installer confirms, then closes and replaces this app. */

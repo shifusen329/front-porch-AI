@@ -170,4 +170,49 @@ void main() {
       );
     }
   });
+
+  test(
+    'a swapped database keeps the tunnels and the phone client lock',
+    () async {
+      // A library Get started from the phone swaps the database under the
+      // page that asked for it: ngrok must not drop its URL and the desktop's
+      // lock overlay must not lift mid-swap.
+      final oldDb = AppDatabase.forTesting();
+      final storage = StorageService();
+      final host = WebServerHost(storage);
+      host.setDatabase(oldDb);
+      await storage.initialized;
+      final newDb = AppDatabase.forTesting();
+      addTearDown(() async {
+        await host.stop();
+        await newDb.close();
+      });
+
+      expect(await host.startSafely(0), isTrue);
+      final port = host.port;
+      final tunnels = host.tunnels;
+      expect(tunnels, isNotNull);
+      host.markClientActive('100.64.0.2', 'Phone');
+
+      await oldDb.close();
+      host.setDatabase(newDb);
+      var status = 0;
+      for (var i = 0; i < 60 && status != 200; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        try {
+          status = await _healthStatus(port);
+        } catch (_) {
+          status = 0;
+        }
+      }
+
+      expect(status, 200);
+      expect(
+        host.tunnels,
+        same(tunnels),
+        reason: 'the same tunnels, not new ones',
+      );
+      expect(host.hasActiveClient, isTrue, reason: 'the phone stays connected');
+    },
+  );
 }

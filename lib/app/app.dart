@@ -22,6 +22,7 @@
 
 export 'app_shutdown.dart';
 export 'launch_window.dart';
+export 'library_sync_wiring.dart';
 export 'main_window.dart';
 export 'phone_system_bars.dart';
 export 'post_frame_tasks.dart';

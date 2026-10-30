@@ -43,6 +43,7 @@ export 'journal_web_surface.dart';
 export 'memory_search_facade.dart';
 export 'settings_facade.dart';
 export 'stoop_facade.dart';
+export 'sync_facade.dart';
 export 'story_export_facade.dart';
 export 'story_facade.dart';
 export 'story_snapshot_builder.dart';

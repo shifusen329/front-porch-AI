@@ -36,10 +36,21 @@ Future<void> pickStoragePath(BuildContext context) async {
       // Close the current database so the file can be moved.
       await AppDatabase.closeAndReset();
       if (!context.mounted) return;
-      final refusal = await Provider.of<StorageService>(
-        context,
-        listen: false,
-      ).setRootPath(selectedDirectory);
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final oldRoot = storage.rootPath;
+      final refusal = await storage.setRootPath(selectedDirectory);
+      // Chat photos and persona avatars store full paths: point them at the
+      // folder the library now lives in.
+      if (refusal == null && oldRoot != null && oldRoot != selectedDirectory) {
+        try {
+          await rebaseLibraryAfterMove(
+            oldRoot: oldRoot,
+            newRoot: selectedDirectory,
+          );
+        } catch (e) {
+          debugPrint('[Storage] Re-pointing stored paths after a move: $e');
+        }
+      }
       if (!context.mounted) return;
       // Reopen from the new location and re-point every service that holds a
       // DB reference. Shared with the stable-DB import and backup restore —

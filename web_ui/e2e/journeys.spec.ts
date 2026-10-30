@@ -1593,3 +1593,36 @@ function storedZip(files: Record<string, Buffer>): Buffer {
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...parts, directory, end]);
 }
+
+test('Settings → Sync sends the desktop library to a folder, and a Get then finds it up to date', async ({ page }) => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const folder = await mkdtemp(join(tmpdir(), 'fpai-sync-journey-'));
+  try {
+    await openRoute(page, '/settings');
+    const card = page.getByTestId('sync-card');
+    await card.scrollIntoViewIfNeeded();
+    await card.getByLabel('A folder on the desktop').check();
+    await card.getByLabel('Folder on the desktop', { exact: true }).fill(folder);
+    await card.getByRole('button', { name: 'Save and test connection', exact: true }).click();
+    await expect(card).toContainText('Connected. This place can hold your library.');
+
+    await card.getByRole('button', { name: 'Send my library', exact: true }).click();
+    await expect(card.getByTestId('sync-status')).toContainText(/^.*Sent \d/, { timeout: 60_000 });
+    await expect(card).toContainText('On the sync place:');
+    const head = JSON.parse(await readFile(join(folder, 'Front Porch AI Sync', 'FrontPorchAI', 'latest.json'), 'utf8')) as {
+      head: string;
+    };
+    expect(head.head).toBeTruthy();
+
+    // Nothing changed since the send, so nothing is swapped: the Get says so.
+    await card.getByRole('button', { name: 'Get the library', exact: true }).click();
+    await expect(card).toContainText('Up to date.', { timeout: 60_000 });
+  } finally {
+    // Leave no sync place behind for the rest of the suite (or a send on close).
+    await page.request.post('/api/sync/settings', {
+      data: { kind: 'none', sendOnClose: false, checkOnStart: false },
+    });
+  }
+});

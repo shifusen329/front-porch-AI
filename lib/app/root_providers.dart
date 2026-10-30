@@ -32,6 +32,7 @@ import 'package:front_porch_ai/services/web/web_server_host.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'library_sync_wiring.dart';
 import 'web_server_host_factory.dart';
 
 /// The full provider graph. ORDER IS LOAD-BEARING: a Provider.of inside a
@@ -475,6 +476,11 @@ Widget buildRootWidget(
               (previous ?? createWiredWebServerHost(context, db))
                 ..setStoryPipelineService(storyPipeline),
         ),
+        // Settings → Sync; hands itself to the web relay above.
+        if (bootPrefs != null)
+          ChangeNotifierProvider<LibrarySyncService>(
+            create: (context) => createLibrarySync(context, bootPrefs),
+          ),
       ],
       child: app,
     ),

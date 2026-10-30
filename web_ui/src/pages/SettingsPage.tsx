@@ -31,6 +31,7 @@ import {
 import { VoiceMediaSettings } from '../components/VoiceMediaSettings';
 import { WorkerBackendCard } from '../components/WorkerBackendCard';
 import { SuperGrokCard } from '../components/SuperGrokCard';
+import { SyncSettings } from '../components/SyncSettings';
 import { parkRemoteModel, rememberedRemoteModel, urlHasStoredApiKey } from '../remoteApiKeys';
 import { remoteReachabilityLabel } from './remoteReachability';
 import { BACKEND_OPTIONS, INTEL_MAC_LOCAL_UNSUPPORTED, backendOptionId } from '../backendOptions';
@@ -680,6 +681,11 @@ export function SettingsPage() {
             </a>
           </div>
         </section>
+      </div>
+
+      <div className="settings-section" data-section="sync">
+        <h3 className="settings-section-heading">Sync</h3>
+        <SyncSettings />
       </div>
     </div>
   );

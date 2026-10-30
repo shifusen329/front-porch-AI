@@ -733,9 +733,27 @@ Restoring replaces your current database with the snapshot, so anything you did 
 
 > **On nightlies, snapshots keep running but can't be restored from inside the app.** The **Backups & Restore** page opens but its contents are replaced by a notice, so there is no way to browse or roll back a snapshot there. The automatic snapshots themselves keep running, against the nightly's own separate database.
 
-**Moving to a new computer:** export your characters as card files and import them on the other machine — or copy your whole data folder, which does include the card images a backup leaves out. Backup snapshots can also be restored on a fresh install.
+**Moving to a new computer:** use **Settings → Sync** (below), export your characters as card files and import them on the other machine, or copy your whole data folder, which does include the card images a backup leaves out. Backup snapshots can also be restored on a fresh install.
 
-> **What happened to Cloud Sync?** Older versions offered syncing through Google Drive or WebDAV. It could occasionally resurrect deleted data across devices, so I retired it — it's gone. Automatic local backups are the replacement, and for moving characters between machines or sharing them with other people, card export/import and The Stoop do the job better.
+### Sync your library between devices
+
+**Settings → Sync** sends your whole library to a place you own and gets it on your other devices: a PC and your Android phone, or two PCs.
+
+- **What travels:** characters with their cards, galleries and expressions, chats with their photos, personas, groups, worlds and lorebooks, the Data Bank, journals, quests, Growth Rings, Porch Stories, system-prompt presets, macro variables and custom chat backgrounds.
+- **What stays on each device:** models, backends and API keys, voices, appearance, the web app's login, Image Batches and Waifu Coder projects.
+- **The sync place:** a WebDAV server (Nextcloud, ownCloud or a NAS's WebDAV service), or on a desktop a folder: a NAS share, or a folder Nextcloud, Dropbox, OneDrive or Syncthing keeps in sync. For Nextcloud, make an app password under Settings → Security; each device keeps it in its own key store. **Save and test connection** checks that the place can hold a library safely.
+- **Send my library** uploads a snapshot. Only files that changed since an earlier send go up again.
+- **Get the library** replaces this device's library with the newest one. Nothing is merged. If this device changed since its last sync, the app asks **Keep mine** or **Take theirs**, and names the chats that changed.
+- **Undo:** a Get sets this device's library aside. For 7 days, **Undo the Get** puts it back.
+- **Earlier versions:** the sync place keeps the last few libraries. If you send yours over a newer one from another device, theirs is kept too, under **Earlier versions**.
+- **Automatic (off by default):** send when the app closes (on a phone, when you leave the app), and check for a newer library when the app starts. The start check only asks; it never replaces anything. An automatic send never overwrites a newer library from another device.
+- **The phone web app** has the same section, and it syncs the desktop's library.
+
+> **Your chats are uploaded as they are** to the place you choose. Pick a server you trust; your own Nextcloud or NAS is the safest choice.
+
+> **A self-signed certificate on Android:** Android only trusts certificates installed in its system settings. Install your server's certificate there, or use `http://` on your own network.
+
+> **Cloud Sync, the old one:** older versions merged individual records through Google Drive or WebDAV, and could bring deleted data back on another device. Sync now moves the whole library at once, so nothing is merged and nothing comes back unasked.
 
 ---
 

@@ -20,10 +20,12 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:front_porch_ai/database/data_migration_service.dart';
 import 'package:front_porch_ai/database/database.dart';
 import 'package:front_porch_ai/services/file_consolidation_service.dart';
 import 'package:front_porch_ai/services/prefs_recovery.dart';
+import 'package:front_porch_ai/services/sync/sync.dart' show replayPendingSwap;
 import 'package:front_porch_ai/ui/widgets/db_init_error_app.dart';
 import 'package:front_porch_ai/utils/native_exit.dart';
 import 'package:front_porch_ai/utils/utils.dart' show StartupTrace;
@@ -113,6 +115,15 @@ Future<({AppDatabase db, bool needsMigration})?> openDatabaseGuarded() async {
   final AppDatabase db;
   final bool needsMigration;
   try {
+    // A library sync swap that a crash, a power cut or Android cut short is
+    // finished first: the database and the card files must change together.
+    final dbFile = await AppDatabase.locateFile();
+    if (await replayPendingSwap(
+      dbFile.parent.parent.path,
+      await SharedPreferences.getInstance(),
+    )) {
+      StartupTrace.mark('finished an interrupted library swap');
+    }
     db = await AppDatabase.instance();
     StartupTrace.mark('AppDatabase.instance (incl. schema migration)');
     needsMigration = !await DataMigrationService.isMigrated();

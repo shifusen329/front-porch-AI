@@ -50,6 +50,7 @@ class WebServerDeps {
     this.chatToolsFacade,
     this.groupFacade,
     this.settingsFacade,
+    this.syncFacade,
     this.stoopFacade,
     this.worldFacade,
     this.worldFromWikiFacade,
@@ -112,6 +113,9 @@ class WebServerDeps {
 
   /// Generation/backend settings adapter — null until the LLM provider is wired.
   final SettingsFacade? settingsFacade;
+
+  /// Settings → Sync (library sync), when the app wired one.
+  final SyncFacade? syncFacade;
 
   /// The Stoop (community hub) relay — always constructible (storage + db),
   /// with download-import available only once the library repositories are

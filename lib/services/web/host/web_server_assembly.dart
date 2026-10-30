@@ -192,6 +192,7 @@ import 'package:front_porch_ai/services/web/web_server_deps.dart';
     chatToolsFacade: chatToolsFacade,
     groupFacade: groupFacade,
     settingsFacade: settingsFacade,
+    syncFacade: services.sync == null ? null : SyncFacade(services.sync!),
     stoopFacade: stoopFacade,
     worldFacade: worldFacade,
     worldFromWikiFacade: worldFromWikiFacade,

@@ -48,17 +48,31 @@ class BackupService {
     debugPrint(
       '[Backup] Auto-backup started (every ${_autoBackupInterval.inMinutes} minutes)',
     );
-    _autoBackupTimer = Timer.periodic(_autoBackupInterval, (_) async {
-      try {
-        final created = await createBackup();
-        // Never prune after a failed snapshot: the daily-retention window
-        // keeps sliding, so pruning during a persistent failure streak would
-        // slowly delete healthy history while writing nothing new.
-        if (created != null) await pruneBackups();
-      } catch (e) {
-        debugPrint('[Backup] Auto-backup failed: $e');
-      }
+    _autoBackupTimer = Timer.periodic(_autoBackupInterval, (_) {
+      _inFlight = _autoBackup();
     });
+  }
+
+  static Future<void>? _inFlight;
+
+  static Future<void> _autoBackup() async {
+    try {
+      final created = await createBackup();
+      // Never prune after a failed snapshot: the daily-retention window
+      // keeps sliding, so pruning during a persistent failure streak would
+      // slowly delete healthy history while writing nothing new.
+      if (created != null) await pruneBackups();
+    } catch (e) {
+      debugPrint('[Backup] Auto-backup failed: $e');
+    }
+  }
+
+  /// Stops the timer and waits for a backup already running, so a library
+  /// swap can move the database file. [startAutoBackup] starts it again.
+  static Future<void> stopAutoBackup() async {
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = null;
+    await _inFlight;
   }
 
   /// Get the backup directory path (creates it if needed).
@@ -149,23 +163,35 @@ class BackupService {
       throw FileSystemException('Backup file not found', backupPath);
     }
 
-    // Close the live DB
+    // Close the live DB, and hold every open until the backup is in place:
+    // a page or the backup timer reopening it mid-copy would write into the
+    // restored file.
     await AppDatabase.closeAndReset();
-
-    // Replace with backup
-    await backupFile.copy(dbPath);
-    // Remove stale WAL/SHM
-    for (final suffix in const ['-wal', '-shm']) {
-      try {
-        await File('$dbPath$suffix').delete();
-      } on PathNotFoundException {
-        // Nothing stale to remove.
-      } catch (e) {
-        debugPrint('[Backup] Could not remove stale $suffix file: $e');
-      }
+    final release = AppDatabase.holdOpens();
+    try {
+      // Remove stale sidecars. The database runs in rollback-journal mode,
+      // so a `-journal` left by a crash would be rolled back INTO the
+      // restored file on the next open.
+      await Future.wait([
+        for (final suffix in const ['-journal', '-wal', '-shm'])
+          _removeSidecar('$dbPath$suffix'),
+      ]);
+      await backupFile.copy(dbPath);
+    } finally {
+      release();
     }
 
     debugPrint('[Backup] Restored backup from: $backupPath');
+  }
+
+  static Future<void> _removeSidecar(String path) async {
+    try {
+      await File(path).delete();
+    } on PathNotFoundException {
+      // Nothing stale to remove.
+    } catch (e) {
+      debugPrint('[Backup] Could not remove stale ${path.split('-').last}: $e');
+    }
   }
 
   /// Two-tier rolling retention. A backup is kept if it satisfies EITHER rule:

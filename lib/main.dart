@@ -105,6 +105,7 @@ class _MyAppState extends State<MyApp>
 
   /// macOS-only hook for Cmd+Q / Dock-quit — see [_onAppExitRequested].
   AppLifecycleListener? _appExitListener;
+  final _syncOnLeave = SyncOnLeave();
 
   @override
   void initState() {
@@ -119,7 +120,11 @@ class _MyAppState extends State<MyApp>
       // A phone has no quit: the OS kills a backgrounded app without a
       // close event, so chat saves are drained each time it leaves view.
       _appExitListener = AppLifecycleListener(
-        onPause: () => unawaited(AppShutdown.flushChatSaves(context)),
+        onPause: () {
+          unawaited(AppShutdown.flushChatSaves(context));
+          _syncOnLeave.paused(context);
+        },
+        onResume: () => _syncOnLeave.resumed(context),
       );
     }
     // Run migration after first frame
@@ -223,6 +228,7 @@ class _MyAppState extends State<MyApp>
         final appearance = storage.appearance;
         return MaterialApp(
           title: appWindowTitle,
+          navigatorKey: appNavigatorKey,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.build(
             palettes: appearance.resolvedPalettes(),
@@ -263,8 +269,9 @@ class _MyAppState extends State<MyApp>
                     if (context.mounted) checkKoboldEngine(context);
                   });
                   autoStartWebServer(context);
-                  // Start auto-backup (always on, every 10 minutes)
+                  // Start auto-backup (always on, every 30 minutes)
                   BackupService.startAutoBackup();
+                  checkLibrarySyncOnStart(context);
                   // Wire TtsService into ChatService (can't be done during provider
                   // creation because TtsService is registered later in the tree)
                   try {
@@ -379,6 +386,7 @@ class _MyAppState extends State<MyApp>
                     // imperceptible; first paint no longer waits on it.
                     if (_overlaysArmed) const SetupOverlay(),
                     if (_overlaysArmed) const RemoteLockOverlay(),
+                    if (_overlaysArmed) const LibrarySyncOverlay(),
                     if (_recovery.isDbCorrupt)
                       DbCorruptionOverlay(
                         backups: _recovery.availableBackups,

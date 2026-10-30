@@ -129,7 +129,34 @@ class AppDatabase extends _$AppDatabase {
   /// `front_porch_beta.db` to protect the production database from schema
   /// changes that may be incompatible with the stable release.
   static Future<AppDatabase> instance() async {
+    // A library swap is moving the file: wait, then open what it put there.
+    while (_opensHeld != null) {
+      await _opensHeld;
+    }
     if (_instance != null) return _instance!;
+    // One open for every caller that arrives while it runs. Two would open
+    // the file twice and the first handle would never be closed.
+    return _opening ??= _open().whenComplete(() => _opening = null);
+  }
+
+  static Future<AppDatabase>? _opening;
+  static Future<void>? _opensHeld;
+
+  /// Holds every [instance] call until the returned release runs, so the
+  /// backup timer or a widget can't reopen the database while a library
+  /// swap moves its file. Call after [closeAndReset].
+  static void Function() holdOpens() {
+    final gate = Completer<void>();
+    _opensHeld = gate.future;
+    return () {
+      if (identical(_opensHeld, gate.future)) _opensHeld = null;
+      if (!gate.isCompleted) gate.complete();
+    };
+  }
+
+  /// Where [instance] opens the database, without opening it: the startup
+  /// replay of an interrupted library swap must finish before anything does.
+  static Future<File> locateFile() async {
     final prefs = await SharedPreferences.getInstance();
     // Mirror StorageService: use a separate prefs key for beta builds so the
     // beta DB path never overwrites the stable user's custom root path.
@@ -142,12 +169,15 @@ class AppDatabase extends _$AppDatabase {
           (await getApplicationDocumentsDirectory()).path,
           defaultRootName,
         );
-    final dbDir = p.join(basePath, 'KoboldManager');
-    _dbDir = dbDir;
-
     // Choose database filename based on release type
     final dbName = isPreRelease ? 'front_porch_beta.db' : 'front_porch.db';
-    final file = File(p.join(dbDir, dbName));
+    return File(p.join(basePath, 'KoboldManager', dbName));
+  }
+
+  static Future<AppDatabase> _open() async {
+    final file = await locateFile();
+    final dbDir = file.parent.path;
+    _dbDir = dbDir;
     await file.parent.create(recursive: true);
 
     // For pre-release: if no beta DB exists yet, copy the production DB

@@ -171,3 +171,41 @@
 }
 .settings-group { margin-bottom: 16px; }
 .settings-group-heading { margin: 0 0 8px; font-size: 0.95rem; color: var(--muted); }
+
+/* Settings → Sync (components/SyncSettings.tsx). */
+.sync-place {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px 12px;
+  margin: 8px 0;
+  min-width: 0;
+}
+.sync-place label input:not([type='radio']) {
+  width: 100%;
+  box-sizing: border-box;
+}
+.sync-choice {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.sync-choice p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.sync-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sync-progress progress {
+  width: 100%;
+}
+.sync-earlier .row-label {
+  flex-wrap: wrap;
+  gap: 8px;
+}

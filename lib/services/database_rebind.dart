@@ -75,65 +75,99 @@ AppDatabase liveDatabase(BuildContext context) =>
 Future<AppDatabase?> reopenAndRebindDatabase(
   BuildContext context, {
   bool cleanOrphanedImages = false,
-}) async {
-  try {
-    // Idempotent, and load-bearing. `close()` alone does NOT clear the static
-    // singleton, so a caller that closed its own handle and then called
-    // `AppDatabase.instance()` was handed back the very object it had just
-    // closed. The flows that must close before touching the file (storage move,
-    // restore) already reset it and this is a no-op for them.
-    await AppDatabase.closeAndReset();
-    final newDb = await AppDatabase.instance();
-    if (!context.mounted) return null;
+}) => DatabaseRebinder.of(
+  context,
+).rebind(cleanOrphanedImages: cleanOrphanedImages);
 
-    final charRepo = Provider.of<CharacterRepository>(context, listen: false);
-    final folderService = Provider.of<FolderService>(context, listen: false);
-    final personaService = Provider.of<UserPersonaService>(
-      context,
-      listen: false,
+/// The services [reopenAndRebindDatabase] re-points, held without a
+/// BuildContext so a library Get started from the phone web app can rebind
+/// too.
+class DatabaseRebinder {
+  DatabaseRebinder({
+    required this.characters,
+    required this.folders,
+    required this.personas,
+    required this.groups,
+    required this.worlds,
+    required this.chat,
+    required this.stories,
+    required this.storyPipeline,
+    required this.webServer,
+  });
+
+  factory DatabaseRebinder.of(BuildContext context) {
+    T read<T>() => Provider.of<T>(context, listen: false);
+    return DatabaseRebinder(
+      characters: read<CharacterRepository>(),
+      folders: read<FolderService>(),
+      personas: read<UserPersonaService>(),
+      groups: read<GroupChatRepository>(),
+      worlds: read<WorldRepository>(),
+      chat: read<ChatService>(),
+      stories: read<StoryRepository>(),
+      storyPipeline: read<StoryPipelineService>,
+      webServer: read<WebServerHost>(),
     );
-    final groupRepo = Provider.of<GroupChatRepository>(context, listen: false);
-    final worldRepo = Provider.of<WorldRepository>(context, listen: false);
+  }
 
-    charRepo.updateDatabase(newDb);
-    folderService.updateDatabase(newDb);
-    personaService.updateDatabase(newDb);
-    groupRepo.updateDatabase(newDb);
-    worldRepo.updateDatabase(newDb);
-    // ChatService.updateDatabase also re-points the MemoryService it owns, so
-    // RAG memory survives the swap instead of querying the closed handle.
-    final chatService = Provider.of<ChatService>(context, listen: false);
-    final storyRepo = Provider.of<StoryRepository>(context, listen: false);
-    chatService.updateDatabase(newDb);
-    storyRepo.updateDatabase(newDb);
-    // The pipeline binds its own handle at construction; without this it kept
-    // the CLOSED one until an unrelated rebuild (Porch Stories looked empty).
-    Provider.of<StoryPipelineService>(
-      context,
-      listen: false,
-    ).updateDatabase(newDb);
-    Provider.of<WebServerHost>(context, listen: false).setDatabase(newDb);
+  final CharacterRepository characters;
+  final FolderService folders;
+  final UserPersonaService personas;
+  final GroupChatRepository groups;
+  final WorldRepository worlds;
+  final ChatService chat;
+  final StoryRepository stories;
 
-    // Every in-memory cache is now a view of the previous database file.
-    await charRepo.loadCharacters();
-    if (cleanOrphanedImages) {
-      await charRepo.cleanOrphanedPngs();
+  /// Read at rebind time: switching backends replaces the pipeline.
+  final StoryPipelineService Function() storyPipeline;
+  final WebServerHost webServer;
+
+  Future<AppDatabase?> rebind({bool cleanOrphanedImages = false}) async {
+    try {
+      // Idempotent, and load-bearing. `close()` alone does NOT clear the
+      // static singleton, so a caller that closed its own handle and then
+      // called `AppDatabase.instance()` was handed back the very object it
+      // had just closed. The flows that must close before touching the file
+      // (storage move, restore) already reset it and this is a no-op for them.
+      await AppDatabase.closeAndReset();
+      final newDb = await AppDatabase.instance();
+
+      characters.updateDatabase(newDb);
+      folders.updateDatabase(newDb);
+      personas.updateDatabase(newDb);
+      groups.updateDatabase(newDb);
+      worlds.updateDatabase(newDb);
+      // ChatService.updateDatabase also re-points the MemoryService it owns,
+      // so RAG memory survives the swap instead of querying the closed handle.
+      chat.updateDatabase(newDb);
+      stories.updateDatabase(newDb);
+      // The pipeline binds its own handle at construction; without this it
+      // kept the CLOSED one until an unrelated rebuild (Porch Stories looked
+      // empty).
+      storyPipeline().updateDatabase(newDb);
+      webServer.setDatabase(newDb);
+
+      // Every in-memory cache is now a view of the previous database file.
+      await characters.loadCharacters();
+      if (cleanOrphanedImages) {
+        await characters.cleanOrphanedPngs();
+      }
+      await folders.reload();
+      await personas.reload();
+      await groups.reload();
+      await worlds.loadWorlds();
+      await stories.loadProjects();
+      // The open chat's transcript is ALSO a view of the previous file.
+      // Without this reload, the next _saveChat upserts the pre-swap messages
+      // back into the swapped database — a user who restored a 10-message
+      // snapshot while a 20-message chat was open silently un-restored that
+      // conversation the moment they sent one more line (1.3 sweep,
+      // 2026-08-15). Import, move and restore all reload here.
+      await chat.reloadCurrentSession();
+      return newDb;
+    } catch (e) {
+      debugPrint('[DB] Rebind after database swap failed: $e');
+      return null;
     }
-    await folderService.reload();
-    await personaService.reload();
-    await groupRepo.reload();
-    await worldRepo.loadWorlds();
-    await storyRepo.loadProjects();
-    // The open chat's transcript is ALSO a view of the previous file. Without
-    // this reload, the next _saveChat upserts the pre-swap messages back into
-    // the swapped database — a user who restored a 10-message snapshot while
-    // a 20-message chat was open silently un-restored that conversation the
-    // moment they sent one more line (1.3 sweep, 2026-08-15). Import, move
-    // and restore all reload here.
-    await chatService.reloadCurrentSession();
-    return newDb;
-  } catch (e) {
-    debugPrint('[DB] Rebind after database swap failed: $e');
-    return null;
   }
 }

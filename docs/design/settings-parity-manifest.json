@@ -8,8 +8,14 @@
     "test/hygiene/settings_parity_manifest_test.dart (Dart side) and",
     "web_ui/src/pages/SettingsPage.parity.test.tsx (web side + section order)."
   ],
-  "sections": ["general", "porch-life", "generation", "voice-media", "backend", "advanced"],
+  "sections": ["general", "porch-life", "generation", "voice-media", "backend", "advanced", "sync"],
   "controls": {
+    "librarySync": {
+      "section": "sync",
+      "dart": "lib/ui/pages/settings_page/sync_tab.dart",
+      "dartMarker": "Send my library",
+      "webMarker": "Sync"
+    },
     "userMessagesOnRight": {
       "section": "general",
       "group": "chat-appearance",

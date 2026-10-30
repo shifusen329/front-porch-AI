@@ -20,6 +20,8 @@ import 'package:flutter/widgets.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/web_server_host.dart';
 import 'package:front_porch_ai/ui/dialogs/dialogs.dart';
+import 'package:front_porch_ai/ui/pages/settings_page/settings_page.dart'
+    show offerNewerLibrary;
 import 'package:front_porch_ai/utils/utils.dart' show PlatformCaps;
 import 'package:provider/provider.dart';
 
@@ -52,7 +54,32 @@ Future<void> checkKoboldEngine(BuildContext context) async {
   await KoboldUpdateDialog.show(context, manager, gate);
 }
 
+/// The sync service, or null in a graph built without boot prefs.
+LibrarySyncService? _librarySync(BuildContext context) {
+  try {
+    return Provider.of<LibrarySyncService>(context, listen: false);
+  } on ProviderNotFoundException {
+    return null;
+  }
+}
+
+/// Clears an expired Undo, then (when the switch is on) offers a newer
+/// library from the sync place. It never replaces anything on its own.
+Future<void> checkLibrarySyncOnStart(BuildContext context) async {
+  final sync = _librarySync(context);
+  if (sync == null) return;
+  await Provider.of<StorageService>(context, listen: false).initialized;
+  await sync.cleanUp();
+  if (!sync.settings.checkOnStart || !sync.settings.isConfigured) return;
+  await sync.refresh();
+  if (sync.remote?.newer != true || !context.mounted) return;
+  await offerNewerLibrary(context, sync);
+}
+
 Future<void> autoStartWebServer(BuildContext context) async {
+  // Made first: the server hands the phone web app's Sync routes the service
+  // it holds when it starts.
+  _librarySync(context);
   // A phone is the PWA's client, and cannot find its bundle inside the APK.
   if (!PlatformCaps.current.canHostWebServer) return;
   final storage = Provider.of<StorageService>(context, listen: false);
