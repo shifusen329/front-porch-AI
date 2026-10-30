@@ -3,6 +3,54 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-30 03:03:51 -0500 (CDT)
+
+On the `dev` branch. This is 1.0.3, with library sync (`12bd5370`, below)
+and these.
+
+### Added
+
+- **Delete many pictures at once in the Avatar Gallery** (`01b33ea5`).
+  Each section's ⋮ menu has **Select…** (pick pictures, then **Select
+  all**, **Select every "joy"** for one emotion's alternates, and **Delete
+  N**) and **Clear expressions** / **Clear looks**. The portrait is never
+  deleted. One confirm shows how many, with thumbnails.
+  - **Replace a sprite pack:** Import ZIP sprite pack asks **Add to these**
+    or **Replace them** when the character has expressions. Replace only
+    runs once the pack has a picture it recognizes, so a wrong ZIP never
+    empties the gallery.
+  - **Undo** for about 10 seconds after a delete, a clear or a replace puts
+    the pictures back with their emotions, order, ★ and default expression.
+  - The phone web app has the same Select, Clear, Replace and Undo, and its
+    single delete now asks first, as the desktop's does.
+
+### Fixed
+
+- After a Send, the Sync card said nothing had been sent; it now shows the
+  library just sent (`9a2dd155`).
+- A new gallery picture could take the same order as an existing one after
+  a delete, and both showed as the default expression (`01b33ea5`).
+- Two pictures added in the same millisecond (a sprite-pack import) could
+  share one file, so deleting one deleted the other's picture
+  (`01b33ea5`).
+- After a delete on the phone web app, chats could keep choosing the
+  deleted picture until the library reloaded (`01b33ea5`).
+- The portrait's **Replace portrait** label overflowed its tile on a phone
+  (`01b33ea5`).
+
+### Changed
+
+- On Windows, test runs no longer leave their temp folders behind
+  (`4c6c368f`). Several suites write a fake 21 GB model, which Windows
+  stores in full; the leftovers had grown to 1.1 TB and filled the drive.
+
+### Known gaps
+
+- Library sync has run against a loopback WebDAV server and a folder, not
+  yet against a real Nextcloud or between a real phone and PC.
+- The gallery's Select mode was checked on the desktop and in the browser
+  suite, not yet on the Android emulator at phone width.
+
 ## 2026-10-29 23:03:39 -0500 (CDT)
 
 On the `dev` branch.
