@@ -540,6 +540,8 @@ export function ChatPage() {
             <ChatThemeSettings
               overrides={state.themeOverrides ?? null}
               scene={novel.scene}
+              painting={novel.scenePainting}
+              sceneProblem={novel.sceneProblem}
               onSave={async (overrides) => {
                 setShowTheme(false);
                 await saveTheme(overrides);

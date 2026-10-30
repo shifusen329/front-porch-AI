@@ -24,10 +24,12 @@ import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/character_store/character_row_codec.dart'
     show mediaFolderName;
 import 'package:front_porch_ai/services/chat_service.dart';
+import 'package:front_porch_ai/services/image_gen_service.dart';
 import 'package:front_porch_ai/services/scenes/scenes.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 
 import 'group_speaker_resolution.dart';
+import 'scene_painter.dart';
 import 'stream_tick_notify.dart';
 
 /// The scene picture a chat shows, and whose library it came from.
@@ -54,10 +56,18 @@ final Expando<SceneBackdrop> _backdrops = Expando('scene backdrop');
 /// regenerate, swipe, delete, edit and Continue move it by rewinding or
 /// restamping that stance. A phrase that names no place keeps looking back
 /// (the scene holds); one that names a place with no picture ends the
-/// search (the normal background returns).
+/// search (the normal background returns), and that place is painted with
+/// the image generator when one is set up ([ScenePainter]).
 class SceneBackdrop extends ChangeNotifier {
   SceneBackdrop._(this._chat, this._storage)
     : _library = SceneLibrary(() => _storage.charactersDir) {
+    _painter = ScenePainter(
+      generator: _generator,
+      writePrompt: (instruction) => _chat.writeScenePrompt(instruction),
+      storage: _storage,
+      library: _library,
+      busy: () => _busy,
+    )..addListener(notifyListeners);
     _chat.addListener(_onChange);
     _weakListen(this, _storage);
     _weakListen(this, SceneLibrary.revision);
@@ -77,6 +87,7 @@ class SceneBackdrop extends ChangeNotifier {
   final ChatService _chat;
   final StorageService _storage;
   final SceneLibrary _library;
+  late final ScenePainter _painter;
 
   SceneShot? _current;
   String? _cue;
@@ -90,9 +101,30 @@ class SceneBackdrop extends ChangeNotifier {
   /// Completes once the newest change has been read.
   Future<void> get settled => _pending ?? Future<void>.value();
 
-  /// Changes whenever the shot might: what it is read from, and what shows.
-  /// The phone re-reads the scene when it changes.
-  String get cue => '${_cue ?? ''}|${_current?.key ?? ''}';
+  /// The place being painted for this chat now.
+  SceneWant? get painting => _painter.painting;
+
+  /// Why the last painting failed, until one succeeds.
+  String? get problem => _painter.problem;
+
+  /// The painter, for tests to wait on.
+  @visibleForTesting
+  ScenePainter get painter => _painter;
+
+  /// Changes whenever the shot might: what it is read from, what shows, and
+  /// what is being painted. The phone re-reads the scene when it changes.
+  String get cue =>
+      '${_cue ?? ''}|${_current?.key ?? ''}|'
+      '${_painter.painting?.key ?? ''}|${_painter.problem ?? ''}';
+
+  /// A chat stand-in has no generator to paint with.
+  ImageGenService? _generator() {
+    try {
+      return _chat.sceneImageGenerator;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Whether this chat follows the scene: the Realism Engine (which reports
   /// where the character is) and the chat's choice, else Settings →
@@ -114,6 +146,7 @@ class SceneBackdrop extends ChangeNotifier {
     return [
       _chat.currentSessionId,
       following,
+      _painter.canPaint,
       _busy,
       msgs.length,
       // A reload or a restamp keeps the count but brings new messages.
@@ -146,14 +179,17 @@ class SceneBackdrop extends ChangeNotifier {
     if (!following) {
       _run++;
       _publish(null);
+      _painter.want(null);
       return;
     }
     // While a reply streams or settles, the stance is the old one; the
     // settle changes the cue and reads again.
     if (_busy) return;
     final run = ++_run;
-    final job = _read().then((shot) {
-      if (run == _run) _publish(shot);
+    final job = _read().then((read) {
+      if (run != _run) return;
+      _publish(read.shot);
+      _painter.want(read.want);
     });
     _pending = job.catchError((Object e) {
       debugPrint('[SceneBackdrop] Could not read the scene: $e');
@@ -185,28 +221,52 @@ class SceneBackdrop extends ChangeNotifier {
     return (text: '', who: null);
   }
 
-  Future<SceneShot?> _read() async {
+  /// The shot to show, and the place to paint (when the painter can).
+  Future<({SceneShot? shot, SceneWant? want})> _read() async {
+    const none = (shot: null, want: null);
     final cast = _castCards;
-    final folders = <CharacterCard, String>{};
+    final owners = <CharacterCard, CharacterCard>{};
     final pictures = <String, List<SceneImage>>{};
     for (final c in cast) {
       final owner = _chat.originLibraryCardFor(c) ?? c;
-      folders[c] = owner.name;
+      owners[c] = owner;
       pictures[owner.name] ??= await _library.list(owner.name);
     }
-    if (pictures.values.every((l) => l.isEmpty)) return null;
+    final paints = _painter.canPaint;
+    if (!paints && pictures.values.every((l) => l.isEmpty)) return none;
 
     final time = SceneTime.fromPeriod(_chat.timeService.timeOfDay);
     final live = _liveStance();
+    final replies = _chat.messages.reversed
+        .where((m) => !m.isUser)
+        .take(lookBack)
+        .toList();
     final phrases = [
-      (text: live.text, who: live.who),
-      for (final m
-          in _chat.messages.reversed.where((m) => !m.isUser).take(lookBack))
-        (text: _stampedStance(m), who: _speaker(cast, m)),
+      (
+        text: live.text,
+        who: live.who,
+        story: replies.firstOrNull?.displayText ?? '',
+      ),
+      for (final m in replies)
+        (text: _stampedStance(m), who: _speaker(cast, m), story: m.displayText),
     ];
-    for (final (:text, :who) in phrases) {
+    for (final (:text, :who, :story) in phrases) {
       if (text.trim().isEmpty) continue;
-      final own = who == null ? null : folders[who];
+      final own = who == null ? null : owners[who]?.name;
+      SceneWant? wantFor(String owner, String place) {
+        if (!paints) return null;
+        final card = owners.values.firstWhere((o) => o.name == owner);
+        return SceneWant(
+          owner: owner,
+          place: place,
+          time: time,
+          stance: text,
+          story: story,
+          setting: card.scenario,
+          names: [for (final c in cast) c.name],
+        );
+      }
+
       final order = [
         ?own,
         for (final f in pictures.keys)
@@ -226,17 +286,26 @@ class SceneBackdrop extends ChangeNotifier {
             final seed = '${_chat.currentSessionId}|$place|${time.name}';
             final pick = SceneMatcher.pick(ofPlace, time, seed);
             if (pick != null && await pick.file.exists()) {
-              return SceneShot(pick, mediaFolderName(f), time);
+              return (
+                shot: SceneShot(pick, mediaFolderName(f), time),
+                want: SceneMatcher.needsPainting(ofPlace, time)
+                    ? wantFor(f, place)
+                    : null,
+              );
             }
           }
-          return null;
-        case AtOtherPlace():
-          return null;
+          return none;
+        case AtOtherPlace(:final place):
+          final owner = own ?? owners.values.firstOrNull?.name;
+          return (
+            shot: null,
+            want: owner == null ? null : wantFor(owner, place),
+          );
         case NoPlace():
           continue;
       }
     }
-    return null;
+    return none;
   }
 
   CharacterCard? _speaker(List<CharacterCard> cast, ChatMessage m) =>

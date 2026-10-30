@@ -19,13 +19,28 @@ export interface ChatScene {
   time: string;
 }
 
+/** A place being painted with the image generator for the chat. */
+export interface ScenePainting {
+  place: string;
+  time: string;
+}
+
 export interface ChatStage {
   visualNovel: boolean;
   stage: StageSprite[];
   scene: ChatScene | null;
+  scenePainting: ScenePainting | null;
+  /** Why the last painting failed, until one succeeds. */
+  sceneProblem: string | null;
 }
 
-const OFF: ChatStage = { visualNovel: false, stage: [], scene: null };
+const OFF: ChatStage = {
+  visualNovel: false,
+  stage: [],
+  scene: null,
+  scenePainting: null,
+  sceneProblem: null,
+};
 
 export function useChatStage(changeKey: string): ChatStage {
   const [stage, setStage] = useState<ChatStage>(OFF);
@@ -40,6 +55,8 @@ export function useChatStage(changeKey: string): ChatStage {
           stage: r.stage ?? [],
           // An older host sends no scene: the chat keeps its background.
           scene: r.scene ?? null,
+          scenePainting: r.scenePainting ?? null,
+          sceneProblem: r.sceneProblem ?? null,
         });
       })
       // An older host has no stage: the chat stays classic.

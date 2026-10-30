@@ -104,6 +104,10 @@ class SettingsWriter {
     if (scenes is bool) {
       await _storage.expressionSettings.setSceneBackgrounds(scenes);
     }
+    final painting = body['scenePainting'];
+    if (painting is bool) {
+      await _storage.expressionSettings.setScenePainting(painting);
+    }
 
     final realism = body['realism'];
     if (realism is Map) {

@@ -42,6 +42,10 @@ enum SceneTime {
     'night' => night,
     _ => day,
   };
+
+  /// Evening and night: the dark half of the day. A picture of one stands
+  /// in for the other.
+  bool get isDark => index >= evening.index;
 }
 
 /// Image types a scene picture can be.

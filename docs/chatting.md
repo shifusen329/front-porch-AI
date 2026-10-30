@@ -9,7 +9,7 @@ How a conversation actually works. If the AI will not talk at all, start with [F
 ![The chat screen](screenshots/chat.png)
 
 - **Top bar** — avatar, name, short description. Back goes to the library. **Toggle Sidebar** opens the right-hand column. That is all the top bar holds.
-- **The conversation** — your bubbles and theirs, on a scene background you can change ([Appearance](user-guide.md#appearance)). With the Realism Engine on, the background can follow the story to the character's porch or kitchen: give them [Scenes](characters.md#scenes--backgrounds-that-follow-the-story). If expressions are on, the portrait changes with mood. **◀ ▶ on that portrait** flips **looks** from the Avatar Gallery for *this chat* (a different face, not a different emotion).
+- **The conversation** — your bubbles and theirs, on a scene background you can change ([Appearance](user-guide.md#appearance)). With the Realism Engine on, the background can follow the story to the character's porch or kitchen: give them [Scenes](characters.md#scenes--backgrounds-that-follow-the-story), or let your image generator paint the places they go. If expressions are on, the portrait changes with mood. **◀ ▶ on that portrait** flips **looks** from the Avatar Gallery for *this chat* (a different face, not a different emotion).
 - **Right sidebar** — **Main Settings** is at the *top of the sidebar*, not the top bar: Edit Character, Avatar Gallery, UI Settings, Chat Settings, Model Settings, TTS Settings. You need the sidebar open to reach it.
 
   Cards under that, which you can collapse:

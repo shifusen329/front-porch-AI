@@ -63,6 +63,9 @@ class ExpressionSettings with SettingsBase {
   // nothing changes until a character has scenes. A chat can overrule it
   // (ChatThemeOverrides.followScene).
   bool _sceneBackgrounds = true;
+  // A place the story reaches with no picture is painted with the image
+  // generator, when one is set up.
+  bool _scenePainting = true;
 
   /// Each downloaded classifier model's labels, by model id.
   Map<String, List<String>> _modelLabels = {};
@@ -76,6 +79,7 @@ class ExpressionSettings with SettingsBase {
   double get expressionEmojiBurstSize => _expressionEmojiBurstSize;
   bool get visualNovelMode => _visualNovelMode;
   bool get sceneBackgrounds => _sceneBackgrounds;
+  bool get scenePainting => _scenePainting;
 
   /// The Hugging Face model (`owner/name`) the ONNX classifier runs.
   String get expressionOnnxModel => _expressionOnnxModel;
@@ -110,6 +114,7 @@ class ExpressionSettings with SettingsBase {
         prefs?.getBool(k('expression_reroll_same')) ?? false;
     _visualNovelMode = prefs?.getBool(k('visual_novel_mode')) ?? false;
     _sceneBackgrounds = prefs?.getBool(k('scene_backgrounds')) ?? true;
+    _scenePainting = prefs?.getBool(k('scene_painting')) ?? true;
     _expressionFallback =
         prefs?.getString(k('expression_fallback')) ?? 'neutral';
     _expressionEmojiBurst =
@@ -165,6 +170,12 @@ class ExpressionSettings with SettingsBase {
   Future<void> setSceneBackgrounds(bool value) async {
     _sceneBackgrounds = value;
     await prefs?.setBool(k('scene_backgrounds'), value);
+    notify();
+  }
+
+  Future<void> setScenePainting(bool value) async {
+    _scenePainting = value;
+    await prefs?.setBool(k('scene_painting'), value);
     notify();
   }
 

@@ -44,8 +44,11 @@ class WebChatStageRoutes {
     '.gif': 'image/gif',
   };
 
-  Future<shelf.Response> _snapshot(shelf.Request r) async =>
-      JsonResponse.ok({..._facade.snapshot(), 'scene': await _facade.scene()});
+  Future<shelf.Response> _snapshot(shelf.Request r) async => JsonResponse.ok({
+    ..._facade.snapshot(),
+    'scene': await _facade.scene(),
+    ..._facade.painting(),
+  });
 
   Future<shelf.Response> _sceneImage(shelf.Request r) async {
     final q = r.url.queryParameters;

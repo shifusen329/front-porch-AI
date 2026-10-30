@@ -9,6 +9,7 @@
 // place, lets go at a place with no picture, and rewinds when the newest
 // reply is deleted.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -19,19 +20,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf_router/shelf_router.dart';
 
 import 'package:front_porch_ai/database/database.dart';
 import 'package:front_porch_ai/models/models.dart';
-import 'package:front_porch_ai/services/chat/chat.dart' show SceneBackdrop;
+import 'package:front_porch_ai/services/chat/chat.dart'
+    show SceneBackdrop, ScenePainter, SceneWant;
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/facade/facades.dart';
 import 'package:front_porch_ai/services/web/routes/routes.dart';
 import 'package:front_porch_ai/services/web/util/util.dart';
 import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
 import 'package:front_porch_ai/ui/dialogs/scene_library/scene_library.dart';
+import 'package:front_porch_ai/ui/settings/tabs/appearance_tab/chat_appearance_section.dart';
 
 import '../../helpers/chat_db_teardown.dart';
 import '../../helpers/double_tap.dart';
@@ -634,6 +638,265 @@ void main() {
       (status, body) = await call('POST', '/scenes/delete', {'clear': true});
       expect(body['scenes'], isEmpty);
     });
+
+    group('painting a place with no picture', () {
+      HttpServer? server;
+      final sent = <Map<String, dynamic>>[];
+      var status = 200;
+      Completer<void>? hold;
+
+      /// The image server: answers txt2img with a real PNG, after [hold].
+      Future<ImageGenService> generator() async {
+        sent.clear();
+        status = 200;
+        hold = null;
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server!.listen((req) async {
+          final body = await utf8.decodeStream(req);
+          try {
+            switch ('${req.method} ${req.uri.path}') {
+              case 'POST /sdapi/v1/txt2img':
+                sent.add(jsonDecode(body) as Map<String, dynamic>);
+                await hold?.future;
+                req.response
+                  ..statusCode = status
+                  ..headers.contentType = ContentType.json
+                  ..write(
+                    jsonEncode(
+                      status == 200
+                          ? {
+                              'images': [base64Encode(_png(sent.length + 10))],
+                            }
+                          : {'detail': 'out of memory'},
+                    ),
+                  );
+              case 'GET /sdapi/v1/progress':
+                req.response
+                  ..headers.contentType = ContentType.json
+                  ..write(jsonEncode({'progress': 0.0}));
+              default:
+                req.response.statusCode = HttpStatus.notFound;
+            }
+          } finally {
+            await req.response.close();
+          }
+        });
+        final s = storage!.imageGenSettings;
+        await s.setImageGenBackend('a1111');
+        await s.setLocalImageGenUrl('http://127.0.0.1:${server!.port}');
+        await s.setImageGenPromptParadigm('tags');
+        final images = ImageGenService(storage!);
+        chat!.setImageGenService(images);
+        return images;
+      }
+
+      Future<void> until(bool Function() ok) async {
+        for (var i = 0; i < 500 && !ok(); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(ok(), isTrue);
+      }
+
+      /// Waits for the scene to be read, painted, and read again.
+      Future<void> painted() async {
+        final backdrop = SceneBackdrop.of(chat!, storage!);
+        await drain();
+        await backdrop.settled;
+        await backdrop.painter.idle;
+        await drain();
+        await backdrop.settled;
+      }
+
+      String prompt(int i) => sent[i]['prompt'] as String;
+
+      tearDown(() async {
+        if (hold?.isCompleted == false) hold!.complete();
+        await server?.close(force: true);
+        server = null;
+      });
+
+      test('paints the place as tags for nobody, shows it, and paints each '
+          'light once', () async {
+        await boot();
+        await generator();
+        await plant(['walks into the hallway'], hour: 23);
+        await painted();
+        expect(sent, hasLength(1));
+        expect(prompt(0), startsWith('no humans, scenery, hallway, night'));
+        expect(sent.single['negative_prompt'], contains('1girl'));
+        expect(
+          sent.single['width'] as int,
+          greaterThan(sent.single['height'] as int),
+        );
+        expect(await shown(), 'hallway-night.png');
+
+        await plant([
+          'walks into the hallway',
+          'leans on the hallway wall',
+        ], hour: 2);
+        await painted();
+        expect(sent, hasLength(1), reason: 'the night has its picture');
+        expect(await shown(), 'hallway-night.png');
+
+        await plant(['walks into the hallway'], hour: 8);
+        await painted();
+        expect(sent, hasLength(2));
+        expect(prompt(1), contains('morning'));
+        expect(await shown(), 'hallway-morning.png');
+
+        await library.remove('Mabel', 'hallway-morning.png');
+        await painted();
+        expect(sent, hasLength(3), reason: 'a deleted painting comes back');
+        expect(await shown(), 'hallway-morning.png');
+      });
+
+      test('shows the other light while it paints, and says so', () async {
+        await boot();
+        await generator();
+        await library.add(
+          'Mabel',
+          _png(4),
+          place: 'living room',
+          time: SceneTime.morning,
+        );
+        hold = Completer<void>();
+        final backdrop = SceneBackdrop.of(chat!, storage!);
+        final cues = <String>[];
+        void onCue() => cues.add(backdrop.cue);
+        backdrop.addListener(onCue);
+        addTearDown(() => backdrop.removeListener(onCue));
+
+        await plant(['curled up on the couch'], hour: 23);
+        await until(() => sent.length == 1);
+        expect(backdrop.current?.scene.name, 'living-room-morning.png');
+        expect(backdrop.painting?.place, 'living room');
+        final router = Router();
+        WebChatStageRoutes(ChatStageFacade(chat!, storage!), router);
+        Future<Map> stage() async => jsonDecode(
+          await (await router.call(
+            shelf.Request('GET', Uri.parse('http://localhost/api/chat/stage')),
+          )).readAsString(),
+        );
+        expect((await stage())['scenePainting'], {
+          'place': 'living room',
+          'time': 'night',
+        });
+        final whilePainting = backdrop.cue;
+        expect(whilePainting, contains('|living room|dark'));
+
+        hold!.complete();
+        await painted();
+        expect(await shown(), 'living-room-night.png');
+        expect(backdrop.painting, isNull);
+        expect(backdrop.cue, isNot(whilePainting));
+        expect(cues.toSet().length, greaterThan(1));
+        expect((await stage())['scenePainting'], isNull);
+        expect((await stage())['sceneProblem'], isNull);
+
+        await plant(['standing at the kitchen counter'], hour: 23);
+        await painted();
+        await plant(['out on the veranda'], hour: 20);
+        await painted();
+        expect(sent, hasLength(1), reason: 'any-time and night pictures stand');
+      });
+
+      test('needs the Appearance switch, a generator that is on, and the '
+          'Realism Engine', () async {
+        await boot();
+        await generator();
+        await storage!.expressionSettings.setScenePainting(false);
+        await plant(['walks into the hallway'], hour: 23);
+        await painted();
+        expect(sent, isEmpty);
+
+        await chat!.setRealismEnabled(false);
+        await storage!.expressionSettings.setScenePainting(true);
+        await painted();
+        expect(sent, isEmpty);
+
+        await storage!.imageGenSettings.setImageGenEnabled(false);
+        await chat!.setRealismEnabled(true);
+        await painted();
+        expect(sent, isEmpty);
+
+        await storage!.imageGenSettings.setImageGenEnabled(true);
+        await painted();
+        expect(sent, hasLength(1));
+        expect(await shown(), 'hallway-night.png');
+      });
+
+      test('paints one at a time, waits for a busy generator, and waits '
+          'before trying a failed place again', () async {
+        await boot();
+        final images = await generator();
+        var now = DateTime.utc(2026, 7, 1);
+        final painter = ScenePainter(
+          generator: () => images,
+          writePrompt: (_) async => null,
+          storage: storage!,
+          library: library,
+          clock: () => now,
+        );
+        addTearDown(painter.dispose);
+        SceneWant at(String place) =>
+            SceneWant(owner: 'Mabel', place: place, time: SceneTime.day);
+        String placeOf(int i) => prompt(i).split(', ')[2];
+
+        hold = Completer<void>();
+        final other = images.generateImage(prompt: 'a lighthouse');
+        await until(() => sent.length == 1);
+        painter
+          ..want(at('cellar'))
+          ..want(at('garage'));
+        expect(painter.painting, isNull, reason: 'the generator is busy');
+        hold!.complete();
+        hold = null;
+        await other;
+        await until(() => sent.length == 2);
+        await painter.idle;
+        expect(placeOf(1), 'garage', reason: 'the newest want');
+
+        hold = Completer<void>();
+        painter.want(at('attic'));
+        await until(() => sent.length == 3);
+        painter
+          ..want(at('barn'))
+          ..want(at('garden'));
+        expect(painter.painting?.place, 'attic');
+        hold!.complete();
+        hold = null;
+        await painter.idle;
+        await painter.idle;
+        expect([placeOf(2), placeOf(3)], ['attic', 'garden']);
+        expect(sent, hasLength(4));
+
+        status = 500;
+        painter.want(at('closet'));
+        await painter.idle;
+        expect(painter.problem, startsWith("Couldn't paint the closet"));
+        painter.want(at('closet'));
+        await painter.idle;
+        expect(sent, hasLength(5), reason: 'waits before trying again');
+        now = now.add(ScenePainter.retryAfter);
+        status = 200;
+        painter.want(at('closet'));
+        await painter.idle;
+        expect(sent, hasLength(6));
+        expect(painter.problem, isNull);
+
+        await library.add('Mabel', _png(8), place: 'barn');
+        painter.want(at('barn'));
+        await painter.idle;
+        expect(
+          sent,
+          hasLength(6),
+          reason: 'the barn has a picture for any time',
+        );
+        expect([
+          for (final s in await library.list('Mabel')) s.name,
+        ], containsAll(['garage-day.png', 'garden-day.png', 'closet-day.png']));
+      });
+    });
   });
 
   group('the Scenes dialog', () {
@@ -728,6 +991,130 @@ void main() {
         expect(tester.takeException(), isNull, reason: '$size');
         await close(tester);
       }
+    });
+  });
+
+  group('the prompt for a painted place', () {
+    test('keeps people out, and the place and its time in', () {
+      expect(
+        cleanSceneTags(
+          'Tags: 1girl, solo, Kitchen, wooden table, Mabel, long hair, day, '
+          'copper pots, kitchen, moonlight through window.',
+          place: 'kitchen',
+          time: SceneTime.night,
+          names: ['Mabel'],
+          styleSuffix: 'anime style, masterpiece',
+        ),
+        'no humans, scenery, kitchen, wooden table, copper pots, '
+        'moonlight through window, night, anime style, masterpiece',
+      );
+      final many = cleanSceneTags(
+        [for (var i = 0; i < 60; i++) 'thing $i'].join(', '),
+        place: 'barn',
+        time: SceneTime.evening,
+      ).split(', ');
+      expect(many, hasLength(kMaxSceneTags));
+      expect(many.sublist(many.length - 3), ['barn', 'evening', 'sunset']);
+      expect(
+        cleanSceneTags(
+          'The kitchen is dark and quiet tonight, with a lamp glowing',
+          place: 'kitchen',
+          time: SceneTime.night,
+        ),
+        'no humans, scenery, with a lamp glowing, kitchen, night',
+      );
+    });
+
+    test('a paragraph loses its names and says it is empty', () {
+      expect(
+        cleanSceneSentences(
+          "Mabel's kitchen glows at night",
+          names: ['Mabel'],
+          styleSuffix: 'Photorealistic.',
+        ),
+        'kitchen glows at night. No people. Photorealistic.',
+      );
+      expect(
+        staticScenePrompt(place: 'porch', time: SceneTime.evening, tags: true),
+        'no humans, scenery, porch, evening, sunset',
+      );
+      expect(
+        staticScenePrompt(place: 'porch', time: SceneTime.night, tags: false),
+        'An empty porch at night, with nobody in it. No people.',
+      );
+    });
+
+    test('a landscape size on a local generator, the negative for tags', () {
+      expect(sceneSize('1024x1024', local: true), '1216x832');
+      expect(sceneSize('832x1216', local: true), '1216x832');
+      expect(sceneSize('1344x768', local: true), '1344x768');
+      expect(sceneSize('1024x1024', local: false), isNull);
+      expect(
+        sceneNegative('lowres, Text', tags: true),
+        'lowres, Text, 1girl, 1boy, solo, person, people, humans, '
+        'watermark, signature',
+      );
+      expect(sceneNegative(' lowres ', tags: false), 'lowres');
+    });
+
+    test('names the place with no picture, and paints a light once', () {
+      String? other(String phrase) => switch (SceneMatcher.read(phrase, [])) {
+        AtOtherPlace(:final place) => place,
+        _ => null,
+      };
+      expect(other('curled up on the couch'), 'living room');
+      expect(other('in the dining room by the kitchen door'), 'dining room');
+      expect(other('leaning back, eyes closed'), isNull);
+
+      final morning = [_scene('porch-morning.png')];
+      expect(SceneMatcher.needsPainting(morning, SceneTime.night), isTrue);
+      expect(SceneMatcher.needsPainting(morning, SceneTime.day), isFalse);
+      expect(
+        SceneMatcher.needsPainting([_scene('porch.png')], SceneTime.night),
+        isFalse,
+      );
+      expect(
+        SceneMatcher.needsPainting([
+          _scene('porch-evening.png'),
+        ], SceneTime.night),
+        isFalse,
+      );
+      expect(SceneMatcher.needsPainting([], SceneTime.day), isTrue);
+    });
+  });
+
+  group('Settings → Appearance', () {
+    testWidgets('painting missing places turns off and is saved', (
+      tester,
+    ) async {
+      late StorageService storage;
+      await tester.runAsync(() async {
+        SharedPreferences.setMockInitialValues({'update_auto_check': false});
+        storage = StorageService();
+        await storage.initialized;
+      });
+      await tester.binding.setSurfaceSize(const Size(900, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StorageService>.value(
+          value: storage,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: ChatAppearanceSection()),
+            ),
+          ),
+        ),
+      );
+      final tile = find.byKey(const ValueKey('scene-painting'));
+      await tester.ensureVisible(tile);
+      expect(tester.widget<SwitchListTile>(tile).value, isTrue);
+
+      await tester.tap(tile);
+      await tester.pump();
+      expect(storage.expressionSettings.scenePainting, isFalse);
+      expect(tester.widget<SwitchListTile>(tile).value, isFalse);
+      final prefs = await tester.runAsync(SharedPreferences.getInstance);
+      expect(prefs!.getBool('scene_painting'), isFalse);
     });
   });
 }

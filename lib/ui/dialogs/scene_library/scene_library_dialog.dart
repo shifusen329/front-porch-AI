@@ -93,7 +93,15 @@ class _SceneLibraryDialogState extends State<SceneLibraryDialog> {
   @override
   void initState() {
     super.initState();
+    // A painting can land while the dialog is open.
+    SceneLibrary.revision.addListener(_reload);
     _reload();
+  }
+
+  @override
+  void dispose() {
+    SceneLibrary.revision.removeListener(_reload);
+    super.dispose();
   }
 
   Future<void> _reload() async {
@@ -334,11 +342,16 @@ class _SceneLibraryDialogState extends State<SceneLibraryDialog> {
       return 'Scene backgrounds are off for this chat (UI Settings).';
     }
     final shot = backdrop.current;
-    if (shot == null) {
-      return "Showing the chat's own background until the story reaches one "
-          'of these places.';
-    }
-    return 'Now showing: ${shot.scene.place} · '
-        '${sceneTimeLabel(shot.time).toLowerCase()}';
+    final showing = shot == null
+        ? "Showing the chat's own background until the story reaches one "
+              'of these places.'
+        : 'Now showing: ${shot.scene.place} · '
+              '${sceneTimeLabel(shot.time).toLowerCase()}';
+    final painting = backdrop.painting;
+    final extra = painting != null
+        ? 'Painting the ${painting.place} · '
+              '${sceneTimeLabel(painting.time).toLowerCase()}…'
+        : backdrop.problem;
+    return extra == null ? showing : '$showing\n$extra';
   }
 }

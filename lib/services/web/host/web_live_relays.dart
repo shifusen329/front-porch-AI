@@ -21,11 +21,13 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:front_porch_ai/services/chat/chat.dart' show SceneBackdrop;
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/image/image.dart';
 import 'package:front_porch_ai/services/web/facade/facades.dart';
 import 'package:front_porch_ai/services/web/facade/settings/settings.dart';
 import 'package:front_porch_ai/services/web/host/web_host_services.dart';
+import 'package:front_porch_ai/services/web/host/web_scene_relay.dart';
 import 'package:front_porch_ai/services/web/streaming/stream_hub.dart';
 
 /// The live broadcasts a running web server pushes to every browser: the eval
@@ -92,6 +94,7 @@ class WebLiveRelays {
   // can remove and cancel them.
   VoidCallback? _libraryListener;
   Timer? _libraryDebounce;
+  WebSceneRelay? _sceneRelay;
   VoidCallback? _settingsListener;
   Timer? _settingsDebounce;
 
@@ -105,6 +108,10 @@ class WebLiveRelays {
     // {active:false} so the overlay dismisses. Cheap no-op on every other notify
     // (just a couple of bool reads).
     if (chatService != null && streamHub != null) {
+      _sceneRelay = WebSceneRelay(
+        SceneBackdrop.of(chatService, _storage),
+        streamHub,
+      );
       void onProcessing() {
         final realism = chatService.isEvaluatingRealism;
         final objective = chatService.isCheckingCompletion;
@@ -421,6 +428,7 @@ class WebLiveRelays {
       _imageProgressListener != null ||
       _packBoardListener != null ||
       _libraryListener != null ||
+      _sceneRelay != null ||
       _settingsListener != null ||
       _genStatusTicker != null ||
       _libraryDebounce != null ||
@@ -479,5 +487,7 @@ class WebLiveRelays {
     }
     _libraryDebounce?.cancel();
     _libraryDebounce = null;
+    _sceneRelay?.detach();
+    _sceneRelay = null;
   }
 }

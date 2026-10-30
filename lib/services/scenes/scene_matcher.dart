@@ -33,9 +33,11 @@ final class AtPicturedPlace extends PlaceReading {
   final String place;
 }
 
-/// The phrase names a place there is no picture of.
+/// The phrase names a place there is no picture of: [place] is its own name,
+/// a synonym's being the place it stands for ("couch" is the living room).
 final class AtOtherPlace extends PlaceReading {
-  const AtOtherPlace();
+  const AtOtherPlace(this.place);
+  final String place;
 }
 
 /// The phrase names no place ("leaning back, eyes closed").
@@ -63,14 +65,36 @@ abstract final class SceneMatcher {
       }
     }
     if (best != null) return AtPicturedPlace(best);
-    for (final known in [
-      ...kKnownScenePlaces,
-      for (final e in kScenePlaceSynonyms.entries) ...[e.key, ...e.value],
-    ]) {
-      if (_contains(words, placeWords(known))) return const AtOtherPlace();
+    String? other;
+    var otherWords = 0;
+    for (final (term, place) in _knownTerms) {
+      final t = placeWords(term);
+      if (t.length > otherWords && _contains(words, t)) {
+        other = place;
+        otherWords = t.length;
+      }
     }
-    return const NoPlace();
+    return other == null ? const NoPlace() : AtOtherPlace(other);
   }
+
+  /// Every word for a place, with the place it names.
+  static Iterable<(String, String)> get _knownTerms sync* {
+    for (final k in kKnownScenePlaces) {
+      yield (k, k);
+    }
+    for (final e in kScenePlaceSynonyms.entries) {
+      yield (e.key, e.key);
+      for (final s in e.value) {
+        yield (s, e.key);
+      }
+    }
+  }
+
+  /// Whether to paint [place]'s pictures a new one for [now]: none of them
+  /// fits any time, and none shares its light (a morning picture serves the
+  /// day, a night one the evening).
+  static bool needsPainting(List<SceneImage> pictures, SceneTime now) =>
+      !pictures.any((s) => s.time == null || s.time!.isDark == now.isDark);
 
   /// How well [place] matches: its own words count double, so a picture
   /// named for the place beats one that only matches through a synonym of
@@ -137,7 +161,7 @@ abstract final class SceneMatcher {
       int cost(SceneTime t) {
         final d = (t.index - now.index).abs();
         final around = d > 2 ? 4 - d : d;
-        final sameLight = (t.index >= 2) == (now.index >= 2);
+        final sameLight = t.isDark == now.isDark;
         return around * 2 + (sameLight ? 0 : 1);
       }
 

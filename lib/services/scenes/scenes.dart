@@ -24,3 +24,4 @@ export 'scene_image.dart';
 export 'scene_library.dart';
 export 'scene_matcher.dart';
 export 'scene_places.dart';
+export 'scene_prompt.dart';

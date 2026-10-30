@@ -71,6 +71,19 @@ class ChatStageFacade {
     };
   }
 
+  /// The place being painted for this chat, and why the last painting
+  /// failed, beside [scene]. Read after it, once the newest change is in.
+  Map<String, dynamic> painting() {
+    final backdrop = SceneBackdrop.of(_chat, _storage);
+    final now = backdrop.painting;
+    return {
+      'scenePainting': now == null
+          ? null
+          : {'place': now.place, 'time': now.time.name},
+      'sceneProblem': backdrop.problem,
+    };
+  }
+
   /// A scene picture of someone in this chat, by [scene]'s `who` and `v`;
   /// null for anyone or anything else.
   Future<File?> sceneImage(String who, String name) async {

@@ -249,4 +249,23 @@ extension ChatServiceImages on ChatService {
       instruction: typed.isEmpty ? null : typed,
     );
   }
+
+  /// The image generator a missing scene picture is painted with; null when
+  /// none is wired in.
+  ImageGenService? get sceneImageGenerator => _imageGenService;
+
+  /// Writes the image prompt for a missing scene picture on the side lane
+  /// (the helper model while its lane is on, else the chat model), which a
+  /// reply waits for. Null when that model is not ready or says nothing.
+  Future<String?> writeScenePrompt(String instruction) async {
+    if (!_sideLaneLlm.isReady) return null;
+    final text = await _fireLLMEval(
+      instruction,
+      label: 'scene-picture',
+      maxLength: 240,
+      salvageReasoning: false,
+      wallClockTimeout: const Duration(seconds: 90),
+    );
+    return (text == null || text.trim().isEmpty) ? null : text;
+  }
 }

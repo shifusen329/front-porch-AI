@@ -200,6 +200,7 @@ class SettingsSnapshot {
       // Appearance → Visual novel mode (additive).
       'visualNovelMode': _storage.expressionSettings.visualNovelMode,
       'sceneBackgrounds': _storage.expressionSettings.sceneBackgrounds,
+      'scenePainting': _storage.expressionSettings.scenePainting,
       // The resolved app theme (mode + both token maps). The web never
       // computes a palette; it paints these. Additive.
       'theme': webThemeWire(_storage.appearance),

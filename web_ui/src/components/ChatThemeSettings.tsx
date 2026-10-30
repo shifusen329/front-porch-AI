@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ChatThemeOverrides, ChatThemePreset } from './chatTypes';
-import type { ChatScene } from '../pages/chat/useChatStage';
+import type { ChatScene, ScenePainting } from '../pages/chat/useChatStage';
 import { ReadingSizeSlider } from './ReadingSizeSettings';
 import { userBubbleDialogueColor } from '../chatColors';
 
@@ -149,11 +149,15 @@ const keepChoices = (prev: ChatThemeOverrides): ChatThemeOverrides => ({
   followScene: prev.followScene,
 });
 
-export function ChatThemeSettings({ overrides, onSave, scene }: {
+export function ChatThemeSettings({ overrides, onSave, scene, painting, sceneProblem }: {
   overrides: ChatThemeOverrides | null;
   onSave: (o: ChatThemeOverrides) => void;
   /** The scene picture the chat shows now, if any. */
   scene?: ChatScene | null;
+  /** The place being painted with the image generator, if any. */
+  painting?: ScenePainting | null;
+  /** Why the last painting failed. */
+  sceneProblem?: string | null;
 }) {
   const [local, setLocal] = useState<ChatThemeOverrides>(overrides ?? {});
   useEffect(() => setLocal(overrides ?? {}), [overrides]);
@@ -287,6 +291,17 @@ export function ChatThemeSettings({ overrides, onSave, scene }: {
         <p className="small" data-testid="scene-now-showing">
           Now showing: {scene.place} · {scene.time}
         </p>
+      )}
+      {painting ? (
+        <p className="small" data-testid="scene-painting">
+          Painting the {painting.place} · {painting.time}…
+        </p>
+      ) : (
+        sceneProblem && (
+          <p className="small rag-engine-error" data-testid="scene-problem">
+            {sceneProblem}
+          </p>
+        )
       )}
 
       <div className="theme-actions">

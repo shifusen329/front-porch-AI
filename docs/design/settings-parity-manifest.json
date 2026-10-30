@@ -58,6 +58,13 @@
       "dartMarker": "Backgrounds follow the scene",
       "webMarker": "Backgrounds follow the scene"
     },
+    "scenePainting": {
+      "section": "general",
+      "group": "chat-appearance",
+      "dart": "lib/ui/settings/tabs/appearance_tab/chat_appearance_section.dart",
+      "dartMarker": "Paint missing places with the image generator",
+      "webMarker": "Paint missing places with the image generator"
+    },
     "spellCheckLanguage": {
       "section": "generation",
       "dart": "lib/ui/settings/tabs/general_tab.dart",

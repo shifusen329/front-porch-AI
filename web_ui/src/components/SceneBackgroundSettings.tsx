@@ -2,22 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Web mirror of Settings → Appearance → Chat Appearance → Backgrounds follow
-// the scene (desktop: chat_appearance_section.dart). A chat can choose for
-// itself in its Chat settings (ChatThemeSettings).
+// the scene and Paint missing places with the image generator (desktop:
+// chat_appearance_section.dart). A chat can choose for itself in its Chat
+// settings (ChatThemeSettings).
 
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 
+type SceneSwitch = 'sceneBackgrounds' | 'scenePainting';
+
 export function SceneBackgroundSettings() {
-  const [on, setOn] = useState(true);
+  const [on, setOn] = useState<Record<SceneSwitch, boolean>>({
+    sceneBackgrounds: true,
+    scenePainting: true,
+  });
   const [problem, setProblem] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     api
-      .get<{ sceneBackgrounds?: boolean }>('/api/settings')
+      .get<Partial<Record<SceneSwitch, boolean>>>('/api/settings')
       .then((r) => {
-        if (!cancelled && typeof r.sceneBackgrounds === 'boolean') setOn(r.sceneBackgrounds);
+        if (cancelled) return;
+        setOn((was) => ({
+          sceneBackgrounds:
+            typeof r.sceneBackgrounds === 'boolean' ? r.sceneBackgrounds : was.sceneBackgrounds,
+          // An older host has no painting switch: it shows on, and does nothing.
+          scenePainting:
+            typeof r.scenePainting === 'boolean' ? r.scenePainting : was.scenePainting,
+        }));
       })
       .catch(() => {});
     return () => {
@@ -25,12 +38,12 @@ export function SceneBackgroundSettings() {
     };
   }, []);
 
-  const commit = (next: boolean) => {
-    const before = on;
-    setOn(next);
+  const commit = (key: SceneSwitch, next: boolean) => {
+    const before = on[key];
+    setOn((was) => ({ ...was, [key]: next }));
     setProblem('');
-    api.post('/api/settings', { sceneBackgrounds: next }).catch(() => {
-      setOn(before);
+    api.post('/api/settings', { [key]: next }).catch(() => {
+      setOn((was) => ({ ...was, [key]: before }));
       setProblem('That could not be saved. Check that the app is running, then try again.');
     });
   };
@@ -46,11 +59,25 @@ export function SceneBackgroundSettings() {
       <label>
         <input
           type="checkbox"
-          checked={on}
-          onChange={(e) => commit(e.target.checked)}
+          checked={on.sceneBackgrounds}
+          onChange={(e) => commit('sceneBackgrounds', e.target.checked)}
           aria-label="Backgrounds follow the scene"
         />
         {' '}Backgrounds follow the scene
+      </label>
+      <p className="reading-blurb">
+        When the story goes somewhere with no picture, the chat model describes it for your image
+        generator (Settings → Image Generation) and the picture is saved to the character’s
+        Scenes. One for the day, one for the night.
+      </p>
+      <label>
+        <input
+          type="checkbox"
+          checked={on.scenePainting}
+          onChange={(e) => commit('scenePainting', e.target.checked)}
+          aria-label="Paint missing places with the image generator"
+        />
+        {' '}Paint missing places with the image generator
       </label>
       {problem && (
         <p className="small rag-engine-error" role="alert">

@@ -256,3 +256,60 @@ it("keeps the chat's scene choice when the theme is cleared, and says what shows
   await click('Save theme');
   expect(saved).toEqual({ visualNovel: true, followScene: null });
 });
+
+it('the painting switch reads and saves its own setting, and says when it could not', async () => {
+  const { SceneBackgroundSettings } = await import('./SceneBackgroundSettings');
+  const client = (await import('../api/client')) as unknown as {
+    api: { get: (path: string) => Promise<unknown>; post: (path: string, body: unknown) => Promise<unknown> };
+  };
+  const get = vi
+    .spyOn(client.api, 'get')
+    .mockResolvedValueOnce({ sceneBackgrounds: true, scenePainting: false });
+  act(() => root.render(createElement(SceneBackgroundSettings)));
+  await settle();
+  const box = (label: string) =>
+    container.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  const painting = box('Paint missing places with the image generator');
+  expect(painting.checked).toBe(false);
+  expect(box('Backgrounds follow the scene').checked).toBe(true);
+
+  act(() => painting.click());
+  await settle();
+  expect(posts).toEqual([{ path: '/api/settings', body: { scenePainting: true } }]);
+  expect(painting.checked).toBe(true);
+
+  const post = vi.spyOn(client.api, 'post').mockRejectedValueOnce(new Error('down'));
+  act(() => painting.click());
+  await settle();
+  expect(painting.checked).toBe(true);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('could not be saved');
+  get.mockRestore();
+  post.mockRestore();
+});
+
+it('says which place is being painted, or why it could not be', async () => {
+  const show = (painting: { place: string; time: string } | null, sceneProblem: string | null) =>
+    act(() =>
+      root.render(
+        createElement(ChatThemeSettings, {
+          overrides: null,
+          onSave: () => {},
+          scene: null,
+          painting,
+          sceneProblem,
+        }),
+      ),
+    );
+  show({ place: 'kitchen', time: 'night' }, null);
+  await settle();
+  expect(container.querySelector('[data-testid="scene-painting"]')?.textContent).toBe(
+    'Painting the kitchen · night…',
+  );
+
+  show(null, "Couldn't paint the kitchen: out of memory");
+  await settle();
+  expect(container.querySelector('[data-testid="scene-painting"]')).toBeNull();
+  expect(container.querySelector('[data-testid="scene-problem"]')?.textContent).toBe(
+    "Couldn't paint the kitchen: out of memory",
+  );
+});

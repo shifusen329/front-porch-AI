@@ -94,6 +94,20 @@ class ChatAppearanceSection extends StatelessWidget {
           activeTrackColor: AppColors.porchAmberOf(context),
           onChanged: storageService.expressionSettings.setSceneBackgrounds,
         ),
+        SwitchListTile(
+          key: const ValueKey('scene-painting'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Paint missing places with the image generator'),
+          subtitle: const Text(
+            'When the story goes somewhere with no picture, the chat model '
+            'describes it for your image generator (Settings → Image '
+            'Generation) and the picture is saved to the character’s '
+            'Scenes. One for the day, one for the night.',
+          ),
+          value: storageService.expressionSettings.scenePainting,
+          activeTrackColor: AppColors.porchAmberOf(context),
+          onChanged: storageService.expressionSettings.setScenePainting,
+        ),
         ColorRow(
           label: 'User Bubble',
           color: storageService.uiSettings.globalUserBubbleColor,
