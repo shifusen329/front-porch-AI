@@ -3,6 +3,49 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-30 13:40:24 -0500 (CDT)
+
+On the `dev` branch. This is 1.0.4.
+
+### Added
+
+- **Chat backgrounds that follow the scene** (`ff33e488`). Each character
+  can have **Scenes**: pictures of the places they spend time, named for
+  the place (*porch*, *kitchen*, *living room*) and optionally a time of
+  day (morning, day, evening or night). When the Realism Engine reports
+  that the character is somewhere with a picture, the chat background
+  cross-fades to it, the night picture at night.
+  - Open Scenes from the chat sidebar's Main Settings menu or a character's
+    menu in the library. Add a picture and name its place, or import a ZIP
+    named the same way (`porch.png`, `porch-night.png`). Tap a picture to
+    rename it; ✕ deletes it.
+  - Places match by whole words, plus everyday stand-ins (*veranda* or
+    *front steps* for a porch, *couch* for a living room). A place with no
+    picture brings the chat's own background back; a line that names no
+    place keeps the picture that's showing.
+  - Regenerate, swipe, delete, edit and Continue take the background back
+    with the reply.
+  - **Settings → Appearance → Backgrounds follow the scene** turns it on or
+    off everywhere (on by default; nothing changes until a character has
+    scenes), and a chat can choose for itself in **UI Settings**. It needs
+    the Realism Engine.
+  - In a group, the background is the place of whoever spoke last.
+  - Scenes travel with Sync and move with a character rename.
+  - The phone web app has a Scenes section on the character's edit page,
+    both switches, and the same cross-fading background.
+
+### Known gaps
+
+- Two characters with the same name share one Scenes folder, so a new
+  character can show the pictures of a deleted one while another
+  character of that name still exists.
+- Scenes are not part of a PNG or `.porch` export yet. Generating a
+  missing place, scenes for worlds, and matching by meaning are planned.
+- The Linux golden pictures of UI Settings, Settings → Appearance and the
+  chat page have not been regenerated.
+- Checked on Windows and in the browser suite, not yet on the Android
+  emulator at phone width.
+
 ## 2026-10-30 03:03:51 -0500 (CDT)
 
 On the `dev` branch. This is 1.0.3, with library sync (`12bd5370`, below)
