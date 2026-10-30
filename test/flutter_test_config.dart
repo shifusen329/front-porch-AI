@@ -34,6 +34,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   TestWidgetsFlutterBinding.ensureInitialized();
+  _tempFoldersGoWithTheFile();
   // StorageService now reads the Tavily key from the native credential store
   // during startup. Use the package's official in-memory platform in every
   // test so unrelated suites never depend on a desktop keyring/plugin.
@@ -58,6 +59,67 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   ]);
 
   await testMain();
+}
+
+/// Windows only: every temp folder a test file makes goes in one folder of
+/// the file's own. Many suites write a fake multi-GB model by seeking to its
+/// end; Linux and macOS store that as a sparse file, but NTFS allocates every
+/// byte, and the folders the tests never delete filled the drive (1.1 TB on
+/// 2026-10-30). Files a test still holds open can't be deleted when its
+/// tests finish, so each file also sweeps what finished runs left: its
+/// siblings' folders after 30 minutes (no test file runs that long, so one in
+/// use is never touched) and loose `fpai*` test folders after a day.
+void _tempFoldersGoWithTheFile() {
+  if (!Platform.isWindows) return;
+  final temp = Directory.systemTemp;
+  _sweep(temp);
+  // Short: the path a test builds under it must stay within MAX_PATH.
+  final folder = temp.createTempSync('fpr');
+  IOOverrides.global = _TempIn(folder);
+  tearDownAll(() async {
+    IOOverrides.global = null;
+    try {
+      await folder.delete(recursive: true);
+    } on FileSystemException {
+      // Something still holds a file; the next file's sweep takes it.
+    }
+  });
+}
+
+void _sweep(Directory temp) {
+  final now = DateTime.now();
+  final List<FileSystemEntity> entries;
+  try {
+    entries = temp.listSync(followLinks: false);
+  } on FileSystemException {
+    return;
+  }
+  for (final e in entries) {
+    if (e is! Directory) continue;
+    final name = e.uri.pathSegments.where((s) => s.isNotEmpty).last;
+    final keep = name.startsWith('fpr')
+        ? const Duration(minutes: 30)
+        : name.startsWith('fpai')
+        ? const Duration(days: 1)
+        : null;
+    if (keep == null) continue;
+    try {
+      // On Windows `changed` is the creation time.
+      if (now.difference(e.statSync().changed) > keep) {
+        e.deleteSync(recursive: true);
+      }
+    } on FileSystemException {
+      // Another test file is sweeping it too, or it is still in use.
+    }
+  }
+}
+
+final class _TempIn extends IOOverrides {
+  _TempIn(this.folder);
+  final Directory folder;
+
+  @override
+  Directory getSystemTempDirectory() => folder;
 }
 
 Future<void> _loadFont(String family, List<String> paths) async {
