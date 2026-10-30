@@ -3,6 +3,51 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-30 16:26:02 -0500 (CDT)
+
+On the `dev` branch. This is 1.1.0.
+
+### Added
+
+- **Missing places are painted with the image generator** (`088b507a`).
+  When the Realism Engine puts a character somewhere they have no Scenes
+  picture of, the image generator set up in Settings → Image Generation
+  paints the place, empty, and the picture is saved to that character's
+  Scenes (`hallway-night.png`). The chat background fades to it when it is
+  ready.
+  - The chat model (or the helper model, when its lane is on) turns what
+    the story says about the place into the image prompt. With **Prompt
+    style → Tags** it writes danbooru tags (`no humans, scenery, hallway,
+    night, …`), the right choice for SD 1.5, SDXL, Pony and Illustrious
+    checkpoints; otherwise a sentence. People, names and the wrong time of
+    day are taken out of what it writes.
+  - Each place gets one picture for the day (morning and day) and one for
+    the night (evening and night). The other one shows while its partner
+    is painted. Local generators paint landscape.
+  - One painting runs at a time, it waits for a Studio or `/image` run to
+    finish, and a place that failed is tried again after 10 minutes.
+    Delete a painting you don't like and it is painted again the next time
+    the story goes there.
+  - **Settings → Appearance → Paint missing places with the image
+    generator** turns it off (on by default; nothing happens without an
+    image generator). The Scenes window, and the phone web app's chat
+    settings, say what is being painted or why the last one failed.
+  - The phone web app has the same switch and shows the painted pictures.
+
+### Known gaps
+
+- Each new place and time of day costs one short model call and one
+  generation. While a painting runs, the Image Studio says "Already
+  generating." On a KoboldCpp that keeps one cached chat, the next reply
+  reads the chat again once.
+- Only places on the built-in word list are noticed (porch, kitchen,
+  hallway, yard, office, tavern and so on); an unusual place such as a
+  gazebo is not painted.
+- Painting was checked against real model and image servers and in the
+  test suites, not yet by hand in a long chat or on the Android emulator.
+- Scenes for worlds, matching by meaning, and scenes in exports are still
+  planned.
+
 ## 2026-10-30 13:40:24 -0500 (CDT)
 
 On the `dev` branch. This is 1.0.4.
