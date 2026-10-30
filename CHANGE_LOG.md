@@ -3,6 +3,31 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-29 23:03:39 -0500 (CDT)
+
+On the `dev` branch.
+
+### Added
+
+- **Library sync between devices** (`12bd5370`). Settings → Sync sends
+  this device's whole library to a WebDAV server (such as Nextcloud) or, on
+  a desktop, a folder, and gets it on another device: the PC and the
+  Android phone, or two PCs. Nothing is merged. A Get replaces this
+  device's library, asks **Keep mine** or **Take theirs** when this device
+  changed since its last sync (and names the chats that changed), and
+  **Undo** puts the old library back for 7 days. Chat photos, persona
+  avatars and backgrounds are re-pointed when a library moves between
+  Windows and Android. Sending on close and checking at start are
+  optional. The phone web app has the same section. The WebDAV password is
+  kept in the system's secure storage.
+
+### Fixed
+
+- **Change Data Directory** now re-points chat photos and persona avatars
+  to the new folder; they used to break after a move (`12bd5370`).
+- **Restoring a backup** keeps the database closed until the copy is in
+  place, so nothing can reopen it halfway (`12bd5370`).
+
 ## 2026-10-29 15:41:20 -0500 (CDT)
 
 On the `dev` branch.
