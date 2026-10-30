@@ -16,6 +16,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf_router/shelf_router.dart';
@@ -23,10 +25,12 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:front_porch_ai/services/web/facade/chat_stage_facade.dart';
 import 'package:front_porch_ai/services/web/util/util.dart';
 
-/// Visual novel endpoints: the open chat's stage, and each figure's picture.
+/// Visual novel and scene endpoints: the open chat's stage with its scene
+/// background, each figure's picture, and the scene picture.
 class WebChatStageRoutes {
   WebChatStageRoutes(this._facade, Router router) {
     router.get('/api/chat/stage', _snapshot);
+    router.get('/api/chat/scene/image', _sceneImage);
     router.get('/api/chat/stage/<id>', _image);
   }
 
@@ -40,12 +44,23 @@ class WebChatStageRoutes {
     '.gif': 'image/gif',
   };
 
-  shelf.Response _snapshot(shelf.Request r) =>
-      JsonResponse.ok(_facade.snapshot());
+  Future<shelf.Response> _snapshot(shelf.Request r) async =>
+      JsonResponse.ok({..._facade.snapshot(), 'scene': await _facade.scene()});
+
+  Future<shelf.Response> _sceneImage(shelf.Request r) async {
+    final q = r.url.queryParameters;
+    final file = await _facade.sceneImage(q['who'] ?? '', q['v'] ?? '');
+    if (file == null) return shelf.Response.notFound('No such scene');
+    return _picture(file);
+  }
 
   Future<shelf.Response> _image(shelf.Request r, String id) async {
     final file = _facade.image(Uri.decodeComponent(id));
     if (file == null) return shelf.Response.notFound('No picture on stage');
+    return _picture(file);
+  }
+
+  Future<shelf.Response> _picture(File file) async {
     return shelf.Response.ok(
       await file.readAsBytes(),
       headers: {

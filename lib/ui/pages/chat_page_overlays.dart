@@ -239,6 +239,13 @@ class ChatSurface extends StatelessWidget {
                     ),
                   ),
                 ],
+                // Where the scene is, over the normal background and the
+                // expression backdrop; the stage stands on it.
+                Positioned.fill(
+                  child: SceneBackdropLayer(
+                    backdrop: SceneBackdrop.of(chatService, storageService),
+                  ),
+                ),
                 if (novel) Positioned.fill(child: VisualNovelStageLayer()),
               ],
             ),

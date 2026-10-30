@@ -58,6 +58,12 @@ class ExpressionSettings with SettingsBase {
   // (ChatThemeOverrides.visualNovel).
   bool _visualNovelMode = false;
 
+  // Settings → Appearance: the chat background follows the place the Realism
+  // Engine reports, when the character has a picture of it. On by default;
+  // nothing changes until a character has scenes. A chat can overrule it
+  // (ChatThemeOverrides.followScene).
+  bool _sceneBackgrounds = true;
+
   /// Each downloaded classifier model's labels, by model id.
   Map<String, List<String>> _modelLabels = {};
 
@@ -69,6 +75,7 @@ class ExpressionSettings with SettingsBase {
   bool get expressionEmojiBurst => _expressionEmojiBurst;
   double get expressionEmojiBurstSize => _expressionEmojiBurstSize;
   bool get visualNovelMode => _visualNovelMode;
+  bool get sceneBackgrounds => _sceneBackgrounds;
 
   /// The Hugging Face model (`owner/name`) the ONNX classifier runs.
   String get expressionOnnxModel => _expressionOnnxModel;
@@ -102,6 +109,7 @@ class ExpressionSettings with SettingsBase {
     _expressionRerollSame =
         prefs?.getBool(k('expression_reroll_same')) ?? false;
     _visualNovelMode = prefs?.getBool(k('visual_novel_mode')) ?? false;
+    _sceneBackgrounds = prefs?.getBool(k('scene_backgrounds')) ?? true;
     _expressionFallback =
         prefs?.getString(k('expression_fallback')) ?? 'neutral';
     _expressionEmojiBurst =
@@ -151,6 +159,12 @@ class ExpressionSettings with SettingsBase {
   Future<void> setVisualNovelMode(bool value) async {
     _visualNovelMode = value;
     await prefs?.setBool(k('visual_novel_mode'), value);
+    notify();
+  }
+
+  Future<void> setSceneBackgrounds(bool value) async {
+    _sceneBackgrounds = value;
+    await prefs?.setBool(k('scene_backgrounds'), value);
     notify();
   }
 

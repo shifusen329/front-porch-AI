@@ -17,6 +17,7 @@ import { IdleUnloadSettings } from '../components/IdleUnloadSettings';
 import { KeepRecentChatsSettings } from '../components/KeepRecentChatsSettings';
 import { MemorySearchSettings } from '../components/MemorySearchSettings';
 import { VisualNovelSettings } from '../components/VisualNovelSettings';
+import { SceneBackgroundSettings } from '../components/SceneBackgroundSettings';
 import { applySpellCheckLang } from '../spellCheckLang';
 import {
   StepUpFields,
@@ -379,6 +380,7 @@ export function SettingsPage() {
           <ReadingSizeSettings />
           <ChatColorsSettings />
           <VisualNovelSettings />
+          <SceneBackgroundSettings />
         </div>
 
         <PromptSettingsCard

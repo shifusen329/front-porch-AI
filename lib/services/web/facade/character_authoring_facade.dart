@@ -26,6 +26,8 @@ import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/portrait_promotion.dart';
 
+import 'character_scene_facade.dart';
+
 /// Write-side adapter for character authoring beyond create/edit: delete and
 /// avatar (expression image) management. Thin over [CharacterRepository] — the
 /// exact desktop methods (`deleteCharacter`, `addAvatar`, `removeAvatar`,
@@ -35,6 +37,12 @@ class CharacterAuthoringFacade {
 
   final CharacterRepository _repo;
   final StorageService _storage;
+
+  /// The character's Scenes, over the same repository and library.
+  late final CharacterSceneFacade scenes = CharacterSceneFacade(
+    _repo,
+    _storage,
+  );
 
   /// Removals the phone can still undo: its banner shows 10 seconds, and
   /// the server keeps them a little longer for the round trip.

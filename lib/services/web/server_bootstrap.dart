@@ -63,6 +63,11 @@ shelf.Handler buildWebHandler(WebServerDeps deps) {
   }
   if (deps.characterAuthoringFacade != null) {
     WebCharacterSpritePackRoutes(deps.characterAuthoringFacade!, router);
+    WebCharacterSceneRoutes(
+      deps.characterAuthoringFacade!.scenes,
+      router,
+      thumbnails: thumbnails,
+    );
   }
   if (deps.chargenFacade != null) WebChargenRoutes(deps.chargenFacade!, router);
   if (deps.chatFacade != null) {

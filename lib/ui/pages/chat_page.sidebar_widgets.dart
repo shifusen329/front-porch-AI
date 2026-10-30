@@ -382,6 +382,16 @@ class ChatSidebarMainSettings extends StatelessWidget {
             }
             onAvatarsChanged();
             break;
+          case 'scenes':
+            // Scenes belong to the library character, like its gallery.
+            await openSceneLibrary(
+              context,
+              character:
+                  chatService.originLibraryCardFor(character) ?? character,
+              storage: Provider.of<StorageService>(context, listen: false),
+              chat: chatService,
+            );
+            break;
           case 'ui':
             showDialog(
               context: context,
@@ -421,6 +431,13 @@ class ChatSidebarMainSettings extends StatelessWidget {
           child: SettingsMenuItem(
             icon: Icons.photo_library_outlined,
             label: 'Avatar Gallery',
+          ),
+        ),
+        PopupMenuItem(
+          value: 'scenes',
+          child: SettingsMenuItem(
+            icon: Icons.landscape_outlined,
+            label: 'Scenes',
           ),
         ),
         PopupMenuItem(

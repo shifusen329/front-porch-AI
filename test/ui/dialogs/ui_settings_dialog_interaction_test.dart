@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/dialogs/ui_settings_dialog.dart';
 
@@ -85,5 +86,62 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Cancel'), findsNothing,
         reason: 'Cancel must close the picker');
+  });
+
+  testWidgets('a chat keeps its scene choice when a theme is picked', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(700, 1250));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final storage = FakeStorageService();
+    final chat = FakeChatService();
+    addTearDown(storage.dispose);
+    addTearDown(chat.dispose);
+    ChatThemeOverrides? saved;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<StorageService>.value(value: storage),
+          ChangeNotifierProvider<ChatService>.value(value: chat),
+        ],
+        child: MaterialApp(
+          home: Material(
+            child: UiSettingsDialog(
+              themeOverrides: ChatThemeOverrides(),
+              onThemeOverrides: (o) => saved = o,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final off = find.descendant(
+      of: find.byKey(const ValueKey('chat-follow-scene')),
+      matching: find.text('Off'),
+    );
+    await tester.scrollUntilVisible(
+      off,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(off);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(saved?.followScene, isFalse);
+
+    await tester.scrollUntilVisible(
+      find.text('None'),
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('None'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      saved?.followScene,
+      isFalse,
+      reason: 'picking a theme must keep the scene choice of the chat',
+    );
   });
 }

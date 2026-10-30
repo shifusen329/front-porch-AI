@@ -178,9 +178,12 @@ class ChatHistoryActions {
   Future<bool> setThemeOverrides(Map<String, dynamic> json) async {
     if (_chat.currentSessionId == null) return false;
     final next = ChatThemeOverrides.fromJson(json);
-    // An older page sends no visual-novel choice: keep the chat's.
+    // An older page sends no visual-novel or scene choice: keep the chat's.
     if (!json.containsKey('visualNovel')) {
       next.visualNovel = _chat.sessionThemeOverrides.visualNovel;
+    }
+    if (!json.containsKey('followScene')) {
+      next.followScene = _chat.sessionThemeOverrides.followScene;
     }
     _chat.sessionThemeOverrides = next;
     _notify();

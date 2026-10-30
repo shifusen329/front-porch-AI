@@ -12,9 +12,10 @@ Characters are the heart of Front Porch AI. This guide covers everything about t
 4. [What's Inside a Card](#whats-inside-a-card)
 5. [Editing & Managing Your Library](#editing--managing-your-library)
 6. [Expression Images](#expression-images)
-7. [Group Cards — Sharing a Whole Cast](#group-cards--sharing-a-whole-cast)
-8. [Compatibility With Other Apps](#compatibility-with-other-apps)
-9. [When an Import Goes Wrong](#when-an-import-goes-wrong)
+7. [Scenes — Backgrounds That Follow the Story](#scenes--backgrounds-that-follow-the-story)
+8. [Group Cards — Sharing a Whole Cast](#group-cards--sharing-a-whole-cast)
+9. [Compatibility With Other Apps](#compatibility-with-other-apps)
+10. [When an Import Goes Wrong](#when-an-import-goes-wrong)
 
 ---
 
@@ -202,6 +203,21 @@ Give a character a set of portraits — one per emotion — and their avatar cha
 - If an emotion has no image, the app quietly falls back to neutral, and then to the main portrait.
 
 The [Image Studio](image-studio.md) and [User Guide → Appearance](user-guide.md#appearance) cover display: **sidebar**, **chat background**, or **both**.
+
+---
+
+## Scenes — Backgrounds That Follow the Story
+
+Give a character pictures of the places they spend time — their porch, their kitchen, the living room — and the chat background switches to wherever the story takes them. The Realism Engine already notes where the character is after every reply ("sitting on the porch swing"); when that names a place you have a picture of, the background cross-fades to it.
+
+- **Where:** **Scenes** in the chat sidebar's Main Settings menu, or in a character's menu in the library (Android too). On the phone, the character's edit page has a **Scenes** section under the expressions.
+- **Name each picture for its place:** *porch*, *kitchen*, *living room*. Pick a time of day as well (**morning**, **day**, **evening**, **night**) to have a night picture show at night; a picture with no time fits any time. Two pictures of the same place and time take turns from chat to chat, but one chat keeps the same one.
+- **Import a ZIP** named the same way: `porch.png`, `porch-night.png`, `living-room-evening.png`. Folders inside the ZIP are fine; a picture whose name isn't a place is skipped.
+- **How places are recognised:** by their words, whole (*porch* matches "the porches", not "the porchlight"), plus a few everyday stand-ins — *veranda*, *stoop* or *front steps* for a porch, *bed* for a bedroom, *couch* or *sofa* for a living room. When the character goes somewhere you have no picture of (*the hallway*), the chat's own background comes back; a line that names no place at all keeps the picture that's showing.
+- **It follows the story's rewinds:** regenerate, swipe, delete or edit a reply, and the background goes back with it.
+- **It needs the Realism Engine** for the chat. **Settings → Appearance → Backgrounds follow the scene** turns it on or off everywhere (on by default; nothing changes until a character has scenes), and a chat can choose for itself under **UI Settings → Scene Backgrounds**.
+- **Group chats** show one background for everyone: the place of whoever spoke last, from any member's Scenes.
+- Scenes travel with **Sync** and with a rename. They are not part of a PNG or `.porch` export yet.
 
 ---
 

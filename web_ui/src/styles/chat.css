@@ -423,3 +423,26 @@ mark.find-hit.active {
   .vn-sprite { transition: none; }
   .vn-sprite img { animation: none; }
 }
+
+/* Scene background: the picture of where the character is, over the chat's
+   own background (desktop twin: scene_backdrop_layer.dart). The first child
+   of .chat-view; the selector outranks .chat-view.has-theme-bg > * so a
+   theme never makes it a zero-height block. */
+.chat-view > .chat-scene { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.chat-scene-layer {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  animation: scene-fade 0.6s ease-in-out;
+}
+.chat-scene-layer::after {
+  content: ''; position: absolute; inset: 0;
+  background: color-mix(in srgb, var(--scrim-ink) 45%, transparent);
+}
+.chat-scene-layer.leaving { animation: scene-fade-out 0.6s ease-in-out forwards; }
+@keyframes scene-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scene-fade-out { from { opacity: 1; } to { opacity: 0; } }
+/* Positioned children paint after the scene (tree order), as with a theme. */
+.chat-view.has-scene > *:not(.chat-scene) { position: relative; }
+@media (prefers-reduced-motion: reduce) {
+  .chat-scene-layer, .chat-scene-layer.leaving { animation: none; }
+}

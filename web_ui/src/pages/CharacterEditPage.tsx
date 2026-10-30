@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { AvatarManager } from '../components/AvatarManager';
+import { SceneManager } from '../components/SceneManager';
 import { AltGreetingsEditor } from '../components/AltGreetingsEditor';
 import { CharacterStatsCard } from '../components/CharacterStatsCard';
 import { MacroField } from '../components/MacroField';
@@ -358,6 +359,7 @@ export function CharacterEditPage() {
 
       <h3 className="section-label">Avatars &amp; expressions</h3>
       <AvatarManager characterId={c.id} />
+      <SceneManager characterId={c.id} />
 
       {error && <p className="error">{error}</p>}
       <div className="wizard-nav">

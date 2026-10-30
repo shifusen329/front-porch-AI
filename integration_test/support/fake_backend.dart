@@ -594,7 +594,7 @@ class FakeBackendServer {
     // into the chat branch — chatRequests and lastChatBody stay trustworthy.
     if (lastContent.contains('minutes_elapsed') ||
         lastContent.contains('"posture"')) {
-      eval['posture'] = 'standing';
+      eval['posture'] = scenePostureFor(lastContent);
       eval['minutes_elapsed'] = 5;
       eval['new_day'] = false;
     }
@@ -756,4 +756,23 @@ class FakeBackendServer {
   }
 
   Future<void> close() => _server.close(force: true);
+}
+
+/// The posture the scene-time eval reports: "standing", unless the scene it
+/// quotes names a place with one of these phrases, which only
+/// scene_backdrop_test.dart sends. The phrase nearest the end (the newest
+/// line) wins. A given verdict, like the climax marker: the app still does
+/// the matching and the drawing.
+String scenePostureFor(String scene) {
+  const places = {
+    'out on the porch': 'sitting on the porch swing',
+    'into the kitchen': 'standing at the kitchen counter',
+  };
+  var posture = 'standing';
+  var at = -1;
+  for (final MapEntry(:key, :value) in places.entries) {
+    final i = scene.lastIndexOf(key);
+    if (i > at) (at, posture) = (i, value);
+  }
+  return posture;
 }

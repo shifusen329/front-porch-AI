@@ -145,10 +145,13 @@ class _UiSettingsDialogState extends State<UiSettingsDialog> {
                 ),
               ChatThemePresetPicker(
                 overrides: overrides,
-                // A picked (or cleared) theme keeps this chat's VN choice.
+                // A picked (or cleared) theme keeps this chat's VN and
+                // scene choices.
                 onSelected: (next) => _commitTheme(
                   chatService,
-                  next..visualNovel = overrides.visualNovel,
+                  next
+                    ..visualNovel = overrides.visualNovel
+                    ..followScene = overrides.followScene,
                 ),
               ),
               const SizedBox(height: 16),
@@ -157,6 +160,21 @@ class _UiSettingsDialogState extends State<UiSettingsDialog> {
                 appearanceOn: storageService.expressionSettings.visualNovelMode,
                 onChanged: (value) {
                   overrides.visualNovel = value;
+                  _commitTheme(chatService, overrides);
+                },
+              ),
+              const SizedBox(height: 16),
+              ChatFollowChoice(
+                key: const ValueKey('chat-follow-scene'),
+                title: 'Scene Backgrounds',
+                about:
+                    'The background shows where the character is, from '
+                    'their Scenes pictures. Needs the Realism Engine. '
+                    '${storageService.expressionSettings.sceneBackgrounds ? 'On' : 'Off'}'
+                    ' in Settings → Appearance.',
+                value: overrides.followScene,
+                onChanged: (value) {
+                  overrides.followScene = value;
                   _commitTheme(chatService, overrides);
                 },
               ),

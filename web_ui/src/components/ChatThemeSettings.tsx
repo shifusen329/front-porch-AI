@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ChatThemeOverrides, ChatThemePreset } from './chatTypes';
+import type { ChatScene } from '../pages/chat/useChatStage';
 import { ReadingSizeSlider } from './ReadingSizeSettings';
 import { userBubbleDialogueColor } from '../chatColors';
 
@@ -142,9 +143,17 @@ export function resolveThemeColors(
   return vars;
 }
 
-export function ChatThemeSettings({ overrides, onSave }: {
+/** Clearing the theme keeps the chat's choices that live apart from it. */
+const keepChoices = (prev: ChatThemeOverrides): ChatThemeOverrides => ({
+  visualNovel: prev.visualNovel,
+  followScene: prev.followScene,
+});
+
+export function ChatThemeSettings({ overrides, onSave, scene }: {
   overrides: ChatThemeOverrides | null;
   onSave: (o: ChatThemeOverrides) => void;
+  /** The scene picture the chat shows now, if any. */
+  scene?: ChatScene | null;
 }) {
   const [local, setLocal] = useState<ChatThemeOverrides>(overrides ?? {});
   useEffect(() => setLocal(overrides ?? {}), [overrides]);
@@ -167,7 +176,7 @@ export function ChatThemeSettings({ overrides, onSave }: {
         {/* "None" card */}
         <button
           className={`theme-preset-card${!local.themeId ? ' active' : ''}`}
-          onClick={() => setLocal((prev) => ({ visualNovel: prev.visualNovel }))}
+          onClick={() => setLocal(keepChoices)}
         >
           <span className="theme-preset-none">—</span>
           <span className="theme-preset-name">None</span>
@@ -256,10 +265,34 @@ export function ChatThemeSettings({ overrides, onSave }: {
         <option value="off">Off</option>
       </select>
 
+      <h4 className="section-label">Scene backgrounds</h4>
+      <p className="reading-blurb">
+        The background shows where the character is, from their Scenes pictures. Needs the
+        Realism Engine.
+      </p>
+      <select
+        className="theme-select"
+        data-testid="chat-follow-scene"
+        aria-label="Scene backgrounds for this chat"
+        value={local.followScene == null ? 'follow' : local.followScene ? 'on' : 'off'}
+        onChange={(e) =>
+          set({ followScene: e.target.value === 'follow' ? null : e.target.value === 'on' })
+        }
+      >
+        <option value="follow">As Settings</option>
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+      {scene && (
+        <p className="small" data-testid="scene-now-showing">
+          Now showing: {scene.place} · {scene.time}
+        </p>
+      )}
+
       <div className="theme-actions">
         <button className="primary" onClick={() => onSave(local)}>Save theme</button>
         {local.themeId && (
-          <button className="ghost" onClick={() => setLocal((prev) => ({ visualNovel: prev.visualNovel }))}>
+          <button className="ghost" onClick={() => setLocal(keepChoices)}>
             Remove theme
           </button>
         )}

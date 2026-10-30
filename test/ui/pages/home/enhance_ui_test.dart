@@ -53,7 +53,7 @@ void main() {
       // Full parity with the pre-extraction menu (plus the new entries).
       expect(values, [
         'new_chat', 'chat_history', 'edit', 'ai_enhance', 'avatar_gallery',
-        'duplicate', 'use_as_persona', 'export', 'export_json', //
+        'scenes', 'duplicate', 'use_as_persona', 'export', 'export_json', //
         'move_folder', 'delete',
       ]);
     });

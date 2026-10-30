@@ -51,6 +51,13 @@
       "dartMarker": "Visual novel mode",
       "webMarker": "Visual novel mode"
     },
+    "sceneBackgrounds": {
+      "section": "general",
+      "group": "chat-appearance",
+      "dart": "lib/ui/settings/tabs/appearance_tab/chat_appearance_section.dart",
+      "dartMarker": "Backgrounds follow the scene",
+      "webMarker": "Backgrounds follow the scene"
+    },
     "spellCheckLanguage": {
       "section": "generation",
       "dart": "lib/ui/settings/tabs/general_tab.dart",

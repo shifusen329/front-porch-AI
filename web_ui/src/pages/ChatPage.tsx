@@ -10,6 +10,7 @@ import { ChatMessageList } from '../components/ChatMessageList';
 import { ChatComposer } from '../components/ChatComposer';
 import { ChatInsight } from '../components/ChatInsight';
 import { MaybeVisualNovelLog, VisualNovelStage } from '../components/VisualNovelStage';
+import { SceneBackdrop } from '../components/SceneBackdrop';
 import { useChatStage } from './chat/useChatStage';
 import { ConversationsDrawer } from '../components/ConversationsDrawer';
 import { ChatThemeSettings } from '../components/ChatThemeSettings';
@@ -97,6 +98,8 @@ export function ChatPage() {
       state?.messages.length,
       state?.isGenerating,
       state?.expressionLabel,
+      // The scene can change after the turn settles, or on a swipe.
+      state?.sceneCue,
       JSON.stringify(state?.themeOverrides ?? null),
     ].join('|'),
   );
@@ -261,6 +264,7 @@ export function ChatPage() {
   return (
     <div className="chat-layout">
       <div className="chat-view">
+        <SceneBackdrop scene={novel.scene} />
         <ChatHeader
           title={title}
           focused={focused}
@@ -535,6 +539,7 @@ export function ChatPage() {
             )}
             <ChatThemeSettings
               overrides={state.themeOverrides ?? null}
+              scene={novel.scene}
               onSave={async (overrides) => {
                 setShowTheme(false);
                 await saveTheme(overrides);

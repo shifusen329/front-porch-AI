@@ -23,6 +23,7 @@ import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_controller.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_dialog.dart';
+import 'package:front_porch_ai/ui/dialogs/scene_library/scene_library.dart';
 import 'package:front_porch_ai/ui/pages/edit_character_page.dart';
 import 'package:front_porch_ai/ui/pages/edit_group_page.dart';
 import 'package:front_porch_ai/ui/pages/home/enhance/enhance_wizard_page.dart';
@@ -68,6 +69,13 @@ void runHomeCharacterMenuAction(
         repository: Provider.of<CharacterRepository>(context, listen: false),
         storage: Provider.of<StorageService>(context, listen: false),
         mode: WardrobeMode.library,
+      );
+      break;
+    case 'scenes':
+      openSceneLibrary(
+        context,
+        character: character,
+        storage: Provider.of<StorageService>(context, listen: false),
       );
       break;
     case 'duplicate':

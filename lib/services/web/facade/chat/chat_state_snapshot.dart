@@ -24,6 +24,8 @@ import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/chat/director/director.dart'
     show kDirectorQuickBeats;
+import 'package:front_porch_ai/services/chat/scene_backdrop.dart'
+    show SceneBackdrop;
 import 'package:front_porch_ai/services/web/facade/chat/chat_message_chips.dart';
 import 'package:front_porch_ai/services/web/facade/chat_realism_read.dart';
 import 'package:front_porch_ai/services/web/streaming/stream_hub.dart';
@@ -218,6 +220,9 @@ class ChatStateSnapshot {
       // expression portrait and only refetch when the mood actually changes.
       // Read-only — no reclassification here, so 1:1/group parity is unaffected.
       'expressionLabel': _chat.currentExpressionLabel,
+      // Changes when the scene background might: the page re-reads
+      // /api/chat/stage, which waits for the scene to settle.
+      'sceneCue': SceneBackdrop.existing(_chat)?.cue ?? '',
       // Living Time §2 welcome-back banner — additive nullable; the shared
       // ChatService gate mirrors desktop (setting off / under threshold →
       // null). Coarse words only, computed locally from the chat's own

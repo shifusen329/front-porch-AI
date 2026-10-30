@@ -44,6 +44,7 @@ export 'expression_pack_normalizer.dart';
 export 'model_fetch.dart';
 export 'model_manager.dart';
 export 'sprite_pack.dart';
+export 'zip_images.dart';
 export 'storage_service.dart';
 // The one settings TYPE consumers need by name (the sidebar's tri-state
 // control, the web facade/routes, the one-shot resolver). The settings
@@ -115,6 +116,7 @@ export 'voice_manager.dart';
 export 'update_service.dart';
 export 'update/update.dart';
 export 'sync/sync.dart';
+export 'scenes/scenes.dart';
 export 'story_lane_labels.dart';
 export 'story_pipeline_factory.dart';
 export 'story_pipeline_service.dart';

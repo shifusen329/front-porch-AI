@@ -18,9 +18,9 @@
 
 import 'dart:typed_data';
 
-import 'package:archive/archive_io.dart';
-
 import 'package:front_porch_ai/utils/emotion_labels.dart';
+
+import 'zip_images.dart';
 
 /// One recognized emotion sprite from a pack.
 class SpritePackEntry {
@@ -50,19 +50,10 @@ SpritePackResult decodeSpritePack(
   Uint8List zipBytes, {
   List<String> labels = EmotionLabels.all,
 }) {
-  const imageExts = {'png', 'jpg', 'jpeg', 'webp', 'gif'};
   final found = <({SpritePackEntry entry, int label, int alt, String name})>[];
   var unrecognized = 0;
 
-  final archive = ZipDecoder().decodeBytes(zipBytes);
-  for (final entry in archive) {
-    if (!entry.isFile) continue;
-    // Match on the file's BASENAME so packs with folders ("sprites/joy.png")
-    // still resolve — matching the full path silently failed every foldered pack.
-    final name = entry.name.split('/').last.split(r'\').last;
-    final ext = name.split('.').last.toLowerCase();
-    if (!imageExts.contains(ext)) continue;
-
+  for (final (:name, bytes: data) in zipImages(zipBytes)) {
     final base = name.replaceAll(RegExp(r'\.\w+$'), '').toLowerCase();
     // The longest label wins, so `reverse-cowgirl-1` is never `reverse`.
     var match = -1;
@@ -77,8 +68,7 @@ SpritePackResult decodeSpritePack(
         match = i;
       }
     }
-    final data = entry.content as Uint8List?;
-    if (match < 0 || data == null) {
+    if (match < 0) {
       unrecognized++;
       continue;
     }

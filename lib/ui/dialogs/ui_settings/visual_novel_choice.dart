@@ -18,7 +18,7 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:front_porch_ai/ui/theme/theme.dart';
+import 'chat_follow_choice.dart';
 
 /// One chat's visual-novel choice: follow Settings → Appearance (null), or
 /// on or off for this chat alone.
@@ -37,46 +37,13 @@ class VisualNovelChoice extends StatelessWidget {
   final ValueChanged<bool?> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    final muted = AppColors.textTertiary(context);
-    return Column(
-      key: const ValueKey('chat-visual-novel'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Visual Novel',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.formAccentOf(context),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'The characters on stage, with the chat in a panel over them. '
-          '${appearanceOn ? 'On' : 'Off'} in Settings → Appearance.',
-          style: TextStyle(fontSize: 12, height: 1.4, color: muted),
-        ),
-        const SizedBox(height: 8),
-        SegmentedButton<int>(
-          segments: const [
-            ButtonSegment(value: 0, label: Text('As Settings')),
-            ButtonSegment(value: 1, label: Text('On')),
-            ButtonSegment(value: 2, label: Text('Off')),
-          ],
-          selected: {
-            switch (value) {
-              null => 0,
-              true => 1,
-              false => 2,
-            },
-          },
-          onSelectionChanged: (s) => onChanged(switch (s.first) {
-            1 => true,
-            2 => false,
-            _ => null,
-          }),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ChatFollowChoice(
+    key: const ValueKey('chat-visual-novel'),
+    title: 'Visual Novel',
+    about:
+        'The characters on stage, with the chat in a panel over them. '
+        '${appearanceOn ? 'On' : 'Off'} in Settings → Appearance.',
+    value: value,
+    onChanged: onChanged,
+  );
 }

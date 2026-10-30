@@ -330,7 +330,7 @@ class CharacterMediaStore {
 
   /// Move a character's avatar-gallery media folder when a rename changes its
   /// safe name. Renames the whole dir when the target is free; otherwise merges
-  /// the avatars/ + looks/ files into the existing target.
+  /// the avatars/, looks/ and scenes/ files into the existing target.
   ///
   /// NON-DESTRUCTIVE by construction: a file whose destination already exists
   /// (safe-name collision — `Alice`, `Alice!`, `Bob Smith`, `Bob_Smith` all
@@ -362,7 +362,7 @@ class CharacterMediaStore {
     }
 
     var conflicts = 0;
-    for (final sub in const ['avatars', 'looks']) {
+    for (final sub in const ['avatars', 'looks', 'scenes']) {
       final from = Directory(p.join(oldDir.path, sub));
       if (!await from.exists()) continue;
       final to = Directory(p.join(newDir.path, sub));

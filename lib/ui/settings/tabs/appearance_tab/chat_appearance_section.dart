@@ -81,6 +81,19 @@ class ChatAppearanceSection extends StatelessWidget {
           activeTrackColor: AppColors.porchAmberOf(context),
           onChanged: storageService.expressionSettings.setVisualNovelMode,
         ),
+        SwitchListTile(
+          key: const ValueKey('scene-backgrounds'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Backgrounds follow the scene'),
+          subtitle: const Text(
+            'With the Realism Engine on, the chat background shows the '
+            'place the character is in, when they have a picture of it in '
+            'their Scenes. A chat can choose for itself in its UI Settings.',
+          ),
+          value: storageService.expressionSettings.sceneBackgrounds,
+          activeTrackColor: AppColors.porchAmberOf(context),
+          onChanged: storageService.expressionSettings.setSceneBackgrounds,
+        ),
         ColorRow(
           label: 'User Bubble',
           color: storageService.uiSettings.globalUserBubbleColor,

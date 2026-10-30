@@ -1662,3 +1662,65 @@ test('clear a character’s expressions in one go, then Undo brings them back', 
     expect(gone.ok(), `deleting the journey character: ${gone.status()}`).toBe(true);
   }
 });
+
+test('a character’s scene pictures become the chat background where the story goes', async ({ page }) => {
+  test.slow();
+  const name = `Scene Journey ${test.info().project.name}`;
+  const created = await page.request.post('/api/characters/create', {
+    data: { name, firstMessage: 'The lemonade is cold.' },
+  });
+  expect(created.ok(), `create: ${created.status()}`).toBe(true);
+  const id = String(((await created.json()) as { id: string | number }).id);
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  try {
+    await openRoute(page, `/edit/${id}`);
+    const scenes = page.getByTestId('scene-manager');
+    await page.getByTestId('scene-image-input').setInputFiles({
+      name: 'IMG_0042.png',
+      mimeType: 'image/png',
+      buffer: png,
+    });
+    const where = page.getByRole('dialog', { name: 'Where is this?' });
+    await where.getByLabel('Place').fill('porch');
+    await where.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(scenes).toContainText('Added porch.');
+    await page.getByTestId('scene-zip-input').setInputFiles({
+      name: 'places.zip',
+      mimeType: 'application/zip',
+      buffer: storedZip({ 'kitchen.png': png }),
+    });
+    await expect(scenes).toContainText('Added 1.');
+    await expect(scenes.locator('.avatar-label')).toHaveText(['kitchen', 'porch']);
+
+    // The fake backend reports a posture on the porch, then at the kitchen
+    // counter (integration_test/support/fake_backend.dart scenePostureFor).
+    await openRoute(page, '/');
+    await page.locator('.lib-card', { hasText: name }).locator('.lib-open').click();
+    await expect(page.locator('.chat-view')).toBeVisible();
+    await waitIdle(page);
+    // The fake's goal mentions the porch, so a turn can start a goal check
+    // before the reply, and the fake never answers one: skip it, as the
+    // evaluation journey does. The picture comes once the reply settles.
+    const say = async (text: string, place: string) => {
+      const box = page.locator('textarea.composer-input');
+      await box.fill(text);
+      await box.press('Enter');
+      await expect(rows(page).filter({ hasText: text })).toHaveCount(1);
+      const picture = page.locator(`.chat-scene-layer[data-scene$="/${place}.png"]`);
+      const skip = page.getByRole('button', { name: 'Skip goal check', exact: true });
+      await expect(async () => {
+        if (await skip.isVisible()) await skip.click();
+        await expect(picture).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: 120_000 });
+      await waitIdle(page);
+    };
+    await say('Let us sit out on the porch, it is cooler.', 'porch');
+    await say('Come into the kitchen, I will pour you another glass.', 'kitchen');
+  } finally {
+    const gone = await page.request.post(`/api/characters/${id}/delete`);
+    expect(gone.ok(), `deleting the journey character: ${gone.status()}`).toBe(true);
+  }
+});

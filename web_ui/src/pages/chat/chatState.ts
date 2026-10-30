@@ -45,6 +45,8 @@ export interface ChatState {
   greetingIndex?: number;
   totalGreetings?: number;
   expressionLabel?: string;
+  /** Changes when the scene background might; the page re-reads the stage. */
+  sceneCue?: string;
   // Living Time §2 welcome-back banner (additive — absent on older facades;
   // null when off/under threshold). Coarse words only.
   absencePhrase?: string | null;

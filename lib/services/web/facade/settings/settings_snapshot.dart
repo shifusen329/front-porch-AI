@@ -199,6 +199,7 @@ class SettingsSnapshot {
       'followStreamingReplies': _storage.uiSettings.followStreamingReplies,
       // Appearance → Visual novel mode (additive).
       'visualNovelMode': _storage.expressionSettings.visualNovelMode,
+      'sceneBackgrounds': _storage.expressionSettings.sceneBackgrounds,
       // The resolved app theme (mode + both token maps). The web never
       // computes a palette; it paints these. Additive.
       'theme': webThemeWire(_storage.appearance),

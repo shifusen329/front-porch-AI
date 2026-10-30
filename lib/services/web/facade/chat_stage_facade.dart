@@ -20,13 +20,15 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'package:front_porch_ai/services/character_store/character_row_codec.dart'
+    show mediaFolderName;
 import 'package:front_porch_ai/services/chat/chat.dart';
 import 'package:front_porch_ai/services/services.dart';
 
-/// Web adapter for visual novel mode: whether the open chat shows as one,
-/// who stands on its stage, and each figure's picture. The same
-/// [stageSpritesFor] the desktop stage draws, so the phone shows the same
-/// cast in the same pictures.
+/// Web adapter for visual novel mode and the scene background: whether the
+/// open chat shows as a visual novel, who stands on its stage, each figure's
+/// picture, and the scene picture behind them. The same [stageSpritesFor]
+/// and [SceneBackdrop] the desktop draws, so the phone shows the same.
 class ChatStageFacade {
   ChatStageFacade(this._chat, this._storage);
 
@@ -51,6 +53,34 @@ class ChatStageFacade {
             ]
           : const [],
     };
+  }
+
+  /// The scene picture behind the chat once the newest change is read, or
+  /// null for the chat's own background. `who` and `v` name the file for
+  /// [sceneImage], so the page can cache each picture.
+  Future<Map<String, dynamic>?> scene() async {
+    final backdrop = SceneBackdrop.of(_chat, _storage);
+    await backdrop.settled;
+    final shot = backdrop.current;
+    if (shot == null) return null;
+    return {
+      'who': shot.who,
+      'v': shot.scene.name,
+      'place': shot.scene.place,
+      'time': shot.time.name,
+    };
+  }
+
+  /// A scene picture of someone in this chat, by [scene]'s `who` and `v`;
+  /// null for anyone or anything else.
+  Future<File?> sceneImage(String who, String name) async {
+    for (final member in _chat.cast) {
+      final owner = _chat.originLibraryCardFor(member.card) ?? member.card;
+      if (mediaFolderName(owner.name) != who) continue;
+      final library = SceneLibrary(() => _storage.charactersDir);
+      return (await library.find(owner.name, name))?.file;
+    }
+    return null;
   }
 
   /// The picture the figure [id] stands in now, or null.

@@ -100,6 +100,10 @@ class SettingsWriter {
     if (novel is bool) {
       await _storage.expressionSettings.setVisualNovelMode(novel);
     }
+    final scenes = body['sceneBackgrounds'];
+    if (scenes is bool) {
+      await _storage.expressionSettings.setSceneBackgrounds(scenes);
+    }
 
     final realism = body['realism'];
     if (realism is Map) {

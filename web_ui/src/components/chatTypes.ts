@@ -154,6 +154,8 @@ export interface ChatThemeOverrides {
   borderColor?: string | null;
   /** This chat's visual-novel choice; null/absent follows Settings. */
   visualNovel?: boolean | null;
+  /** Whether this chat's background follows the scene; null/absent follows Settings. */
+  followScene?: boolean | null;
 }
 
 /** A theme preset as returned by the desktop (mirrors ChatThemePreset). */

@@ -4,6 +4,7 @@
 // Barrel for the app-wide modal dialogs.
 
 export 'background_settings_dialog.dart';
+export 'scene_library/scene_library.dart';
 export 'byaf_import_dialog.dart';
 export 'chat_settings_dialog.dart';
 export '../pages/home/dialogs/chat_history_dialog.dart';

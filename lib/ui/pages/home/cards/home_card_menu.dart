@@ -114,6 +114,7 @@ List<CardMenuEntry> characterCardMenuEntries({required bool inFolder}) => [
     Icons.photo_library_outlined,
     'Avatar Gallery',
   ),
+  const CardMenuEntry('scenes', Icons.landscape_outlined, 'Scenes'),
   const CardMenuEntry('duplicate', Icons.copy, 'Duplicate Character'),
   // SillyTavern's "Convert to Persona": a copy you can play as.
   const CardMenuEntry('use_as_persona', Icons.switch_account, 'Use as Persona'),

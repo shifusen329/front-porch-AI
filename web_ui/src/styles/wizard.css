@@ -65,6 +65,9 @@ button.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transpar
   gap: 6px 12px; margin: 6px 0 2px;
 }
 .avatar-tile.favorite { border-color: var(--porch-honey); }
+/* Scenes (SceneManager): the place and time form. */
+.scene-manager { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.scene-field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
 .avatar-tile.favorite .avatar-badge { background: var(--porch-honey); color: var(--on-accent); }
 .review .review-val { max-width: 60%; text-align: right; word-break: break-word; }
 

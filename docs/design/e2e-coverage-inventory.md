@@ -54,6 +54,7 @@ Update this file when you add or retire a suite.
 | `growth_rings_test` | Growth switch → pass → ring + receipt jump |
 | `sidebar_sweep_test` | Accordion open + one control per section |
 | `climax_refractory_test` | Climax lands + survives regen restamp |
+| `scene_backdrop_test` | Scene backgrounds: the posture pass puts the character on the porch → the porch picture shows; into the kitchen (no picture) → the chat's own background; delete that reply → the porch again. Web twin: the scene journey in `web_ui/e2e/journeys.spec.ts` (edit page add + ZIP, then the chat background) |
 | `needs_reprocess_test` | Manual needs reprocess wiring |
 | `spell_check_test` | Spell-check language plumbing |
 | `stoop_test` | Sign-in → AUP → browse → download → share (fake backporch) |

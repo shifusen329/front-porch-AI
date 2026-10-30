@@ -48,6 +48,7 @@ import 'package:front_porch_ai/database/database.dart' show AppDatabase;
 import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/avatar_gallery_removal.dart';
 import 'package:front_porch_ai/services/character_repository.dart';
+import 'package:front_porch_ai/services/scenes/scenes.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/services/v2_card_service.dart';
 
@@ -520,6 +521,27 @@ void main() {
         expect(await undo.restore(removal.batchId, card), isFalse);
         expect(await ctx.repo.getAvatarImages(card.dbId!), isEmpty);
         expect(card.primeAvatarIndex, 1);
+        await ctx.db.close();
+      },
+    );
+  });
+
+  group('Scene pictures follow a rename', () {
+    test(
+      'a rename into a folder that already exists carries scenes/ too',
+      () async {
+        final ctx = await _freshRepo();
+        final scenes = SceneLibrary(() => ctx.storage.charactersDir);
+        await scenes.add('Old Name', _realPng(seed: 1), place: 'porch');
+        await scenes.add('New Name', _realPng(seed: 2), place: 'kitchen');
+
+        await ctx.repo.batchMedia.moveMediaFolder('Old Name', 'New Name');
+
+        expect((await scenes.list('New Name')).map((s) => s.name), [
+          'kitchen.png',
+          'porch.png',
+        ]);
+        expect(await scenes.list('Old Name'), isEmpty);
         await ctx.db.close();
       },
     );

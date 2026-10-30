@@ -19,6 +19,10 @@ class ChatThemeOverrides {
   /// Kept apart from the theme: picking or clearing a theme leaves it.
   bool? visualNovel;
 
+  /// Whether this chat's background follows the scene; null follows
+  /// Settings → Appearance. Kept apart from the theme, like [visualNovel].
+  bool? followScene;
+
   ChatThemeOverrides({
     this.themeId,
     this.fontFamily,
@@ -32,6 +36,7 @@ class ChatThemeOverrides {
     this.borderStyle,
     this.borderColor,
     this.visualNovel,
+    this.followScene,
   });
 
   bool get hasTheme => themeId != null;
@@ -107,6 +112,7 @@ class ChatThemeOverrides {
     if (borderStyle != null) map['borderStyle'] = borderStyle;
     if (borderColor != null) map['borderColor'] = borderColor;
     if (visualNovel != null) map['visualNovel'] = visualNovel;
+    if (followScene != null) map['followScene'] = followScene;
     return map;
   }
 
@@ -126,11 +132,19 @@ class ChatThemeOverrides {
       visualNovel: json['visualNovel'] is bool
           ? json['visualNovel'] as bool
           : null,
+      followScene: json['followScene'] is bool
+          ? json['followScene'] as bool
+          : null,
     );
   }
 
   String? toJsonString() {
-    if (!hasTheme && !isCustomized && visualNovel == null) return null;
+    if (!hasTheme &&
+        !isCustomized &&
+        visualNovel == null &&
+        followScene == null) {
+      return null;
+    }
     return jsonEncode(toJson());
   }
 
