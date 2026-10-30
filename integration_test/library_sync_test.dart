@@ -150,13 +150,17 @@ void main() {
     await chat.flushPendingSaves();
 
     // ── Settings → Sync: a folder as the place ───────────────────────────
-    // ignore: use_build_context_synchronously — root MainLayout element.
-    Navigator.of(
-      ctx,
-    ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
-    await pumpUntilFound(tester, find.text('Sync'));
-    await tester.tap(find.text('Sync'));
-    await tester.pump(const Duration(milliseconds: 400));
+    Future<void> openSyncTab() async {
+      // ignore: use_build_context_synchronously — root MainLayout element.
+      Navigator.of(
+        ctx,
+      ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+      await pumpUntilFound(tester, find.text('Sync'));
+      await tester.tap(find.text('Sync'));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    await openSyncTab();
     await tapWhenHittable(tester, find.text('A folder'));
     await tester.enterText(
       find.widgetWithText(TextField, 'Folder'),
@@ -213,7 +217,17 @@ void main() {
       reason: 'Juniper\'s chat is not in the library that arrived',
     );
 
+    // The swap leaves every page for the main screen, so nothing open can
+    // write into the library that just arrived.
+    await pumpUntilTrue(
+      tester,
+      () => find.byType(SettingsPage).evaluate().isEmpty,
+      describe: () => 'Settings to close for the swap',
+    );
+    expect(sync.undoRecord, isNotNull);
+
     // ── Undo: this device's own library comes back ───────────────────────
+    await openSyncTab();
     await pumpUntilFound(tester, find.textContaining('Undo the Get from'));
     await tapInTab(
       tester.widget<Text>(find.textContaining('Undo the Get from')).data!,

@@ -208,6 +208,11 @@ void main() {
       () async {
         await seedSender();
         expect(await sender.sync.send(), isA<SyncDone>());
+        expect(
+          sender.sync.remote?.head.headEntry?.deviceId,
+          await sender.sync.state.deviceId(),
+          reason: 'the status card shows the library just sent',
+        );
 
         final rootB = await _tempRoot('b');
         final dbB = await _openSingletonAt(rootB);

@@ -112,10 +112,8 @@ class LibrarySyncService extends ChangeNotifier {
       ? settings.deviceName
       : (Platform.isAndroid ? 'Android phone' : Platform.localHostname);
 
-  UndoRecord? get undoRecord {
-    final undo = state.undo;
-    return undo == null || undo.expiredAt(_now()) ? null : undo;
-  }
+  UndoRecord? get undoRecord =>
+      state.undo?.expiredAt(_now()) == false ? state.undo : null;
 
   void _setPhase(SyncPhase value) {
     phase = value;
@@ -171,9 +169,10 @@ class LibrarySyncService extends ChangeNotifier {
     _place?.close();
   }
 
-  /// Reads the sync place's newest library for the status card.
+  /// The place's newest library, for the status card. A place of its own,
+  /// so it runs beside a job (a Send reads its new head with it).
   Future<void> refresh() async {
-    if (disabled || !settings.isConfigured || busy) return;
+    if (disabled || !settings.isConfigured) return;
     final SyncPlace place;
     try {
       place = await _openOwn();
@@ -296,7 +295,7 @@ class LibrarySyncService extends ChangeNotifier {
         }
         await saveDigest(root, deviceId, snap.digest);
         await outgoingDir(root).delete(recursive: true);
-        unawaited(refresh());
+        await refresh();
         return SyncDone('Sent at ${syncWhen(_now())}.');
       });
 
