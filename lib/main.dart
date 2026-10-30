@@ -272,6 +272,7 @@ class _MyAppState extends State<MyApp>
                   // Start auto-backup (always on, every 30 minutes)
                   BackupService.startAutoBackup();
                   checkLibrarySyncOnStart(context);
+                  clearHeldGalleryPictures(context);
                   // Wire TtsService into ChatService (can't be done during provider
                   // creation because TtsService is registered later in the tree)
                   try {

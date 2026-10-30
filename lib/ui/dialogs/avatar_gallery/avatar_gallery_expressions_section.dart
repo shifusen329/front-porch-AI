@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 
 import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_controller.dart';
+import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_selection.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_section_header.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_tile.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
@@ -38,7 +39,16 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
     required this.onExpand,
     required this.onRelabel,
     required this.onDelete,
+    this.selection,
+    this.onClear,
   });
+
+  /// Select mode, shared with the looks section.
+  /// Null: no Select mode and no ⋮ menu (a section shown on its own).
+  final AvatarGallerySelection? selection;
+
+  /// Confirm + delete every expression image (looks and portrait stay).
+  final VoidCallback? onClear;
 
   final AvatarGalleryController controller;
 
@@ -68,6 +78,8 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
     final used = controller.usedLabels.length;
     final images = controller.expressions.length;
     final atCap = used >= kMaxExpressions;
+    final selection = this.selection;
+    final selecting = selection?.active ?? false;
     final tiles = <Widget>[
       for (final e in controller.expressions)
         AvatarTile(
@@ -77,16 +89,20 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
           caption: (controller.tempLabels[e.id] ?? '').isEmpty
               ? 'unlabelled'
               : controller.tempLabels[e.id],
-          onCaptionTap: () => onRelabel(e.id),
+          onCaptionTap: selecting ? null : () => onRelabel(e.id),
           starred: controller.favoriteId == e.id,
           onStar: () => controller.setFavorite(e.id),
           onDelete: () => onDelete(e.id),
-          onTap: () => controller.setPrime(e),
+          selected: selecting ? selection!.contains(e.id) : null,
+          onTap: selecting
+              ? () => selection!.toggle(e)
+              : () => controller.setPrime(e),
           badge: e.displayOrder + 1 == controller.primeIndex ? 'Default' : null,
           highlighted: e.displayOrder + 1 == controller.primeIndex,
           badgeColor: AppColors.logWarn,
         ),
-      GalleryAddTile(label: 'Add expression', onTap: onAddExpression),
+      if (!selecting)
+        GalleryAddTile(label: 'Add expression', onTap: onAddExpression),
     ];
 
     return Column(
@@ -95,8 +111,21 @@ class AvatarGalleryExpressionsSection extends StatelessWidget {
         AvatarGallerySectionHeader(
           title: 'Expression images',
           subtitle: 'Tap one to set the default emotion · swapped by mood',
-          trailing: _AutoDisplayPill(
-            on: controller.storage.expressionSettings.expressionEnabled,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AutoDisplayPill(
+                on: controller.storage.expressionSettings.expressionEnabled,
+              ),
+              if (selection != null && !selecting)
+                GallerySectionMenu(
+                  onSelect: controller.expressions.isEmpty
+                      ? null
+                      : selection.start,
+                  clearLabel: 'Clear expressions',
+                  onClear: controller.expressions.isEmpty ? null : onClear,
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 10),

@@ -24,15 +24,17 @@ import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/portrait_promotion.dart';
+import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_bulk_actions.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_controller.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_expressions_section.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_looks_section.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_io.dart';
+import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_select_bar.dart';
+import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_selection.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/emotion_picker.dart';
 import 'package:front_porch_ai/ui/dialogs/image_crop_dialog.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 import 'package:front_porch_ai/ui/widgets/widgets.dart';
-import 'package:front_porch_ai/utils/utils.dart';
 
 /// The one unified Avatar Gallery — gallery avatars + expression images in a
 /// single warm-porch dialog, sharing one ★ canonical-avatar star. Replaces the
@@ -75,19 +77,31 @@ class _AvatarGalleryDialog extends StatefulWidget {
 
 class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
   AvatarGalleryController get _c => widget.controller;
+  final _sel = AvatarGallerySelection();
+
+  /// Set from the first tap of a Delete until it settles: a second tap in
+  /// the same frame must not open a second confirm or delete twice.
+  bool _deleting = false;
 
   @override
   void initState() {
     super.initState();
     _c.addListener(_onChange);
+    _sel.addListener(_onSelection);
     _c.init();
   }
 
   @override
   void dispose() {
     _c.removeListener(_onChange);
+    _sel.removeListener(_onSelection);
+    _sel.dispose();
     _c.dispose();
     super.dispose();
+  }
+
+  void _onSelection() {
+    if (mounted) setState(() {});
   }
 
   void _onChange() {
@@ -99,6 +113,7 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
         context,
       ).showSnackBar(SnackBar(content: Text('Something went wrong: $err')));
     }
+    _sel.keepOnly(_c.looks.followedBy(_c.expressions).map((a) => a.id));
     setState(() {});
   }
 
@@ -136,9 +151,34 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
       zip,
       labels: _c.storage.expressionSettings.expressionLabels,
     );
-    final (added, unrecognized, skipped) = await _c.importSpritePack([
-      for (final e in pack.entries) (bytes: e.bytes, emotion: e.emotion),
-    ], pack.unrecognized);
+    if (!mounted) return;
+    if (pack.entries.isEmpty) {
+      // Nothing to put in their place, so nothing here is touched.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nothing in that ZIP is named for an expression. The gallery '
+            'was not changed.',
+          ),
+        ),
+      );
+      return;
+    }
+    var replace = false;
+    if (_c.expressions.isNotEmpty) {
+      final mode = await askPackImportMode(
+        context,
+        existing: _c.expressions.length,
+        incoming: pack.entries.length,
+      );
+      if (mode == null) return;
+      replace = mode == PackImportMode.replace;
+    }
+    final (added, unrecognized, skipped) = await _c.importSpritePack(
+      [for (final e in pack.entries) (bytes: e.bytes, emotion: e.emotion)],
+      pack.unrecognized,
+      replace: replace,
+    );
     if (!mounted) return;
     final parts = <String>[
       'Imported $added',
@@ -201,6 +241,40 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
     if (ok == true) await _c.remove(img);
   }
 
+  /// Delete N from the select bar: one confirm with the count and a strip
+  /// of thumbnails, then one batch.
+  Future<void> _deleteSelected() async {
+    if (_deleting || _sel.count == 0) return;
+    _deleting = true;
+    try {
+      final picked = [
+        for (final a in _c.looks.followedBy(_c.expressions))
+          if (_sel.contains(a.id)) a,
+      ];
+      final ok = await confirmGalleryDelete(context, [
+        for (final a in picked) _c.fileFor(a),
+      ]);
+      if (!ok || !mounted) return;
+      _sel.cancel();
+      await _c.removeMany(picked.map((a) => a.id));
+    } finally {
+      _deleting = false;
+    }
+  }
+
+  /// Clear looks / Clear expressions from a section's ⋮ menu.
+  Future<void> _clear({required bool looks}) async {
+    final count = (looks ? _c.looks : _c.expressions).length;
+    if (_deleting || count == 0) return;
+    _deleting = true;
+    try {
+      final ok = await confirmGalleryClear(context, looks: looks, count: count);
+      if (ok && mounted) await _c.clear(looks: looks);
+    } finally {
+      _deleting = false;
+    }
+  }
+
   Future<void> _confirmDeletePortrait() async {
     // The SAME selection rule the action uses (portrait_promotion.dart), so
     // the preview can never show a different image than the one promoted —
@@ -208,49 +282,12 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
     // would move into the portrait slot.
     final candidate = promotionCandidate(_c.looks, _c.favoriteId);
     if (candidate == null) return; // affordance is hidden with no looks
-    final starred = candidate.id == _c.favoriteId;
-    final ok = await showWarmDialog<bool>(
+    final ok = await confirmPortraitSwap(
       context,
-      title: 'Swap the portrait?',
-      content: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              _c.fileFor(candidate),
-              width: 56,
-              height: 56,
-              cacheWidth: kPortraitAvatarDecodeWidth,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Icon(
-                Icons.image_outlined,
-                size: 40,
-                color: AppColors.iconSecondary(context),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: WarmDialogText(
-              'This image — ${starred ? 'your ★ starred look' : 'your first '
-                        'gallery look'} — becomes the new portrait, and the old '
-              'portrait moves into the gallery as a look. Nothing is '
-              'deleted; swap back any time.',
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        warmDialogCancel(context),
-        warmDialogConfirm(
-          context,
-          label: 'Swap portrait',
-          onPressed: () => Navigator.pop(context, true),
-        ),
-      ],
+      _c.fileFor(candidate),
+      starred: candidate.id == _c.favoriteId,
     );
-    if (ok == true) await _c.deletePortrait();
+    if (ok) await _c.deletePortrait();
   }
 
   @override
@@ -277,6 +314,8 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
                       onReplacePortrait: _replacePortrait,
                       onDelete: _confirmDelete,
                       onDeletePortrait: _confirmDeletePortrait,
+                      selection: _sel,
+                      onClear: () => _clear(looks: true),
                     ),
                     const SizedBox(height: 22),
                     Divider(
@@ -294,15 +333,56 @@ class _AvatarGalleryDialogState extends State<_AvatarGalleryDialog> {
                       },
                       onRelabel: _relabel,
                       onDelete: _confirmDelete,
+                      selection: _sel,
+                      onClear: () => _clear(looks: false),
                     ),
                   ],
                 ),
               ),
             ),
-            _actionBar(),
+            _footer(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _footer() {
+    if (_sel.active) {
+      final label = _sel.last?.label?.trim() ?? '';
+      final alternates = label.isEmpty
+          ? 0
+          : _c.expressions
+                .where(
+                  (e) =>
+                      (e.label ?? '').trim().toLowerCase() ==
+                      label.toLowerCase(),
+                )
+                .length;
+      return GallerySelectBar(
+        count: _sel.count,
+        onSelectAll: () => _sel.selectAll(_c.looks.followedBy(_c.expressions)),
+        labelToSelect: alternates > 1 ? label : null,
+        onSelectLabel: () => _sel.selectLabel(label, _c.expressions),
+        onCancel: _sel.cancel,
+        onDelete: _sel.count == 0 ? null : _deleteSelected,
+      );
+    }
+    final undo = _c.pendingUndo;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (undo != null)
+          GalleryUndoBanner(
+            message: undo.added.isNotEmpty
+                ? 'Replaced ${undo.count} expression '
+                      '${undo.count == 1 ? 'image' : 'images'} with '
+                      '${undo.added.length} from the pack'
+                : 'Deleted ${undo.count} ${undo.count == 1 ? 'image' : 'images'}',
+            onUndo: _c.undo,
+          ),
+        _actionBar(),
+      ],
     );
   }
 

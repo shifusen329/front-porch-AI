@@ -46,8 +46,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:front_porch_ai/database/database.dart' show AppDatabase;
 import 'package:front_porch_ai/models/models.dart';
+import 'package:front_porch_ai/services/avatar_gallery_removal.dart';
 import 'package:front_porch_ai/services/character_repository.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
+import 'package:front_porch_ai/services/v2_card_service.dart';
 
 /// Mocks path_provider so StorageService can resolve
 /// getApplicationDocumentsDirectory() without a real platform channel.
@@ -356,6 +358,168 @@ void main() {
           isFalse,
         );
 
+        await ctx.db.close();
+      },
+    );
+  });
+
+  group('Gallery bulk delete and Undo', () {
+    Future<(CharacterCard, List<String>)> seeded(_Ctx ctx) async {
+      final portrait = File(p.join(ctx.storage.charactersDir.path, 'src.png'))
+        ..writeAsBytesSync(_realPng(seed: 9));
+      final card = CharacterCard(name: 'Bulk Owner');
+      final png = p.join(ctx.storage.charactersDir.path, 'Bulk_Owner_1.png');
+      await V2CardService().saveCardAsPng(card, png, portrait.path);
+      card.imagePath = png;
+      await ctx.repo.addCharacter(card);
+      final ids = <String>[];
+      for (final (i, label) in ['joy', 'sadness', 'anger'].indexed) {
+        ids.add(
+          await ctx.repo.addAvatar(
+            card.dbId!,
+            card.name,
+            _realPng(seed: i),
+            label,
+          ),
+        );
+      }
+      return (card, ids);
+    }
+
+    test('rows go in one batch, files wait in the hold, and a later add '
+        'never repeats an order', () async {
+      final ctx = await _freshRepo();
+      final (card, ids) = await seeded(ctx);
+      final hold = Directory(p.join(ctx.storage.rootPath!, 'hold'));
+
+      final removed = await ctx.repo.batchMedia.removeAvatars(card.dbId!, [
+        ids[0],
+      ], hold);
+      expect(removed.single.id, ids[0]);
+      expect(
+        File(
+          p.join(hold.path, 'avatars', removed.single.filename),
+        ).existsSync(),
+        isTrue,
+        reason: 'held for an Undo, not deleted',
+      );
+
+      final added = await ctx.repo.addAvatar(
+        card.dbId!,
+        card.name,
+        _realPng(seed: 7),
+        'joy',
+      );
+      final orders = {
+        for (final a in await ctx.repo.getAvatarImages(card.dbId!))
+          a.id: a.displayOrder,
+      };
+      expect(
+        orders[added],
+        3,
+        reason: 'after the last order, not the row count',
+      );
+      expect(orders.values.toSet().length, orders.length);
+      await ctx.db.close();
+    });
+
+    test(
+      'every new picture gets a file name no other add can repeat',
+      () async {
+        final ctx = await _freshRepo();
+        final (card, ids) = await seeded(ctx);
+        final rows = await ctx.repo.getAvatarImages(card.dbId!);
+        for (final id in ids) {
+          final row = rows.firstWhere((a) => a.id == id);
+          expect(
+            row.filename,
+            contains(id.replaceAll('-', '').substring(0, 8)),
+          );
+        }
+        expect(rows.map((a) => a.filename).toSet().length, rows.length);
+        await ctx.db.close();
+      },
+    );
+
+    test(
+      'removing the default and the starred picture fixes both once; '
+      'Undo puts back ids, labels, order, the star and the default',
+      () async {
+        final ctx = await _freshRepo();
+        final (card, ids) = await seeded(ctx);
+        (card.frontPorchExtensions ??= FrontPorchExtensions())
+                .favoriteAvatarId =
+            ids[1];
+        await ctx.repo.updateCharacter(card, notify: false);
+        await ctx.repo.setPrimeAvatar(card.dbId!, 2);
+        card.primeAvatarIndex = 2;
+        final before = await ctx.repo.getAvatarImages(card.dbId!);
+
+        final removal = await removeGalleryImages(
+          repo: ctx.repo,
+          storage: ctx.storage,
+          card: card,
+          ids: [ids[0], ids[1]],
+        );
+        expect(removal!.count, 2);
+        expect(card.frontPorchExtensions!.favoriteAvatarId, isNull);
+        expect(card.primeAvatarIndex, 3, reason: 'the first expression left');
+        expect(card.avatarImages!.map((a) => a.id), [ids[2]]);
+        final starOnDisk = await V2CardService().readCard(card.imagePath!);
+        expect(starOnDisk!.frontPorchExtensions?.favoriteAvatarId, isNull);
+
+        final undo = GalleryUndo(repo: ctx.repo, storage: ctx.storage)
+          ..hold(removal);
+        expect(await undo.restore(removal.batchId, card), isTrue);
+        final after = await ctx.repo.getAvatarImages(card.dbId!);
+        String key(AvatarImage a) =>
+            '${a.id}|${a.label}|${a.displayOrder}|${a.filename}';
+        expect(after.map(key).toSet(), before.map(key).toSet());
+        for (final a in after) {
+          expect(
+            File(
+              p.join(
+                ctx.storage.characterBaseDir(card.name).path,
+                'avatars',
+                a.filename,
+              ),
+            ).existsSync(),
+            isTrue,
+          );
+        }
+        expect(card.frontPorchExtensions!.favoriteAvatarId, ids[1]);
+        expect(card.primeAvatarIndex, 2);
+        expect(galleryUndoRoot(ctx.storage).listSync(), isEmpty);
+        await ctx.db.close();
+      },
+    );
+
+    test(
+      'an Undo window that closes deletes the held pictures for good',
+      () async {
+        final ctx = await _freshRepo();
+        final (card, ids) = await seeded(ctx);
+        final removal = await removeGalleryImages(
+          repo: ctx.repo,
+          storage: ctx.storage,
+          card: card,
+          ids: ids,
+        );
+        final undo = GalleryUndo(
+          repo: ctx.repo,
+          storage: ctx.storage,
+          keep: const Duration(milliseconds: 50),
+        )..hold(removal!);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(
+          Directory(
+            p.join(galleryUndoRoot(ctx.storage).path, removal.batchId),
+          ).existsSync(),
+          isFalse,
+        );
+        expect(await undo.restore(removal.batchId, card), isFalse);
+        expect(await ctx.repo.getAvatarImages(card.dbId!), isEmpty);
+        expect(card.primeAvatarIndex, 1);
         await ctx.db.close();
       },
     );

@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -108,6 +109,9 @@ class AvatarGalleryController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    // Closing the gallery ends its Undo; the held pictures go for good.
+    final undo = _undo;
+    if (undo != null) unawaited(undo.expireAll());
     if (_needsCloseBroadcast) {
       // The star wrote silently per click (no repaint behind the dialog);
       // the home grid gets its ONE refresh now that the dialog is gone.
@@ -311,25 +315,43 @@ class AvatarGalleryController extends ChangeNotifier {
 
   /// Import an emotion-named ZIP sprite pack. Alternates of an expression
   /// already here always go in; a new expression past [kMaxExpressions] is
-  /// skipped. Returns (added, unrecognized, skippedForCap) for the snackbar.
+  /// skipped. With [replace], the expressions here go first (looks stay),
+  /// and the Undo brings them back and takes the pack out again. Returns
+  /// (added, unrecognized, skippedForCap) for the snackbar.
   Future<(int, int, int)> importSpritePack(
     List<({Uint8List bytes, String emotion})> entries,
-    int unrecognized,
-  ) async {
+    int unrecognized, {
+    bool replace = false,
+  }) async {
     if (dbId == null) return (0, unrecognized, 0);
     var added = 0;
     var skippedForCap = 0;
     await _run(() async {
-      final used = usedLabels;
+      final removal = replace && entries.isNotEmpty
+          ? await _removeQuietly(expressions.map((e) => e.id))
+          : null;
+      final used = removal == null ? usedLabels : <String>{};
+      final newIds = <String>[];
       for (final e in entries) {
         if (!admitExpression(used, e.emotion)) {
           skippedForCap++;
           continue;
         }
-        await repository.addAvatar(dbId!, libraryCard.name, e.bytes, e.emotion);
+        newIds.add(
+          await repository.addAvatar(
+            dbId!,
+            libraryCard.name,
+            e.bytes,
+            e.emotion,
+          ),
+        );
         added++;
       }
-      if (added > 0) await _reload();
+      if (removal != null) {
+        removal.added.addAll(newIds);
+        _holdForUndo(removal);
+      }
+      if (added > 0 || removal != null) await _reload();
     });
     return (added, unrecognized, skippedForCap);
   }
@@ -347,31 +369,85 @@ class AvatarGalleryController extends ChangeNotifier {
   }
 
   // ── Delete (with all cascades in one place — Grok) ──────────────────────────
-  Future<void> remove(AvatarImage img) => _run(() async {
-    if (dbId == null) return;
-    // Evict before the file is gone so the ImageCache drops this path.
-    await evictPortraitImage(fileFor(img));
-    await repository.removeAvatar(dbId!, img.id);
-    // Star pointed at it → back to the portrait (materializes ext + persists).
-    if (favoriteId == img.id) await _persistFavorite(null);
-    // This chat was showing it → clear the per-chat selection (falls back to
-    // the star/portrait; the resolver also degrades stale ids, this is hygiene).
-    if (mode == WardrobeMode.inChat && selectedFaceId == img.id) {
-      await chat?.setLookForCharacter(dbId!, null);
-    }
+  Future<void> remove(AvatarImage img) => removeMany([img.id]);
+
+  /// Deletes many pictures at once: the ★ and the default expression are
+  /// fixed once for the batch, and [undo] can bring them all back until the
+  /// banner times out or the gallery closes.
+  Future<void> removeMany(Iterable<String> ids) => _run(() async {
+    final removal = await _removeQuietly(ids);
+    if (removal == null) return;
+    _holdForUndo(removal);
+    await _reload();
+  });
+
+  /// Every look, or every expression image. The portrait never goes.
+  Future<void> clear({required bool looks}) =>
+      removeMany((looks ? this.looks : expressions).map((a) => a.id));
+
+  /// The removal [undo] would put back, while its window is open.
+  GalleryRemoval? pendingUndo;
+
+  GalleryUndo? _undo;
+
+  GalleryUndo get _undoStore =>
+      _undo ??= GalleryUndo(repo: repository, storage: storage)
+        ..onExpired = () {
+          pendingUndo = null;
+          notifyListeners();
+        };
+
+  void _holdForUndo(GalleryRemoval removal) {
+    // One banner at a time: a newer removal closes the older one's window.
+    final older = pendingUndo;
+    if (older != null) unawaited(_undoStore.expire(older.batchId));
+    _undoStore.hold(removal);
+    pendingUndo = removal;
+  }
+
+  /// Puts back the last removal (and takes out what its Replace added).
+  Future<void> undo() => _run(() async {
+    final removal = pendingUndo;
+    if (removal == null) return;
+    pendingUndo = null;
+    await _undoStore.restore(removal.batchId, libraryCard);
+    favoriteId = libraryCard.frontPorchExtensions?.favoriteAvatarId;
+    primeIndex = libraryCard.primeAvatarIndex;
     _bumpMedia();
     await _reload();
-    // Prime pointed at a now-deleted expression → first remaining (or reset to
-    // 1 when none remain). Always persist so the DB can't keep a dangling prime.
-    if (!expressions.any((e) => e.displayOrder + 1 == primeIndex)) {
-      primeIndex = expressions.isNotEmpty
-          ? expressions.first.displayOrder + 1
-          : 1;
-      libraryCard.primeAvatarIndex = primeIndex;
-      await repository.setPrimeAvatar(dbId!, primeIndex);
-    }
     _needsCloseBroadcast = true;
   });
+
+  /// The removal itself, without a window or a reload: evict the pictures,
+  /// remove them, and take this chat off a face that went.
+  Future<GalleryRemoval?> _removeQuietly(Iterable<String> ids) async {
+    if (dbId == null) return null;
+    final idSet = ids.toSet();
+    for (final a in looks.followedBy(expressions)) {
+      // Evict before the files move so the ImageCache drops these paths.
+      if (idSet.contains(a.id)) await evictPortraitImage(fileFor(a));
+    }
+    final removal = await removeGalleryImages(
+      repo: repository,
+      storage: storage,
+      card: libraryCard,
+      ids: idSet,
+    );
+    if (removal == null) return null;
+    favoriteId = libraryCard.frontPorchExtensions?.favoriteAvatarId;
+    primeIndex = libraryCard.primeAvatarIndex;
+    // This chat was showing one → clear the per-chat selection (falls back to
+    // the star/portrait; the resolver also degrades stale ids, this is
+    // hygiene). Other chats fall back through the resolvers.
+    final face = selectedFaceId;
+    if (mode == WardrobeMode.inChat && face != null && idSet.contains(face)) {
+      await chat?.setLookForCharacter(dbId!, null);
+    }
+    tempLabels.removeWhere((id, _) => idSet.contains(id));
+    _bumpMedia();
+    _needsCloseBroadcast = true;
+    return removal;
+  }
 
   /// Flush the drafted emotion labels + prime index. Called on Done. Routed
   /// through [_run] so a failed label write surfaces as [lastError] instead of

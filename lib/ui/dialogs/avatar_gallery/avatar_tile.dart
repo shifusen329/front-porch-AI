@@ -52,7 +52,13 @@ class AvatarTile extends StatelessWidget {
     this.onCaptionTap,
     this.imageVersion = 0,
     this.deleteTooltip = 'Delete',
+    this.selected,
   });
+
+  /// Select mode: null when not selecting; otherwise whether this tile is
+  /// picked. While selecting the ★, ✕ and action button step aside for a
+  /// check circle, and [onTap] toggles the pick.
+  final bool? selected;
 
   /// The image to display (already resolved to its `looks/` or `avatars/` file).
   final File imageFile;
@@ -153,23 +159,42 @@ class AvatarTile extends StatelessWidget {
                 ),
               ),
 
-            // ★ star, top-left.
-            Positioned(
-              top: 5,
-              left: 5,
-              child: _circleButton(
-                icon: starred ? Icons.star_rounded : Icons.star_border_rounded,
-                tooltip: starred
-                    ? 'Canonical avatar'
-                    : 'Set as canonical avatar',
-                onTap: onStar,
-                bg: starred ? AppColors.formAccentOf(context) : scrim,
-                fg: onScrim,
+            // Select mode's check, where the ★ sits.
+            if (selected != null)
+              Positioned(
+                top: 5,
+                left: 5,
+                child: _circleButton(
+                  icon: selected!
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  tooltip: selected! ? 'Selected' : 'Select',
+                  onTap: onTap ?? () {},
+                  bg: selected! ? AppColors.formAccentOf(context) : scrim,
+                  fg: onScrim,
+                ),
               ),
-            ),
+
+            // ★ star, top-left.
+            if (selected == null)
+              Positioned(
+                top: 5,
+                left: 5,
+                child: _circleButton(
+                  icon: starred
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  tooltip: starred
+                      ? 'Canonical avatar'
+                      : 'Set as canonical avatar',
+                  onTap: onStar,
+                  bg: starred ? AppColors.formAccentOf(context) : scrim,
+                  fg: onScrim,
+                ),
+              ),
 
             // ✕ delete, top-right.
-            if (onDelete != null)
+            if (onDelete != null && selected == null)
               Positioned(
                 top: 5,
                 right: 5,
@@ -217,7 +242,7 @@ class AvatarTile extends StatelessWidget {
               ),
 
             // Optional labelled action (portrait "Replace portrait").
-            if (actionLabel != null && onAction != null)
+            if (actionLabel != null && onAction != null && selected == null)
               Positioned(
                 left: 6,
                 right: 6,
@@ -235,12 +260,18 @@ class AvatarTile extends StatelessWidget {
                         children: [
                           Icon(Icons.edit_outlined, size: 12, color: onScrim),
                           const SizedBox(width: 4),
-                          Text(
-                            actionLabel!,
-                            style: TextStyle(
-                              color: onScrim,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                          // Shrinks on a phone's narrow tile instead of
+                          // overflowing it.
+                          Flexible(
+                            child: Text(
+                              actionLabel!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: onScrim,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],

@@ -232,5 +232,143 @@ void main() {
       final bad = await post(utf8.encode('not a zip at all'));
       expect(bad.statusCode, 400);
     });
+
+    Router galleryRoutes() {
+      final router = Router();
+      WebCharacterSpritePackRoutes(facade, router);
+      return router;
+    }
+
+    Future<(int, Map)> postJson(Router router, String path, Object body) async {
+      final res = await router.call(
+        shelf.Request(
+          'POST',
+          Uri.parse('http://localhost/api/characters/$charId/$path'),
+          body: jsonEncode(body),
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      return (res.statusCode, jsonDecode(await res.readAsString()) as Map);
+    }
+
+    Future<List<String>> expressionIds() async => [
+      for (final a in await facade.avatars(charId))
+        if (a['isLook'] != true) a['id'] as String,
+    ];
+
+    test('a bulk delete fixes the star and the default once and refreshes '
+        'the card; Undo brings all of it back', () async {
+      for (final label in ['joy', 'sadness', 'anger']) {
+        await facade.addAvatar(charId, _png, label);
+      }
+      final ids = await expressionIds();
+      expect(await facade.setPrime(charId, ids[1]), isTrue);
+      await facade.setFavorite(charId, ids[1]);
+      final router = galleryRoutes();
+
+      final (status, json) = await postJson(router, 'avatars/delete', {
+        'ids': [ids[0], ids[1]],
+      });
+      expect(status, 200);
+      final card = (await repo.getCharacterCardById(charId))!;
+      expect(card.avatarImages!.map((a) => a.id), [
+        ids[2],
+      ], reason: 'the in-memory card the chat reads is refreshed too');
+      expect(card.frontPorchExtensions?.favoriteAvatarId, isNull);
+      final third = card.avatarImages!.single;
+      expect(card.primeAvatarIndex, third.displayOrder + 1);
+      final undo = json['undo'] as Map;
+      expect(undo['count'], 2);
+
+      final (undone, _) = await postJson(router, 'avatars/undo', {
+        'batch': undo['batch'],
+      });
+      expect(undone, 200);
+      expect((await expressionIds()).toSet(), ids.toSet());
+      expect(card.frontPorchExtensions?.favoriteAvatarId, ids[1]);
+      final second = card.avatarImages!.firstWhere((a) => a.id == ids[1]);
+      expect(card.primeAvatarIndex, second.displayOrder + 1);
+    });
+
+    test(
+      'Replace from a ZIP: a pack with nothing recognizable changes '
+      'nothing; a good one swaps the expressions and Undo swaps them back',
+      () async {
+        expect(await facade.addLook(charId, _png), isTrue); // the portrait
+        expect(await facade.addLook(charId, _png), isTrue); // a look
+        for (final label in ['joy', 'sadness']) {
+          await facade.addAvatar(charId, _png, label);
+        }
+        final before = await expressionIds();
+        final router = galleryRoutes();
+        Future<shelf.Response> replace(List<String> names) {
+          final archive = Archive();
+          for (final name in names) {
+            archive.addFile(ArchiveFile(name, _png.length, _png));
+          }
+          return router.call(
+            shelf.Request(
+              'POST',
+              Uri.parse(
+                'http://localhost/api/characters/$charId/avatars/zip?replace=1',
+              ),
+              body: ZipEncoder().encode(archive),
+            ),
+          );
+        }
+
+        final bad = await replace(['notes.png']);
+        expect(bad.statusCode, 400);
+        expect(
+          await bad.readAsString(),
+          contains('the gallery was not changed'),
+        );
+        expect(await expressionIds(), before);
+
+        final good = await replace(['anger.png', 'joy.png']);
+        expect(good.statusCode, 200);
+        final json = jsonDecode(await good.readAsString()) as Map;
+        final labels = {
+          for (final a in json['avatars'] as List)
+            if (a['isLook'] != true) a['label'],
+        };
+        expect(labels, {'anger', 'joy'});
+        expect(
+          (json['avatars'] as List).where((a) => a['isLook'] == true),
+          hasLength(1),
+        );
+        final undo = json['undo'] as Map;
+        expect(undo['replaced'], 2);
+
+        final (undone, _) = await postJson(router, 'avatars/undo', {
+          'batch': undo['batch'],
+        });
+        expect(undone, 200);
+        expect((await expressionIds()).toSet(), before.toSet());
+      },
+    );
+
+    test('Clear looks keeps the expressions; the delete route needs ids or '
+        'clear; an Undo past its window answers 410', () async {
+      expect(await facade.addLook(charId, _png), isTrue); // the portrait
+      expect(await facade.addLook(charId, _png), isTrue);
+      await facade.addAvatar(charId, _png, 'joy');
+      final router = galleryRoutes();
+
+      final (none, _) = await postJson(router, 'avatars/delete', {});
+      expect(none, 400);
+      final (cleared, json) = await postJson(router, 'avatars/delete', {
+        'clear': 'looks',
+      });
+      expect(cleared, 200);
+      final left = json['avatars'] as List;
+      expect(left.where((a) => a['isLook'] == true), isEmpty);
+      expect(left.where((a) => a['isLook'] != true), hasLength(1));
+
+      final (gone, _) = await postJson(router, 'avatars/undo', {
+        'batch': 'not-a-batch',
+      });
+      expect(gone, 410);
+    });
   });
 }

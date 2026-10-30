@@ -118,3 +118,44 @@ class GalleryAddTile extends StatelessWidget {
     );
   }
 }
+
+/// A section's ⋮ menu: **Select…** starts Select mode, and [clearLabel]
+/// ("Clear expressions") removes every picture in the section after a
+/// confirm. A null [onClear] greys it out (nothing to clear).
+class GallerySectionMenu extends StatelessWidget {
+  const GallerySectionMenu({
+    super.key,
+    required this.onSelect,
+    required this.clearLabel,
+    required this.onClear,
+  });
+
+  final VoidCallback? onSelect;
+  final String clearLabel;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<void Function()>(
+      tooltip: 'More',
+      icon: Icon(
+        Icons.more_vert_rounded,
+        size: 18,
+        color: AppColors.textSecondary(context),
+      ),
+      onSelected: (run) => run(),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: onSelect,
+          enabled: onSelect != null,
+          child: const Text('Select…'),
+        ),
+        PopupMenuItem(
+          value: onClear,
+          enabled: onClear != null,
+          child: Text(clearLabel),
+        ),
+      ],
+    );
+  }
+}

@@ -1626,3 +1626,39 @@ test('Settings → Sync sends the desktop library to a folder, and a Get then fi
     });
   }
 });
+
+test('clear a character’s expressions in one go, then Undo brings them back', async ({ page }) => {
+  const name = `Clear Gallery ${test.info().project.name}`;
+  const created = await page.request.post('/api/characters/create', {
+    data: { name, firstMessage: 'The porch light is on.' },
+  });
+  expect(created.ok(), `create: ${created.status()}`).toBe(true);
+  const id = String(((await created.json()) as { id: string | number }).id);
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  try {
+    await openRoute(page, `/edit/${id}`);
+    await page.locator('input[accept=".zip,application/zip"]').setInputFiles({
+      name: 'sprites.zip',
+      mimeType: 'application/zip',
+      buffer: storedZip({ 'joy.png': png, 'joy-1.png': png, 'anger.png': png }),
+    });
+    const gallery = page.locator('.avatar-manager');
+    await expect(gallery).toContainText('2/40 expressions · 3 images');
+
+    await gallery.getByRole('button', { name: 'Clear expressions', exact: true }).click();
+    const confirm = page.getByRole('dialog', { name: 'Delete all 3 expression images?' });
+    await confirm.getByRole('button', { name: 'Delete all', exact: true }).click();
+    await expect(gallery).toContainText('Deleted 3 images');
+    await expect(gallery).toContainText('0/40 expressions');
+
+    await gallery.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(gallery).toContainText('2/40 expressions · 3 images');
+    await expect(gallery.locator('.avatar-label', { hasText: /^joy$/ })).toHaveCount(2);
+  } finally {
+    const gone = await page.request.post(`/api/characters/${id}/delete`);
+    expect(gone.ok(), `deleting the journey character: ${gone.status()}`).toBe(true);
+  }
+});

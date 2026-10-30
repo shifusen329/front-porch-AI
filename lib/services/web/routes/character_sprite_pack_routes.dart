@@ -22,12 +22,20 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:front_porch_ai/services/web/facade/character_authoring_facade.dart';
 import 'package:front_porch_ai/services/web/util/util.dart';
 
-/// `POST /api/characters/<id>/avatars/zip`: an emotion-named ZIP sprite pack,
-/// the desktop gallery's "Import ZIP sprite pack". Replies with the counts
-/// and the character's avatars.
+/// The gallery's batch routes, the desktop gallery's ZIP import, Delete N,
+/// Clear and Undo:
+/// - `POST /api/characters/<id>/avatars/zip[?replace=1]`: an emotion-named
+///   ZIP sprite pack. Replies with the counts and the character's avatars.
+/// - `POST /api/characters/<id>/avatars/delete` with `{ids: [...]}` or
+///   `{clear: "expressions" | "looks"}`. Replies with the avatars and an
+///   `undo` handle.
+/// - `POST /api/characters/<id>/avatars/undo` with `{batch}`: 410 once the
+///   window has closed.
 class WebCharacterSpritePackRoutes {
   WebCharacterSpritePackRoutes(this._authoring, Router router) {
     router.post('/api/characters/<id>/avatars/zip', _import);
+    router.post('/api/characters/<id>/avatars/delete', _delete);
+    router.post('/api/characters/<id>/avatars/undo', _undo);
   }
 
   final CharacterAuthoringFacade _authoring;
@@ -45,11 +53,53 @@ class WebCharacterSpritePackRoutes {
     if (bytes.isEmpty) return JsonResponse.badRequest('Empty upload');
     final Map<String, dynamic>? result;
     try {
-      result = await _authoring.importSpritePack(id, bytes);
+      result = await _authoring.importSpritePack(
+        id,
+        bytes,
+        replace: request.url.queryParameters['replace'] == '1',
+      );
     } on FormatException catch (e) {
       return JsonResponse.badRequest("That file isn't a ZIP sprite pack ($e).");
     }
     if (result == null) return JsonResponse.error(404, 'Character not found');
+    return JsonResponse.ok(result);
+  }
+
+  Future<Map<String, dynamic>?> _json(shelf.Request request) async {
+    try {
+      return await RequestBody.readJsonMap(request);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<shelf.Response> _delete(shelf.Request request, String id) async {
+    final body = await _json(request);
+    final ids = body?['ids'];
+    final clear = body?['clear'];
+    final Map<String, dynamic>? result;
+    if (ids is List && ids.isNotEmpty) {
+      result = await _authoring.removeAvatars(id, [for (final i in ids) '$i']);
+    } else if (clear == 'expressions' || clear == 'looks') {
+      result = await _authoring.clearAvatars(id, looks: clear == 'looks');
+    } else {
+      return JsonResponse.badRequest(
+        'Send ids, or clear: "expressions" or "looks".',
+      );
+    }
+    if (result == null) return JsonResponse.error(404, 'Character not found');
+    return JsonResponse.ok(result);
+  }
+
+  Future<shelf.Response> _undo(shelf.Request request, String id) async {
+    final batch = (await _json(request))?['batch'];
+    if (batch is! String || batch.isEmpty) {
+      return JsonResponse.badRequest('batch is required');
+    }
+    final result = await _authoring.undoRemoval(id, batch);
+    if (result == null) {
+      return JsonResponse.error(410, 'It is too late to undo that delete.');
+    }
     return JsonResponse.ok(result);
   }
 }

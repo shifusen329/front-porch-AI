@@ -76,6 +76,14 @@ Future<void> checkLibrarySyncOnStart(BuildContext context) async {
   await offerNewerLibrary(context, sync);
 }
 
+/// Pictures a gallery Delete held for its Undo: an Undo never outlives the
+/// app, so whatever the last run left is deleted.
+Future<void> clearHeldGalleryPictures(BuildContext context) async {
+  final storage = Provider.of<StorageService>(context, listen: false);
+  await storage.initialized;
+  await pruneGalleryUndo(storage);
+}
+
 Future<void> autoStartWebServer(BuildContext context) async {
   // Made first: the server hands the phone web app's Sync routes the service
   // it holds when it starts.

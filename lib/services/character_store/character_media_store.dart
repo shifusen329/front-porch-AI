@@ -43,6 +43,25 @@ class CharacterMediaStore {
     p.join(_storage.charactersDir.path, mediaFolderName(characterName), sub),
   );
 
+  /// A file-name stem no other add can repeat: the time alone collided when
+  /// a sprite-pack import added two images in one millisecond, and deleting
+  /// one then deleted the other's picture.
+  static String _uniqueStem(String avatarId) =>
+      '${DateTime.now().millisecondsSinceEpoch}_'
+      '${avatarId.replaceAll('-', '').substring(0, 8)}';
+
+  /// The display order after every row this character has. A row count
+  /// repeats an order once anything was deleted, and two expressions then
+  /// both read as the default (prime is keyed on display order).
+  Future<int> _nextOrder(String characterId) async {
+    final rows = await _db().getAvatarImagesByCharacterId(characterId);
+    var last = -1;
+    for (final r in rows) {
+      if (r.displayOrder > last) last = r.displayOrder;
+    }
+    return last + 1;
+  }
+
   /// All avatar images for a character from the database.
   Future<List<AvatarImage>> avatarImages(String characterId) async {
     try {
@@ -76,14 +95,14 @@ class CharacterMediaStore {
       if (!await avatarDir.exists()) {
         await avatarDir.create(recursive: true);
       }
-      final filename = 'avatar_${DateTime.now().millisecondsSinceEpoch}.png';
+      final avatarId = mediaId ?? const Uuid().v4();
+      final filename = 'avatar_${_uniqueStem(avatarId)}.png';
       final filePath = p.join(avatarDir.path, filename);
       debugPrint('[CharacterRepository] addAvatar: writing file=$filePath');
       await File(filePath).writeAsBytes(imageBytes);
       debugPrint('[CharacterRepository] addAvatar: file written');
 
-      final displayOrder = await _db().countAvatarsForCharacter(characterId);
-      final avatarId = mediaId ?? const Uuid().v4();
+      final displayOrder = await _nextOrder(characterId);
       debugPrint(
         '[CharacterRepository] addAvatar: inserting DB record, filename=$filename, displayOrder=$displayOrder',
       );
@@ -152,12 +171,11 @@ class CharacterMediaStore {
     if (!await looksDir.exists()) {
       await looksDir.create(recursive: true);
     }
-    final filename =
-        'look_${mediaId ?? DateTime.now().millisecondsSinceEpoch}.png';
+    final avatarId = mediaId ?? const Uuid().v4();
+    final filename = 'look_${mediaId ?? _uniqueStem(avatarId)}.png';
     await File(p.join(looksDir.path, filename)).writeAsBytes(imageBytes);
 
-    final displayOrder = await _db().countAvatarsForCharacter(characterId);
-    final avatarId = mediaId ?? const Uuid().v4();
+    final displayOrder = await _nextOrder(characterId);
     await _db().insertAvatar(
       AvatarImagesCompanion(
         id: Value(avatarId),
@@ -196,6 +214,100 @@ class CharacterMediaStore {
       debugPrint('[CharacterRepository] Failed to remove avatar: $e');
       rethrow;
     }
+  }
+
+  /// Removes many gallery images at once and keeps their files in [hold], so
+  /// [restoreAvatars] can put them back. The rows go first, in one
+  /// transaction: a failure part-way leaves a picture with no row (harmless),
+  /// never a row with no picture. Returns the rows removed.
+  Future<List<AvatarImage>> removeAvatars(
+    String characterId,
+    Iterable<String> ids,
+    Directory hold,
+  ) async {
+    final removed = <AvatarImage>[];
+    for (final id in ids.toSet()) {
+      final row = await _db().getAvatarById(id);
+      if (row != null && row.characterId == characterId) {
+        removed.add(avatarFromRow(row));
+      }
+    }
+    if (removed.isEmpty) return removed;
+    await _db().transaction(() async {
+      for (final a in removed) {
+        await _db().deleteAvatar(a.id);
+      }
+    });
+    final name = await _nameOf(characterId);
+    if (name == null) return removed;
+    for (final a in removed) {
+      final from = File(p.join(_mediaDir(name, a.subfolder).path, a.filename));
+      final to = File(p.join(hold.path, a.subfolder, a.filename));
+      try {
+        if (!await from.exists()) continue;
+        await to.parent.create(recursive: true);
+        await from.rename(to.path);
+      } on FileSystemException catch (e) {
+        // Windows: a tile still reading the picture holds it open. The row
+        // is gone, which is what counts; the file stays where it was, and
+        // an Undo finds it there.
+        debugPrint(
+          '[CharacterRepository] Could not set ${a.filename} aside: $e',
+        );
+      }
+    }
+    return removed;
+  }
+
+  /// Puts back what [removeAvatars] took: each file from [hold], and each
+  /// row with its own id, label, order and date, so the ★, the default
+  /// expression and chats' chosen faces point at it again. A row whose file
+  /// is gone stays out. Returns how many came back.
+  Future<int> restoreAvatars(
+    String characterId,
+    List<AvatarImage> rows,
+    Directory hold,
+  ) async {
+    final name = await _nameOf(characterId);
+    if (name == null) return 0;
+    var restored = 0;
+    for (final a in rows) {
+      final held = File(p.join(hold.path, a.subfolder, a.filename));
+      final back = File(p.join(_mediaDir(name, a.subfolder).path, a.filename));
+      try {
+        if (await held.exists()) {
+          await back.parent.create(recursive: true);
+          await held.rename(back.path);
+        }
+      } on FileSystemException catch (e) {
+        debugPrint(
+          '[CharacterRepository] Could not put ${a.filename} back: $e',
+        );
+      }
+      if (!await back.exists() || await _db().getAvatarById(a.id) != null) {
+        continue;
+      }
+      await _db().insertAvatar(
+        AvatarImagesCompanion(
+          id: Value(a.id),
+          characterId: Value(characterId),
+          filename: Value(a.filename),
+          label: Value(a.label),
+          displayOrder: Value(a.displayOrder),
+          createdAt: Value(a.createdAt),
+        ),
+      );
+      restored++;
+    }
+    return restored;
+  }
+
+  Future<String?> _nameOf(String characterId) async {
+    final listed = _characters().where((c) => c.dbId == characterId);
+    final name = listed.isNotEmpty
+        ? listed.first.name
+        : (await _cardById(characterId))?.name;
+    return name == null || name.isEmpty ? null : name;
   }
 
   Future<void> setPrimeAvatar(String characterId, int primeIndex) async {

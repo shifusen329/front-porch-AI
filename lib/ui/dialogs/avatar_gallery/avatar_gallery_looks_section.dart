@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 
 import 'package:front_porch_ai/services/avatar_gallery.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_controller.dart';
+import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_selection.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_gallery_section_header.dart';
 import 'package:front_porch_ai/ui/dialogs/avatar_gallery/avatar_tile.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
@@ -37,7 +38,16 @@ class AvatarGalleryLooksSection extends StatelessWidget {
     required this.onReplacePortrait,
     required this.onDelete,
     required this.onDeletePortrait,
+    this.selection,
+    this.onClear,
   });
+
+  /// Select mode, shared with the expressions section.
+  /// Null: no Select mode and no ⋮ menu (a section shown on its own).
+  final AvatarGallerySelection? selection;
+
+  /// Confirm + delete every look (the portrait stays).
+  final VoidCallback? onClear;
 
   final AvatarGalleryController controller;
   final VoidCallback onAddLook;
@@ -58,35 +68,41 @@ class AvatarGalleryLooksSection extends StatelessWidget {
     final selected = controller.selectedFaceId;
     final tiles = <Widget>[];
 
-    // Portrait tile (always, when a portrait exists).
+    final selection = this.selection;
+    final selecting = selection?.active ?? false;
+
+    // Portrait tile (always, when a portrait exists). Never selectable.
     if (portrait != null) {
-      tiles.add(
-        AvatarTile(
-          // Stable id + mediaGen: portrait path is reused when a look is
-          // promoted over it; without a versioned key the blank face sticks.
-          key: ValueKey('portrait-${controller.mediaGen}'),
-          imageFile: portrait,
-          imageVersion: controller.mediaGen,
-          caption: 'Portrait',
-          starred: controller.favoriteId == null,
-          onStar: () => controller.setFavorite(null),
-          actionLabel: 'Replace portrait',
-          onAction: onReplacePortrait,
-          // Swappable only when a look exists to take its place.
-          onDelete: controller.looks.isEmpty ? null : onDeletePortrait,
-          deleteTooltip: 'Swap portrait',
-          onTap: _inChat
-              ? () => controller.selectFaceInChat(kPortraitFaceId)
-              : null,
-          badge: _inChat && (selected == null || selected == kPortraitFaceId)
-              ? 'Showing'
-              : null,
-          highlighted:
-              _inChat && (selected == null || selected == kPortraitFaceId),
-          badgeColor: AppColors.formAccentOf(context),
-        ),
+      final tile = AvatarTile(
+        // Stable id + mediaGen: portrait path is reused when a look is
+        // promoted over it; without a versioned key the blank face sticks.
+        key: ValueKey('portrait-${controller.mediaGen}'),
+        imageFile: portrait,
+        imageVersion: controller.mediaGen,
+        caption: 'Portrait',
+        starred: controller.favoriteId == null,
+        onStar: () => controller.setFavorite(null),
+        actionLabel: 'Replace portrait',
+        onAction: onReplacePortrait,
+        // Swappable only when a look exists to take its place.
+        onDelete: controller.looks.isEmpty ? null : onDeletePortrait,
+        deleteTooltip: 'Swap portrait',
+        onTap: _inChat
+            ? () => controller.selectFaceInChat(kPortraitFaceId)
+            : null,
+        badge: _inChat && (selected == null || selected == kPortraitFaceId)
+            ? 'Showing'
+            : null,
+        highlighted:
+            _inChat && (selected == null || selected == kPortraitFaceId),
+        badgeColor: AppColors.formAccentOf(context),
       );
-    } else {
+      tiles.add(
+        selecting
+            ? IgnorePointer(child: Opacity(opacity: 0.45, child: tile))
+            : tile,
+      );
+    } else if (!selecting) {
       // No portrait yet — explicit Set portrait (crops + writes imagePath).
       // Add avatar alone used to only create a look; without this tile users
       // never found the path that fills Edit Character's card face (#171).
@@ -107,7 +123,12 @@ class AvatarGalleryLooksSection extends StatelessWidget {
           starred: controller.favoriteId == look.id,
           onStar: () => controller.setFavorite(look.id),
           onDelete: () => onDelete(look.id),
-          onTap: _inChat ? () => controller.selectFaceInChat(look.id) : null,
+          selected: selecting ? selection!.contains(look.id) : null,
+          onTap: selecting
+              ? () => selection!.toggle(look)
+              : _inChat
+              ? () => controller.selectFaceInChat(look.id)
+              : null,
           badge: _inChat && selected == look.id ? 'Showing' : null,
           highlighted: _inChat && selected == look.id,
           badgeColor: AppColors.formAccentOf(context),
@@ -116,7 +137,9 @@ class AvatarGalleryLooksSection extends StatelessWidget {
     }
 
     // Add tile.
-    tiles.add(GalleryAddTile(label: 'Add avatar', onTap: onAddLook));
+    if (!selecting) {
+      tiles.add(GalleryAddTile(label: 'Add avatar', onTap: onAddLook));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,6 +151,13 @@ class AvatarGalleryLooksSection extends StatelessWidget {
               : portrait == null
               ? 'Set a portrait, or Add avatar · ★ is the card cover'
               : 'Outfits, scenes, moods · ★ sets the default + card cover',
+          trailing: selection == null || selecting
+              ? null
+              : GallerySectionMenu(
+                  onSelect: controller.looks.isEmpty ? null : selection.start,
+                  clearLabel: 'Clear looks',
+                  onClear: controller.looks.isEmpty ? null : onClear,
+                ),
         ),
         const SizedBox(height: 10),
         GridView.count(

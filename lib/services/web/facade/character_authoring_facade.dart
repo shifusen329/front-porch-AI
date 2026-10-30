@@ -36,6 +36,21 @@ class CharacterAuthoringFacade {
   final CharacterRepository _repo;
   final StorageService _storage;
 
+  /// Removals the phone can still undo: its banner shows 10 seconds, and
+  /// the server keeps them a little longer for the round trip.
+  late final GalleryUndo _undo = GalleryUndo(
+    repo: _repo,
+    storage: _storage,
+    keep: const Duration(seconds: 15),
+  );
+
+  Map<String, Object> _undoJson(GalleryRemoval r) => {
+    'batch': r.batchId,
+    'count': r.count,
+    'replaced': r.added.length,
+    'seconds': 10,
+  };
+
   /// Delete a character (soft-delete row + remove PNG + chat history), reusing
   /// the desktop delete path. Returns false if not found.
   Future<bool> delete(String id) async {
@@ -94,12 +109,16 @@ class CharacterAuthoringFacade {
   /// The desktop gallery's "Import ZIP sprite pack": emotion-named images
   /// (`joy.png`, `joy-1.png`) become expression images, in pack order.
   /// Alternates always go in; a new expression past [kMaxExpressions] is
-  /// skipped. Null when the character is gone; throws [FormatException] for
-  /// bytes that aren't a ZIP.
+  /// skipped. With [replace], the expressions here go first (looks stay)
+  /// and the reply carries an Undo, but only once the pack has at least one
+  /// recognized image, so a bad ZIP never empties the gallery. Null when the
+  /// character is gone; throws [FormatException] for bytes that aren't a
+  /// ZIP, or a Replace with nothing to put in their place.
   Future<Map<String, dynamic>?> importSpritePack(
     String id,
-    List<int> zip,
-  ) async {
+    List<int> zip, {
+    bool replace = false,
+  }) async {
     final card = await _repo.getCharacterCardById(id);
     if (card == null) return null;
     // The decoder reads arbitrary bytes as an empty archive; say so instead.
@@ -110,23 +129,85 @@ class CharacterAuthoringFacade {
       Uint8List.fromList(zip),
       labels: _storage.expressionSettings.expressionLabels,
     );
-    final used = expressionLabelsOf(await _repo.getAvatarImages(id));
+    if (replace && pack.entries.isEmpty) {
+      throw const FormatException(
+        'nothing in it is named for an expression; the gallery was not changed',
+      );
+    }
+    final current = await _repo.getAvatarImages(id);
+    final removal = replace
+        ? await removeGalleryImages(
+            repo: _repo,
+            storage: _storage,
+            card: card,
+            ids: [
+              for (final a in current)
+                if (!a.isLook) a.id,
+            ],
+          )
+        : null;
+    final used = removal == null ? expressionLabelsOf(current) : <String>{};
     var added = 0;
     var skipped = 0;
+    final newIds = <String>[];
     for (final e in pack.entries) {
       if (!admitExpression(used, e.emotion)) {
         skipped++;
         continue;
       }
-      await _repo.addAvatar(id, card.name, e.bytes, e.emotion);
+      newIds.add(await _repo.addAvatar(id, card.name, e.bytes, e.emotion));
       added++;
+    }
+    card.avatarImages = await _repo.getAvatarImages(id);
+    if (removal != null) {
+      removal.added.addAll(newIds);
+      _undo.hold(removal);
     }
     return {
       'added': added,
       'skipped': skipped,
       'unrecognized': pack.unrecognized,
       'avatars': await avatars(id),
+      if (removal != null) 'undo': _undoJson(removal),
     };
+  }
+
+  /// Deletes [ids] in one go, as the desktop gallery's Delete N does: the ★
+  /// and the default expression are fixed once, and the reply carries an
+  /// Undo. Null when the character is gone.
+  Future<Map<String, dynamic>?> removeAvatars(
+    String id,
+    Iterable<String> ids,
+  ) async {
+    final card = await _repo.getCharacterCardById(id);
+    if (card == null) return null;
+    final removal = await removeGalleryImages(
+      repo: _repo,
+      storage: _storage,
+      card: card,
+      ids: ids,
+    );
+    if (removal != null) _undo.hold(removal);
+    return {
+      'avatars': await avatars(id),
+      if (removal != null) 'undo': _undoJson(removal),
+    };
+  }
+
+  /// Clear looks / Clear expressions. The portrait never goes.
+  Future<Map<String, dynamic>?> clearAvatars(
+    String id, {
+    required bool looks,
+  }) async => removeAvatars(id, [
+    for (final a in await _repo.getAvatarImages(id))
+      if (a.isLook == looks) a.id,
+  ]);
+
+  /// Puts back what [batch] removed. Null when its window has closed.
+  Future<Map<String, dynamic>?> undoRemoval(String id, String batch) async {
+    final card = await _repo.getCharacterCardById(id);
+    if (card == null || !await _undo.restore(batch, card)) return null;
+    return {'avatars': await avatars(id)};
   }
 
   /// Add a gallery LOOK from uploaded bytes (goes to `looks/`, look-labeled —
@@ -151,34 +232,9 @@ class CharacterAuthoringFacade {
     return true;
   }
 
-  Future<bool> removeAvatar(String id, String avatarId) async {
-    final card = await _repo.getCharacterCardById(id);
-    if (card == null) return false;
-    // Cascade to match desktop (avatar_gallery_controller.remove): capture
-    // whether this avatar was the ★ favorite (export cover / default face)
-    // and/or the prime BEFORE deleting, then heal both pointers after — the
-    // web path previously left a dangling favorite id and a prime index still
-    // pointing at the deleted expression.
-    final wasFavorite = card.frontPorchExtensions?.favoriteAvatarId == avatarId;
-    final before = await _repo.getAvatarImages(id);
-    final removed = before.where((a) => a.id == avatarId).firstOrNull;
-    final removedPrimeIdx = removed != null ? removed.displayOrder + 1 : -1;
-
-    await _repo.removeAvatar(id, avatarId);
-
-    if (wasFavorite) await setFavorite(id, null); // → portrait
-    if (card.primeAvatarIndex == removedPrimeIdx) {
-      final remaining =
-          (await _repo.getAvatarImages(id)).where((a) => !a.isLook).toList()
-            ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
-      final newPrime = remaining.isNotEmpty
-          ? remaining.first.displayOrder + 1
-          : 1;
-      await _repo.setPrimeAvatar(id, newPrime);
-      card.primeAvatarIndex = newPrime;
-    }
-    return true;
-  }
+  /// One picture, through the same batch removal as the desktop gallery.
+  Future<bool> removeAvatar(String id, String avatarId) async =>
+      await removeAvatars(id, [avatarId]) != null;
 
   /// Mark the avatar [avatarId] as the prime (default) one. The DB stores a
   /// 1-based index (`displayOrder + 1`), matching the desktop avatars dialog.

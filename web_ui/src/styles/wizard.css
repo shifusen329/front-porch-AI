@@ -101,3 +101,11 @@ button.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transpar
   width: 56px; height: 56px; flex: none; object-fit: cover;
   border-radius: var(--radius); border: 1px solid var(--border);
 }
+/* Avatar gallery: Select mode, Clear, Delete N's thumbnails, Undo */
+.gallery-batch-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 2px; }
+.avatar-tile.selecting { cursor: pointer; }
+.avatar-tile.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+.gallery-select-bar { margin: 6px 0 0; }
+.gallery-confirm-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.gallery-confirm-thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+.gallery-undo-bar { margin-top: 6px; }

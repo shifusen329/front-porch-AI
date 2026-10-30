@@ -11,10 +11,12 @@
 //                   alternates of one don't count (the desktop's limit).
 // The ★ favorite (one across BOTH sections) is the default opening face + the
 // image baked into an exported / Stoop card. Upload-only: no in-app editing or
-// generation on the web (that lives on desktop).
+// generation on the web (that lives on desktop). Select mode, Clear, Replace on
+// ZIP import and a short Undo match the desktop gallery.
 
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
+import { GallerySelectBar, GalleryUndoBar } from './GallerySelectBar';
 import { ImageCropModal } from './ImageCropModal';
 
 interface AvatarItem {
@@ -26,8 +28,24 @@ interface AvatarItem {
   isFavorite: boolean;
 }
 
-type Resp = { avatars: AvatarItem[] };
+interface UndoHandle {
+  batch: string;
+  count: number;
+  replaced: number;
+  seconds: number;
+}
+
+type Resp = { avatars: AvatarItem[]; undo?: UndoHandle };
 type ZipResp = Resp & { added: number; skipped: number; unrecognized: number };
+
+/** A confirm the gallery is waiting on. */
+interface Confirm {
+  title: string;
+  body: string;
+  action: string;
+  thumbs: string[];
+  run: () => void;
+}
 
 /** The desktop's limit (kMaxExpressions): distinct expressions, not images. */
 export const MAX_EXPRESSIONS = 40;
@@ -41,7 +59,7 @@ export function expressionCount(items: AvatarItem[]): number {
 
 /** The host explains a refused upload (the 40 limit, a file that isn't a ZIP). */
 function messageOf(e: unknown): string {
-  return e instanceof ApiError && (e.status === 400 || e.status === 409)
+  return e instanceof ApiError && [400, 409, 410].includes(e.status)
     ? e.message
     : 'Action failed.';
 }
@@ -70,20 +88,98 @@ export function AvatarManager({ characterId }: { characterId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId]);
 
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [lastPicked, setLastPicked] = useState<AvatarItem | null>(null);
+  const [undo, setUndo] = useState<UndoHandle | null>(null);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [zipChoice, setZipChoice] = useState<File | null>(null);
+  // A ref, not state: a fast double tap lands before the re-render.
+  const acting = useRef(false);
+
   const run = (p: Promise<Resp>) => {
     setBusy(true);
     setError('');
     setNotice('');
-    p.then((r) => setAvatars(r.avatars))
+    p.then((r) => {
+      setAvatars(r.avatars);
+      if (r.undo) setUndo(r.undo);
+    })
       .catch((e) => setError(messageOf(e)))
       .finally(() => setBusy(false));
   };
 
+  /** One post per tap, however fast the taps. */
+  const once = (go: () => Promise<Resp>) => {
+    if (acting.current) return;
+    acting.current = true;
+    run(
+      go().finally(() => {
+        acting.current = false;
+      }),
+    );
+  };
+
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+    setLastPicked(null);
+  };
+
+  const pick = (a: AvatarItem) => {
+    const next = new Set(selected);
+    if (next.has(a.id)) {
+      next.delete(a.id);
+    } else {
+      next.add(a.id);
+      setLastPicked(a.isLook ? null : a);
+    }
+    setSelected(next);
+  };
+
+  const thumb = (id: string) => `${base}/avatars/${id}/image?w=128`;
+
+  const removeIds = (ids: string[]) =>
+    once(() => api.post<Resp>(`${base}/avatars/delete`, { ids }));
+
+  const askDelete = (ids: string[]) =>
+    setConfirm({
+      title: ids.length === 1 ? 'Delete this image?' : `Delete ${ids.length} images?`,
+      body: 'They leave the gallery; the portrait stays. Undo brings them back for a few seconds.',
+      action: ids.length === 1 ? 'Delete' : `Delete ${ids.length}`,
+      thumbs: ids.slice(0, 8).map(thumb),
+      run: () => {
+        stopSelecting();
+        removeIds(ids);
+      },
+    });
+
+  const askClear = (looksOnly: boolean, count: number) =>
+    setConfirm({
+      title: `Delete all ${count} ${looksOnly ? 'gallery looks' : 'expression images'}?`,
+      body: `${
+        looksOnly
+          ? 'The portrait and the expression images stay.'
+          : 'The portrait and the gallery looks stay.'
+      } Undo brings them back for a few seconds.`,
+      action: 'Delete all',
+      thumbs: [],
+      run: () =>
+        once(() =>
+          api.post<Resp>(`${base}/avatars/delete`, { clear: looksOnly ? 'looks' : 'expressions' }),
+        ),
+    });
+
+  const undoNow = (handle: UndoHandle) => {
+    setUndo(null);
+    once(() => api.post<Resp>(`${base}/avatars/undo`, { batch: handle.batch }));
+  };
+
   // The desktop gallery's "Import ZIP sprite pack": emotion-named images,
   // alternates as joy-1.png, joy-2.png.
-  const importZip = (file: File) =>
+  const importZip = (file: File, replace = false) =>
     run(
-      api.upload<ZipResp>(`${base}/avatars/zip`, file).then((r) => {
+      api.upload<ZipResp>(`${base}/avatars/zip${replace ? '?replace=1' : ''}`, file).then((r) => {
         setNotice(
           [
             `Imported ${r.added}`,
@@ -122,6 +218,27 @@ export function AvatarManager({ characterId }: { characterId: string }) {
   const expressions = avatars.filter((a) => !a.isLook);
   const used = expressionCount(avatars);
 
+  const sameLabel = (e: AvatarItem) =>
+    !!lastPicked && e.label.trim().toLowerCase() === lastPicked.label.trim().toLowerCase();
+  const alternates = expressions.filter(sameLabel).length;
+
+  const batchTools = (items: AvatarItem[], looksOnly: boolean) =>
+    items.length > 0 &&
+    !selecting && (
+      <div className="gallery-batch-tools">
+        <button className="ghost small" disabled={busy} onClick={() => setSelecting(true)}>
+          Select
+        </button>
+        <button
+          className="ghost small danger"
+          disabled={busy}
+          onClick={() => askClear(looksOnly, items.length)}
+        >
+          {looksOnly ? 'Clear looks' : 'Clear expressions'}
+        </button>
+      </div>
+    );
+
   // Desktop parity: the portrait ✕ is a SWAP — the ★ (else first) look
   // promotes into the portrait slot and the old portrait demotes into the
   // gallery (2026-08-14: nothing is destroyed any more). The confirm shows
@@ -139,39 +256,52 @@ export function AvatarManager({ characterId }: { characterId: string }) {
   const tile = (a: AvatarItem, withPrime: boolean) => (
     <div
       key={a.id}
-      className={`avatar-tile${a.isPrime ? ' prime' : ''}${a.isFavorite ? ' favorite' : ''}`}
+      className={`avatar-tile${a.isPrime ? ' prime' : ''}${a.isFavorite ? ' favorite' : ''}${
+        selecting ? ' selecting' : ''
+      }${selected.has(a.id) ? ' selected' : ''}`}
+      onClick={selecting ? () => pick(a) : undefined}
+      role={selecting ? 'checkbox' : undefined}
+      aria-checked={selecting ? selected.has(a.id) : undefined}
+      aria-label={selecting ? `Select ${a.label || 'look'}` : undefined}
     >
       <img src={`${base}/avatars/${a.id}/image?w=256`} alt={a.label || 'avatar'} />
       {a.label && <span className="avatar-label">{a.label}</span>}
-      {a.isFavorite && <span className="avatar-badge">★ Default</span>}
-      <div className="avatar-actions">
-        <button
-          className="icon-btn"
-          title={a.isFavorite ? 'Unset default face' : 'Use as default face (★)'}
-          disabled={busy}
-          onClick={() => toggleFavorite(a)}
-        >
-          {a.isFavorite ? '★' : '☆'}
-        </button>
-        {withPrime && !a.isPrime && (
+      {a.isFavorite && !selecting && <span className="avatar-badge">★ Default</span>}
+      {selecting && (
+        <span className={`select-check${selected.has(a.id) ? ' on' : ''}`}>
+          {selected.has(a.id) ? '✓' : ''}
+        </span>
+      )}
+      {!selecting && (
+        <div className="avatar-actions">
           <button
             className="icon-btn"
-            title="Set as the expression engine's default"
+            title={a.isFavorite ? 'Unset default face' : 'Use as default face (★)'}
             disabled={busy}
-            onClick={() => run(api.post(`${base}/avatars/${a.id}/prime`))}
+            onClick={() => toggleFavorite(a)}
           >
-            📌
+            {a.isFavorite ? '★' : '☆'}
           </button>
-        )}
-        <button
-          className="icon-btn"
-          title="Delete"
-          disabled={busy}
-          onClick={() => run(api.post(`${base}/avatars/${a.id}/delete`))}
-        >
-          🗑
-        </button>
-      </div>
+          {withPrime && !a.isPrime && (
+            <button
+              className="icon-btn"
+              title="Set as the expression engine's default"
+              disabled={busy}
+              onClick={() => run(api.post(`${base}/avatars/${a.id}/prime`))}
+            >
+              📌
+            </button>
+          )}
+          <button
+            className="icon-btn"
+            title="Delete"
+            disabled={busy}
+            onClick={() => askDelete([a.id])}
+          >
+            🗑
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -191,6 +321,7 @@ export function AvatarManager({ characterId }: { characterId: string }) {
           </button>
         </div>
       </div>
+      {batchTools(looks, true)}
       {looks.length === 0 ? (
         <p className="muted gallery-empty">
           Upload alternate looks (outfits, scenes) — you can swipe between them in chat.
@@ -209,6 +340,7 @@ export function AvatarManager({ characterId }: { characterId: string }) {
           </button>
         </div>
       </div>
+      {batchTools(expressions, false)}
       {expressions.length === 0 ? (
         <p className="muted gallery-empty">
           Upload emotion-labeled face images one at a time, or a ZIP sprite pack named by
@@ -228,6 +360,33 @@ export function AvatarManager({ characterId }: { characterId: string }) {
         </span>
       </div>
 
+      {selecting && (
+        <GallerySelectBar
+          count={selected.size}
+          busy={busy}
+          labelToSelect={alternates > 1 && lastPicked ? lastPicked.label : null}
+          onSelectAll={() => setSelected(new Set(avatars.map((a) => a.id)))}
+          onSelectLabel={() =>
+            setSelected(new Set([...selected, ...expressions.filter(sameLabel).map((e) => e.id)]))
+          }
+          onCancel={stopSelecting}
+          onDelete={() => askDelete([...selected])}
+        />
+      )}
+      {undo && (
+        <GalleryUndoBar
+          key={undo.batch}
+          message={
+            undo.replaced > 0
+              ? `Replaced ${undo.count} expression images with ${undo.replaced} from the pack`
+              : `Deleted ${undo.count} ${undo.count === 1 ? 'image' : 'images'}`
+          }
+          seconds={undo.seconds}
+          busy={busy}
+          onUndo={() => undoNow(undo)}
+          onExpire={() => setUndo(null)}
+        />
+      )}
       {notice && <p className="muted">{notice}</p>}
       {error && <p className="error">{error}</p>}
 
@@ -261,7 +420,11 @@ export function AvatarManager({ characterId }: { characterId: string }) {
         hidden
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) importZip(f);
+          // With expressions here, ask first: add to them, or replace them.
+          if (f) {
+            if (expressions.length > 0) setZipChoice(f);
+            else importZip(f);
+          }
           e.target.value = '';
         }}
       />
@@ -295,6 +458,87 @@ export function AvatarManager({ characterId }: { characterId: string }) {
               </button>
               <button className="primary" onClick={doSwapPortrait}>
                 Swap portrait
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirm && (
+        <div className="drawer-backdrop center" onClick={() => setConfirm(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-label={confirm.title}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="drawer-head">
+              <span>{confirm.title}</span>
+            </div>
+            {confirm.thumbs.length > 0 && (
+              <div className="gallery-confirm-thumbs">
+                {confirm.thumbs.map((src) => (
+                  <img key={src} src={src} alt="" />
+                ))}
+              </div>
+            )}
+            <p className="muted">{confirm.body}</p>
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setConfirm(null)}>
+                Cancel
+              </button>
+              <button
+                className="danger-btn"
+                onClick={() => {
+                  const go = confirm.run;
+                  setConfirm(null);
+                  go();
+                }}
+              >
+                {confirm.action}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {zipChoice && (
+        <div className="drawer-backdrop center" onClick={() => setZipChoice(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-label="Add or replace"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="drawer-head">
+              <span>Add to these, or replace them?</span>
+            </div>
+            <p className="muted">
+              This character has {expressions.length} expression{' '}
+              {expressions.length === 1 ? 'image' : 'images'}. Replace deletes them first (the
+              gallery looks stay); Undo brings them back for a few seconds.
+            </p>
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setZipChoice(null)}>
+                Cancel
+              </button>
+              <button
+                className="ghost danger"
+                onClick={() => {
+                  const f = zipChoice;
+                  setZipChoice(null);
+                  importZip(f, true);
+                }}
+              >
+                Replace them
+              </button>
+              <button
+                className="primary"
+                onClick={() => {
+                  const f = zipChoice;
+                  setZipChoice(null);
+                  importZip(f);
+                }}
+              >
+                Add to these
               </button>
             </div>
           </div>
