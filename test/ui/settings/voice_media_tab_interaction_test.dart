@@ -30,6 +30,7 @@ import 'package:record/record.dart' show InputDevice;
 
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/settings/tabs/voice_media_tab.dart';
+import 'package:front_porch_ai/ui/settings/tabs/voice_media_tab/expression_section.dart';
 
 import '../../golden/support/fakes.dart';
 import '../../golden/support/fakes_services.dart';
@@ -275,6 +276,50 @@ void main() {
     expect(
       settings.expressionOnnxModel,
       'Shifusen/distilbert-go_emotions-nsfw',
+    );
+  });
+
+  // Visual novel mode shows expressions on its stage, so None keeps them out
+  // of the sidebar and the background. The chat side is pinned in
+  // test/ui/pages/chat_sidebar_display_test.dart.
+  testWidgets('Display offers None and saves it', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final storage = _VoiceStorage();
+    final classifier = _FakeClassifier();
+    addTearDown(() {
+      storage.dispose();
+      classifier.dispose();
+    });
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<StorageService>.value(value: storage),
+          ChangeNotifierProvider<ExpressionClassifierService>.value(
+            value: classifier,
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: VoiceMediaExpressionSection()),
+          ),
+        ),
+      ),
+    );
+    expect(find.textContaining('Sidebar'), findsWidgets);
+
+    await tester.tap(find.text('Sidebar Only'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('None').last);
+    await tester.pumpAndSettle();
+
+    expect(storage.expressionSettings.expressionDisplayMode, 'none');
+    expect(storage.expressionSettings.expressionsInSidebar, isFalse);
+    expect(storage.expressionSettings.expressionsAsBackground, isFalse);
+    expect(find.textContaining(', None'), findsOneWidget);
+    expect(
+      find.textContaining('the sidebar shows the portrait'),
+      findsOneWidget,
     );
   });
 }

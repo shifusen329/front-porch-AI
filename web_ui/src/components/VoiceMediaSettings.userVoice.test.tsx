@@ -86,6 +86,32 @@ it('sends Speak my messages and each voice, and names the global voice', async (
   expect(q<HTMLInputElement>('speak-my-messages').checked).toBe(true);
 });
 
+// Expression Images → Display, as the desktop's Voice & Media has it. None
+// leaves expressions to the visual novel stage.
+it('Expression display offers None and sends it', async () => {
+  status = { ...status, expressionEnabled: true, expressionDisplay: 'sidebar' };
+  await act(async () => {
+    root.render(createElement(VoiceMediaSettings));
+  });
+  const display = q<HTMLSelectElement>('expression-display');
+  expect([...display.options].map((o) => o.value)).toEqual(['sidebar', 'background', 'both', 'none']);
+  expect(display.value).toBe('sidebar');
+
+  await choose('expression-display', 'none');
+
+  expect(posted).toEqual([{ path: '/api/voice/settings', body: { expressionDisplay: 'none' } }]);
+  expect(q<HTMLSelectElement>('expression-display').value).toBe('none');
+  expect(container.textContent).toContain('the sidebar shows the portrait');
+});
+
+it('Expression display is hidden while expressions are off', async () => {
+  status = { ...status, expressionEnabled: false };
+  await act(async () => {
+    root.render(createElement(VoiceMediaSettings));
+  });
+  expect(container.querySelector('[data-testid="expression-display"]')).toBeNull();
+});
+
 it('a voice this engine does not list is still shown', async () => {
   status = { ...status, userVoice: 'en_US-lessac-medium' };
   await act(async () => {

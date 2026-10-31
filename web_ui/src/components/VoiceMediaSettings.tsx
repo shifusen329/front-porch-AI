@@ -35,6 +35,8 @@ interface VoiceStatus extends ExpressionModelStatus {
   found?: number | null;
   expressionEnabled?: boolean;
   expressionMode?: string;
+  /** Expression Images → Display: sidebar, background, both or none. */
+  expressionDisplay?: string;
 }
 
 export function VoiceMediaSettings() {
@@ -147,6 +149,33 @@ export function VoiceMediaSettings() {
       {/* Every mode: the model's own labels are what images can be tagged
           with and what the Realism Engine may choose. */}
       {v.expressionEnabled && <ExpressionModelSettings status={v} onSaved={setV} />}
+      {/* Expression Images → Display. Here "the sidebar" is the chat's
+          header picture and its insight portrait; None leaves expressions
+          to the visual novel stage. */}
+      {v.expressionEnabled && (
+        <>
+          <label className="row-label">
+            <span>Expression display</span>
+            <select
+              aria-label="Expression display"
+              data-testid="expression-display"
+              value={v.expressionDisplay ?? 'sidebar'}
+              disabled={saving}
+              onChange={(e) => void patch({ expressionDisplay: e.target.value })}
+            >
+              <option value="sidebar">Sidebar Only</option>
+              <option value="background">Background Only</option>
+              <option value="both">Both</option>
+              <option value="none">None</option>
+            </select>
+          </label>
+          {v.expressionDisplay === 'none' && (
+            <p className="muted small">
+              Expressions still change on the visual novel stage; the sidebar shows the portrait.
+            </p>
+          )}
+        </>
+      )}
       {v.listsVoices && (
         <>
           <div className="row-label">

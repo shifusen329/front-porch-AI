@@ -28,7 +28,8 @@ import 'package:front_porch_ai/ui/widgets/widgets.dart';
 import 'package:front_porch_ai/ui/chat_components/chat_components.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/services/chat/chat.dart';
-import 'package:front_porch_ai/services/avatar_gallery.dart';
+
+import 'chat_expression_backdrop.dart';
 
 /// Chat surface (background + bubbles). Theme chrome is Stack siblings under
 /// the list (IgnorePointer backgrounds). It does not wrap or remount the
@@ -155,65 +156,7 @@ class ChatSurface extends StatelessWidget {
                   ),
                 ],
                 // Expression background sprite
-                Consumer<ChatService>(
-                  builder: (context, chat, _) {
-                    final storage = Provider.of<StorageService>(
-                      context,
-                      listen: false,
-                    );
-                    final displayMode =
-                        storage.expressionSettings.expressionDisplayMode;
-                    final isEnabled =
-                        storage.expressionSettings.expressionEnabled;
-                    if (novel ||
-                        !isEnabled ||
-                        displayMode == 'sidebar' ||
-                        chat.isEvaluatingRealism) {
-                      return const SizedBox.shrink();
-                    }
-                    final char = character;
-                    if (char == null ||
-                        expressionsFrom(char.avatarImages).isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    final avatar = chat.resolveExpressionAvatar(
-                      char,
-                      rerollIfSame:
-                          storage.expressionSettings.expressionRerollSame,
-                    );
-                    if (avatar == null) {
-                      return const SizedBox.shrink();
-                    }
-                    final avatarDir = storage.characterAvatarDir(char.name);
-                    final avatarFile = File(
-                      '${avatarDir.path}/${avatar.filename}',
-                    );
-                    return Positioned.fill(
-                      child: IgnorePointer(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 500),
-                          child: Stack(
-                            key: ValueKey('expr_bg_${avatar.id}'),
-                            fit: StackFit.expand,
-                            children: [
-                              Image.file(
-                                avatarFile,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) =>
-                                    const SizedBox.shrink(),
-                              ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: InkColors.dim(0.85),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                ChatExpressionBackdrop(character: character, novel: novel),
                 if (bgPath != null)
                   Positioned.fill(
                     child: IgnorePointer(

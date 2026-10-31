@@ -21,11 +21,11 @@ void _setupPathProviderMock() {
   const channel = MethodChannel('plugins.flutter.io/path_provider');
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(channel, (MethodCall call) async {
-    if (call.method == 'getApplicationDocumentsDirectory') {
-      return Directory.systemTemp.createTempSync('fpai_docs_').path;
-    }
-    return null;
-  });
+        if (call.method == 'getApplicationDocumentsDirectory') {
+          return Directory.systemTemp.createTempSync('fpai_docs_').path;
+        }
+        return null;
+      });
 }
 
 void main() {
@@ -55,10 +55,13 @@ void main() {
       expect(await facade.speak('hello'), isNull);
     });
 
-    test('transcribe is a no-op when STT is unavailable or body empty', () async {
-      expect(await facade.transcribe(const [1, 2, 3]), isNull); // STT off
-      expect(await facade.transcribe(const []), isNull); // empty body
-    });
+    test(
+      'transcribe is a no-op when STT is unavailable or body empty',
+      () async {
+        expect(await facade.transcribe(const [1, 2, 3]), isNull); // STT off
+        expect(await facade.transcribe(const []), isNull); // empty body
+      },
+    );
   });
 
   // The web Voice & Media card sets the Local ONNX expression classifier's
@@ -127,6 +130,71 @@ void main() {
       );
       final (_, labelled) = await call('GET', '/api/voice/status');
       expect(labelled['expressionModelLabels'], ['joy', 'cowgirl']);
+    });
+  });
+
+  // Expression Images → Display through /api/voice/settings. Desktop twin:
+  // the Display test in test/ui/settings/voice_media_tab_interaction_test.dart;
+  // the chat side is test/ui/pages/chat_sidebar_display_test.dart.
+  group('expression display over the relay', () {
+    late StorageService storage;
+    late Router router;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      storage = StorageService();
+      await storage.initialized;
+      router = Router();
+      WebVoiceRoutes(
+        VoiceFacade(FakeTtsService(), FakeSttService(), storage),
+        router,
+      );
+    });
+
+    Future<(int, Map<String, dynamic>)> call(
+      String method,
+      String path, [
+      Map<String, dynamic>? body,
+    ]) async {
+      final response = await router.call(
+        shelf.Request(
+          method,
+          Uri.parse('http://localhost$path'),
+          body: body == null ? null : jsonEncode(body),
+        ),
+      );
+      return (
+        response.statusCode,
+        jsonDecode(await response.readAsString()) as Map<String, dynamic>,
+      );
+    }
+
+    test('None is read and saved; an unknown one is refused and changes '
+        'nothing', () async {
+      final (_, before) = await call('GET', '/api/voice/status');
+      expect(before['expressionDisplay'], 'sidebar');
+
+      final (ok, after) = await call('POST', '/api/voice/settings', {
+        'expressionDisplay': 'none',
+      });
+      expect(ok, 200);
+      expect(after['expressionDisplay'], 'none');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('expression_display_mode'), 'none');
+
+      // The model is applied before Display, so a refusal must come first.
+      final (refused, _) = await call('POST', '/api/voice/settings', {
+        'expressionDisplay': 'sideways',
+        'expressionModel': 'Shifusen/distilbert-go_emotions-nsfw',
+        'ttsEnabled': true,
+      });
+      expect(refused, 400);
+      expect(storage.expressionSettings.expressionDisplayMode, 'none');
+      expect(
+        storage.expressionSettings.expressionOnnxModel,
+        kDefaultExpressionModel,
+      );
+      expect(storage.ttsSettings.ttsEnabled, isFalse);
     });
   });
 }

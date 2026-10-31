@@ -24,6 +24,10 @@ import 'package:front_porch_ai/utils/utils.dart';
 
 import 'settings_base.dart';
 
+/// Where Expression Images → Display shows the expression. `none` leaves it
+/// to the visual novel stage, which shows it under every choice.
+const kExpressionDisplayModes = ['sidebar', 'background', 'both', 'none'];
+
 /// Expression images / avatar classification + display settings.
 ///
 /// Lifted Stage 7.
@@ -46,7 +50,7 @@ class ExpressionSettings with SettingsBase {
 
   bool _expressionEnabled = false;
   String _expressionClassificationMode = 'llm'; // 'llm', 'onnx', 'manual'
-  String _expressionDisplayMode = 'sidebar'; // 'sidebar', 'background', 'both'
+  String _expressionDisplayMode = 'sidebar'; // one of kExpressionDisplayModes
   bool _expressionRerollSame = false;
   String _expressionFallback = 'neutral'; // 'neutral', 'prime', 'none', 'emoji'
   bool _expressionEmojiBurst = false;
@@ -75,6 +79,17 @@ class ExpressionSettings with SettingsBase {
   bool get expressionEnabled => _expressionEnabled;
   String get expressionClassificationMode => _expressionClassificationMode;
   String get expressionDisplayMode => _expressionDisplayMode;
+
+  /// Display puts the expression in the chat's sidebar (and the phone's
+  /// Stats & story sheet); otherwise the sidebar shows the plain portrait.
+  bool get expressionsInSidebar =>
+      _expressionDisplayMode == 'sidebar' || _expressionDisplayMode == 'both';
+
+  /// Display puts the expression, dimmed, behind the chat.
+  bool get expressionsAsBackground =>
+      _expressionDisplayMode == 'background' ||
+      _expressionDisplayMode == 'both';
+
   bool get expressionRerollSame => _expressionRerollSame;
   String get expressionFallback => _expressionFallback;
   bool get expressionEmojiBurst => _expressionEmojiBurst;
@@ -114,8 +129,10 @@ class ExpressionSettings with SettingsBase {
     _expressionEnabled = prefs?.getBool(k('expression_enabled')) ?? false;
     _expressionClassificationMode =
         prefs?.getString(k('expression_classification_mode')) ?? 'llm';
-    _expressionDisplayMode =
-        prefs?.getString(k('expression_display_mode')) ?? 'sidebar';
+    final display = prefs?.getString(k('expression_display_mode'));
+    _expressionDisplayMode = kExpressionDisplayModes.contains(display)
+        ? display!
+        : 'sidebar';
     _expressionRerollSame =
         prefs?.getBool(k('expression_reroll_same')) ?? false;
     _visualNovelMode = prefs?.getBool(k('visual_novel_mode')) ?? false;
@@ -162,7 +179,11 @@ class ExpressionSettings with SettingsBase {
     notify();
   }
 
+  /// Throws [ArgumentError] for a value not in [kExpressionDisplayModes].
   Future<void> setExpressionDisplayMode(String value) async {
+    if (!kExpressionDisplayModes.contains(value)) {
+      throw ArgumentError.value(value, 'value', 'not an expression display');
+    }
     _expressionDisplayMode = value;
     await prefs?.setString(k('expression_display_mode'), value);
     notify();

@@ -403,7 +403,11 @@ class CharacterFacade {
   /// pure read that performs no reclassification, so Realism parity is intact.
   File? activeExpressionAvatarFile() {
     final chat = _chat;
-    if (chat == null) return null;
+    // Display None or Background Only: the phone shows the portrait, as the
+    // desktop sidebar does.
+    if (chat == null || !_storage.expressionSettings.expressionsInSidebar) {
+      return null;
+    }
     final activeChar = chat.activeCharacter;
     if (activeChar == null) return null;
     final avatar = chat.resolveExpressionAvatar(activeChar);

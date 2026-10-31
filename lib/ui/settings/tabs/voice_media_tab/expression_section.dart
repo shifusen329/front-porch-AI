@@ -54,6 +54,8 @@ class VoiceMediaExpressionSection extends StatelessWidget {
         return 'Background';
       case 'both':
         return 'Both';
+      case 'none':
+        return 'None';
       default:
         return mode;
     }
@@ -229,6 +231,10 @@ class VoiceMediaExpressionSection extends StatelessWidget {
                                 value: 'both',
                                 child: Text('Both'),
                               ),
+                              DropdownMenuItem(
+                                value: 'none',
+                                child: Text('None'),
+                              ),
                             ],
                             onChanged: (val) {
                               if (val != null) {
@@ -240,6 +246,19 @@ class VoiceMediaExpressionSection extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (storage.expressionSettings.expressionDisplayMode ==
+                        'none')
+                      Padding(
+                        padding: const EdgeInsets.only(left: 24, top: 4),
+                        child: Text(
+                          'Expressions still change on the visual novel '
+                          'stage; the sidebar shows the portrait.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textTertiary(context),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     // Reroll toggle
                     Row(

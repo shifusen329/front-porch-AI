@@ -22,6 +22,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import 'package:front_porch_ai/services/services.dart';
+import 'package:front_porch_ai/services/storage/storage.dart';
 import 'package:front_porch_ai/services/tts/openai_voice_list.dart';
 
 /// Audio bytes plus the MIME type to serve them with.
@@ -76,6 +77,8 @@ class VoiceFacade {
     'expressionModel': _storage.expressionSettings.expressionOnnxModel,
     'expressionModelDefault': kDefaultExpressionModel,
     'expressionModelLabels': _storage.expressionSettings.expressionModelLabels,
+    // Additive (2026-10-31): Expression Images → Display (kExpressionDisplayModes).
+    'expressionDisplay': _storage.expressionSettings.expressionDisplayMode,
   };
 
   /// Reads the voices the OpenAI-compatible server publishes, as the
@@ -93,9 +96,18 @@ class VoiceFacade {
   /// [ArgumentError] when that names no model.
   Future<Map<String, dynamic>> apply(Map<String, dynamic> body) async {
     // First, so a model that is refused leaves the flags untouched too.
+    final display = body['expressionDisplay'];
+    if (display is String && !kExpressionDisplayModes.contains(display)) {
+      throw ArgumentError(
+        'Display is one of ${kExpressionDisplayModes.join(', ')}.',
+      );
+    }
     final model = body['expressionModel'];
     if (model is String) {
       await _storage.expressionSettings.setExpressionOnnxModel(model);
+    }
+    if (display is String) {
+      await _storage.expressionSettings.setExpressionDisplayMode(display);
     }
     final tts = body['ttsEnabled'];
     if (tts is bool) await _storage.ttsSettings.setTtsEnabled(tts);

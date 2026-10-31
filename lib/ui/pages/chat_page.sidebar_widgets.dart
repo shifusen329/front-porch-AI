@@ -59,8 +59,11 @@ class ChatSidebarPortrait extends StatelessWidget {
     return ChatTurnBuilder(
       builder: (context, chat) {
         final storage = Provider.of<StorageService>(context, listen: false);
+        // Display None or Background Only: the plain portrait here, as with
+        // expressions off (the visual novel stage still shows them).
         final isExpressionEnabled =
-            storage.expressionSettings.expressionEnabled;
+            storage.expressionSettings.expressionEnabled &&
+            storage.expressionSettings.expressionsInSidebar;
         // Expression-only (looks filtered out) so a looks-only character
         // never trips the expression path, and prime/neutral fallbacks
         // never resolve to a gallery look.
