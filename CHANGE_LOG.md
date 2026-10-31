@@ -3,6 +3,44 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-30 19:47:33 -0500 (CDT)
+
+On the `dev` branch. This is 1.1.1.
+
+### Added
+
+- **Embeddings in the Image Studio** (`7a4fc534`). **Advanced ▸** has an
+  **Embeddings** field under the negative prompt, on the desktop, Android
+  and the phone web app.
+  - **Add an embedding** lists the ones your image server has. On
+    Automatic1111, Forge and reForge, the ones made for another kind of
+    model (an SD 1.5 embedding under an SDXL checkpoint) are listed
+    underneath and can't be picked.
+  - Each embedding goes in the **Prompt** or the **Negative** prompt. A new
+    one starts on the side its name suggests (`lazyneg`, `IllusN3g` and
+    `badhandv4` on Negative; `lazypos` on Prompt).
+  - They lead every picture from that server: the Studio, `/image`,
+    expression packs and painted scenes. One already typed into a prompt
+    is not added twice. Each backend keeps its own.
+  - Automatic1111, Forge, reForge, and ComfyUI in Create mode
+    (`embedding:name`). Not shown for Draw Things or remote services.
+- **Prompt format in the phone web app's Image Studio** (`7a4fc534`).
+  **Advanced ▸** now picks natural language or Danbooru tags there too.
+
+### Fixed
+
+- **Scene painting pointed at a page that doesn't exist** (`23ed4406`).
+  The switch, its phone web app twin and the Scenes docs said to set up
+  the image generator in "Settings → Image Generation". It is the Image
+  Generation switch in Settings → Voice & Media, and the server and
+  Prompt format in the Image Studio.
+
+### Known gaps
+
+- Embeddings were checked in the test suites and against a real reForge
+  server's list, not yet by hand in a real generate. They have no weight
+  slider; type `(name:1.2)` into a prompt field for that.
+
 ## 2026-10-30 16:26:02 -0500 (CDT)
 
 On the `dev` branch. This is 1.1.0.
@@ -11,13 +49,15 @@ On the `dev` branch. This is 1.1.0.
 
 - **Missing places are painted with the image generator** (`088b507a`).
   When the Realism Engine puts a character somewhere they have no Scenes
-  picture of, the image generator set up in Settings → Image Generation
-  paints the place, empty, and the picture is saved to that character's
-  Scenes (`hallway-night.png`). The chat background fades to it when it is
+  picture of, your image generator (Image Generation on in Settings →
+  Voice & Media, its server set up in the Image Studio) paints the place,
+  empty, and the picture is saved to that character's Scenes
+  (`hallway-night.png`). The chat background fades to it when it is
   ready.
   - The chat model (or the helper model, when its lane is on) turns what
-    the story says about the place into the image prompt. With **Prompt
-    style → Tags** it writes danbooru tags (`no humans, scenery, hallway,
+    the story says about the place into the image prompt. With **Danbooru
+    tags** picked in the Image Studio's **Advanced → Prompt format** it
+    writes danbooru tags (`no humans, scenery, hallway,
     night, …`), the right choice for SD 1.5, SDXL, Pony and Illustrious
     checkpoints; otherwise a sentence. People, names and the wrong time of
     day are taken out of what it writes.
