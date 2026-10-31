@@ -3,6 +3,70 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-31 01:27:09 -0500 (CDT)
+
+On the `dev` branch, after 1.1.1.
+
+### Added
+
+- **Esc goes back** (`b6eb762c`), on the desktop and in the phone web app.
+  Each press takes one step:
+  - In a text box it lets go of the cursor first, and what you typed stays.
+  - An open menu, dialog, sheet or drawer closes. One that can't be
+    dismissed (one showing progress, say) stays up.
+  - Otherwise the screen goes back: a chat to the library, a sidebar page
+    to the page you were on before it.
+  - On Home it first returns Porch Stories or Waifu Coder to Chats, then
+    leaves select mode, then goes up out of a folder.
+  - Leaving unsaved edits asks first, as the back button does. Esc never
+    closes the app.
+  - In the phone web app, sheets that ignored Esc before now close as a tap
+    outside them would. On the phone shell, Esc takes the same steps as the
+    back button but stops at Chats instead of leaving the app.
+  - `docs/keyboard-shortcuts.md` has a new **Esc Goes Back** section.
+- **Show markdown formatting in messages** (`4d5e91a7`), a switch in
+  Settings → Appearance → Chat Appearance (on by default), and in the phone
+  web app's Settings → General → Chat appearance.
+  - On, messages show `*italics*`, `**bold**`, `***both***`, `_italics_`,
+    `__bold__`, `~~struck~~` and `` `code` `` as formatting, without the
+    marks. Stars keep the action color; quotes keep the dialogue color and
+    can hold formatting.
+  - A mark counts only when it hugs its text and closes on the same line,
+    so `2 * 3 * 4` and `snake_case` stay as typed. Nothing inside code is
+    formatted.
+  - Off shows messages exactly as written, marks and all, with only the
+    colors.
+  - On the desktop this is new: actions were colored but kept their stars,
+    and bold wasn't shown. The phone web app already hid the stars for
+    italics and bold; it now follows the same rules and the switch.
+
+### Changed
+
+- **Install now reopens the app on Windows** (`3d57684c`). The app asks
+  the installer for that, and the installer opens the app again as you,
+  never as administrator. **Later** still installs when you close the app and leaves
+  it closed. The update dialog now says the app closes, installs and opens
+  again. Linux and macOS already reopened.
+
+### Known gaps
+
+- Reopening starts with the update after the next one: 1.1.1 doesn't ask
+  for it, so updating from 1.1.1 still leaves the app closed. It was
+  checked with a throwaway installer built the same way and by compiling
+  the real installer script, not yet with a real update.
+- The desktop end-to-end suite (`integration_test/escape_back_test.dart`)
+  failed its first run in the real app: Esc on Settings didn't go back.
+  The cause looked like focus falling out of the pages, which the first
+  version couldn't see. The fix handles Esc wherever the focus is, and the
+  widget tests cover that, but the suite hasn't been run again. The web
+  browser journey is written and hasn't been run.
+- In the Narration panel's **Starting at** box, Esc closes its dropdown but
+  doesn't let go of the cursor; click elsewhere to leave the box.
+- Esc on the phone shell hasn't been tried on Android with a keyboard.
+- Markdown formatting covers inline marks only: headings, lists, quotes
+  and code blocks show as typed. It was checked in the test suites, not
+  yet by hand in a real chat on either side.
+
 ## 2026-10-30 19:47:33 -0500 (CDT)
 
 On the `dev` branch. This is 1.1.1.
