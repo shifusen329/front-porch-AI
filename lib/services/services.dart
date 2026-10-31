@@ -115,6 +115,7 @@ export 'hardware_service.dart';
 export 'voice_manager.dart';
 export 'update_service.dart';
 export 'update/update.dart';
+export 'debug_log/debug_log.dart';
 export 'sync/sync.dart';
 export 'scenes/scenes.dart';
 export 'story_lane_labels.dart';

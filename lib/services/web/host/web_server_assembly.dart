@@ -211,6 +211,7 @@ import 'package:front_porch_ai/services/web/web_server_deps.dart';
     storyFacade: storyFacade,
     storyExportFacade: storyExportFacade,
     tunnelManager: tunnelManager,
+    debugLog: DebugLog.instance,
     onClientActive: onClientActive,
   );
   return (deps: deps, storyFacade: storyFacade);

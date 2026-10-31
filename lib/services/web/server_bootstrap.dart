@@ -137,6 +137,7 @@ shelf.Handler buildWebHandler(WebServerDeps deps) {
   }
   final sync = deps.syncFacade;
   if (sync != null) WebSyncRoutes(sync, deps.auth, router);
+  if (deps.debugLog != null) WebDebugLogRoutes(deps.debugLog!, router);
 
   return shelf.Pipeline()
       .addMiddleware(const CorsMiddleware().middleware)

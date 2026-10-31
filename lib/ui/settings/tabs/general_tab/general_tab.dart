@@ -17,5 +17,7 @@
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
 export 'about_license_card.dart';
+export 'debug_log_card.dart';
+export 'debug_log_viewer.dart';
 export 'porch_life_pointer_card.dart';
 export 'system_prompt_preset_chip.dart';

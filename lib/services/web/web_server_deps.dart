@@ -63,6 +63,7 @@ class WebServerDeps {
     this.storyFacade,
     this.storyExportFacade,
     this.tunnelManager,
+    this.debugLog,
     this.onClientActive,
   });
 
@@ -162,6 +163,9 @@ class WebServerDeps {
   /// Remote-access (Tailscale/ngrok/port-forward) orchestrator. Created once the
   /// server is bound (it needs the live port). Null before bind.
   final TunnelManager? tunnelManager;
+
+  /// The host's debug log, for Settings → Advanced in the phone web app.
+  final DebugLog? debugLog;
 
   /// Invoked by the auth middleware after a request authenticates, with the
   /// client IP and a human-readable "Browser on OS" string, to drive the

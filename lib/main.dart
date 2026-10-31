@@ -40,7 +40,12 @@ import 'package:front_porch_ai/utils/utils.dart'
 
 void _mark(String step) => StartupTrace.mark(step);
 
-void main(List<String> args) async {
+// Everything the app prints reaches the debug log (Settings → General →
+// Troubleshooting), so the whole launch runs in its zone.
+void main(List<String> args) =>
+    runWithDebugLog(DebugLog.instance, () => _start(args));
+
+Future<void> _start(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   _mark('binding ready');
   // A phone has no window_manager plugin; its activity is the window.
@@ -56,6 +61,9 @@ void main(List<String> args) async {
   // why each must precede the next).
   installSignalHandlers();
   await healPrefsAndConsolidateFiles();
+  // Settings can be read now. The log's file opens before the database, so
+  // a launch that dies there still leaves a log.
+  await DebugLog.instance.start();
   final boot = await openDatabaseGuarded();
   if (boot == null) return; // DbInitErrorApp is already running
   // The saved theme is read before anything is painted: the native view

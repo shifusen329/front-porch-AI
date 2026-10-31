@@ -17,6 +17,7 @@ import { IdleUnloadSettings } from '../components/IdleUnloadSettings';
 import { KeepRecentChatsSettings } from '../components/KeepRecentChatsSettings';
 import { MemorySearchSettings } from '../components/MemorySearchSettings';
 import { ChatMarkdownSettings } from '../components/ChatMarkdownSettings';
+import { DebugLogSettings } from '../components/DebugLogSettings';
 import { VisualNovelSettings } from '../components/VisualNovelSettings';
 import { SceneBackgroundSettings } from '../components/SceneBackgroundSettings';
 import { applySpellCheckLang } from '../spellCheckLang';
@@ -655,6 +656,8 @@ export function SettingsPage() {
         >
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save settings'}
         </button>
+
+        <DebugLogSettings />
 
         <section className="card" data-testid="about-license-card">
           <h2>About &amp; License</h2>

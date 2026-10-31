@@ -86,6 +86,8 @@ When something goes wrong, this page is the fastest route back to chatting. Find
 
    Whatever it prints when things go wrong is gold — include it if you ask for help.
 
+   **No terminal, or on Android? Turn on the debug log.** Settings → **General** → **Troubleshooting** → **Write a debug log**. Then do what goes wrong and tap **Save a copy…** to keep the log somewhere you can attach it (on a computer, **Open folder** shows the file itself). It has everything the terminal would show, each line with its time, plus every error the app didn't expect and its latest lines from before you switched it on. It stays on across restarts, so it also catches a launch that fails. Keys and passwords are blanked out, but the log can hold parts of your chats, so read it before you post it. From the phone web app: Settings → **Advanced** → **Debug log** → **Download a copy**.
+
 ---
 
 ## Startup Problems

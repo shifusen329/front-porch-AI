@@ -156,6 +156,12 @@
       "dartMarker": "SectionHeader('Memory search')",
       "webMarker": "Memory search"
     },
+    "debugLog": {
+      "section": "advanced",
+      "dart": "lib/ui/settings/tabs/general_tab/debug_log_card.dart",
+      "dartMarker": "Write a debug log",
+      "webMarker": "Write a debug log"
+    },
     "aboutLicense": {
       "section": "advanced",
       "dart": "lib/ui/settings/tabs/general_tab.dart",

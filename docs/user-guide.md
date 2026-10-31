@@ -598,7 +598,7 @@ Open **Settings** from the left sidebar. Tabs, left to right:
 
 | Tab | What lives here |
 |---|---|
-| **General** | Dark/light, chat fonts, bubble colors, **Font Size Scale** (whole app, separate from chat text size), **18+ themes**, system prompt + presets, About & License. Pointer to Porch Life. |
+| **General** | Dark/light, chat fonts, bubble colors, **Font Size Scale** (whole app, separate from chat text size), **18+ themes**, system prompt + presets, **Troubleshooting → Write a debug log** (view it, save a copy, open its folder), About & License. Pointer to Porch Life. |
 | **Porch Life** | Defaults for Realism, Needs, clock, Journal, Pockets, Objectives, Chaos, Growth, Afterglow. Clock In / AFK / RAG live elsewhere. See [Porch Life](porch-life.md). |
 | **Generation** | Samplers, token limits, smooth output buffer, stop sequences, banned phrases (Kobold only), Output Sanitizer, thinking/reasoning effort. |
 | **Voice & Media** | TTS engines (Kokoro / Piper / ElevenLabs / OpenAI). Piper **Add custom voice** = raw `.onnx` + `.onnx.json` next to it (**desktop**). Voice catalog + preview is here, not on the character Voice row. STT/Whisper, Voice Call (separate call model, buffer, call prompt, auto-send), expression display (**sidebar / background / both / none**), **Image Generation** on/off, **Photo Understanding** uninstall (separate from Image Generation). |
@@ -770,6 +770,7 @@ Stable installs are only ever offered stable updates. Nightly builds are their o
 
 - **[FAQ](faq.md)** — quick answers to the most common questions.
 - **[Troubleshooting](troubleshooting.md)** — fixes for GPU, model, import, and audio issues.
+- **Debug log** — Settings → General → Troubleshooting → **Write a debug log** keeps what the app does and every error, with the time, on Windows, Android and the other desktops. Do what goes wrong, then **Save a copy…** and attach it to your question. Keys and passwords are blanked out; parts of your chats can be in it, so read it first.
 - **[Discord](https://discord.gg/e4tET6rpdv)** — the friendliest place to ask anything, share characters, and talk to me (I'm the developer) directly.
 
 ---
