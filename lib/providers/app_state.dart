@@ -46,9 +46,36 @@ class AppState extends ChangeNotifier {
 
   void setIndex(int index) {
     if (index == 0 && _selectedIndex == 0) _homeResetTick++;
+    if (index != _selectedIndex) {
+      _history.add(_selectedIndex);
+      if (_history.length > _historyLimit) _history.removeAt(0);
+    }
     _selectedIndex = index;
     notifyListeners();
   }
+
+  /// The pages the sidebar showed before this one, newest last, for back.
+  final List<int> _history = [];
+  static const _historyLimit = 20;
+
+  bool get canGoBack => _history.isNotEmpty;
+
+  /// Back to the page the sidebar showed before. The caller asks about
+  /// unsaved edits first, as a sidebar tap does.
+  void goBack() {
+    if (_history.isEmpty) return;
+    _selectedIndex = _history.removeLast();
+    notifyListeners();
+  }
+
+  /// The main screen's open page's own back step (Home: a sub-app back to
+  /// Chats, a folder up a level), set by the page while it is shown. True
+  /// when it took a step.
+  ValueGetter<bool>? pageBack;
+
+  /// One step back inside the main screen before the sidebar's history: the
+  /// phone shell's, or the open page's. True when a step was taken.
+  bool backWithinPage() => shellIntents?.back() ?? pageBack?.call() ?? false;
 
   // Pages say where they want to go, not which sidebar slot that is, so a
   // shell without the desktop sidebar can map the same intent its own way.
@@ -83,4 +110,8 @@ abstract interface class ShellIntents {
   bool get isShowingLibrary;
   void showLibrary();
   void showCreateCharacter();
+
+  /// One step back inside the shell, never out of the app. True when a
+  /// step was taken.
+  bool back();
 }

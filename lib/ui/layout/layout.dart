@@ -8,6 +8,7 @@
 
 export 'app_destinations.dart';
 export 'engine_failure_notice.dart';
+export 'escape_back.dart';
 export 'form_factor.dart';
 export 'main_layout.dart';
 export 'shell_switch.dart';

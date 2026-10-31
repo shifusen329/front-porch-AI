@@ -152,12 +152,15 @@ class _MobileShellState extends State<MobileShell> implements ShellIntents {
   /// Back reaches the shell only when nothing is pushed over it. The open
   /// tab gets it first, then back returns to Chats, then leaves the app.
   Future<void> _onBack() async {
-    if (_hooks.back(_current)) return;
-    if (_index != 0) {
-      _show(0);
-    } else {
-      await SystemNavigator.pop();
-    }
+    if (!back()) await SystemNavigator.pop();
+  }
+
+  @override
+  bool back() {
+    if (_hooks.back(_current)) return true;
+    if (_index == 0) return false;
+    _show(0);
+    return true;
   }
 
   @override

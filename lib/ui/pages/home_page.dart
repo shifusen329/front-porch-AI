@@ -119,8 +119,26 @@ class _HomePageState extends State<HomePage> {
       _appStateListened?.removeListener(_onAppStateChanged);
       appState.removeListener(_onAppStateChanged);
       appState.addListener(_onAppStateChanged);
+      appState.pageBack = _stepBack;
       _appStateListened = appState;
     } catch (_) {}
+  }
+
+  /// Back on Home (Escape): a sub-app returns to Chats, then picks are
+  /// called off, then the open folder goes up a level.
+  bool _stepBack() {
+    if (_homeMode != HomeMode.chats) {
+      _setHomeMode(HomeMode.chats);
+      return true;
+    }
+    final selection = _library.selection;
+    if (selection.picking) {
+      selection.cancel();
+      return true;
+    }
+    if (_library.activeFolderId == null) return false;
+    _library.goUp(Provider.of<FolderService>(context, listen: false).folders);
+    return true;
   }
 
   int? _lastHomeResetTick;
@@ -138,6 +156,9 @@ class _HomePageState extends State<HomePage> {
     _koboldListened?.removeListener(_onKoboldUpdate);
     _charRepoListened?.removeListener(_onCharactersChanged);
     _appStateListened?.removeListener(_onAppStateChanged);
+    if (_appStateListened?.pageBack == _stepBack) {
+      _appStateListened?.pageBack = null;
+    }
     // A remounted Home opens on Chats, so the sidebar comes back with it.
     _appStateListened?.setSidebarHidden(false, notify: false);
     super.dispose();

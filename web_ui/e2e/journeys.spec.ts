@@ -767,6 +767,38 @@ test('Manage Chats on a library card starts a new chat through the persona step'
   }
 });
 
+// Escape is the back key, as in the desktop app: a screen goes back, and a
+// sheet with no Escape of its own closes as a tap outside it would.
+test('Escape goes back a screen, then closes the Manage Chats sheet', async ({ page }) => {
+  const name = `Escape ${test.info().project.name}`;
+  const created = await page.request.post('/api/characters/create', {
+    data: { name, firstMessage: 'Evening.' },
+  });
+  expect(created.ok(), `create: ${created.status()}`).toBe(true);
+  const id = String(((await created.json()) as { id: string | number }).id);
+  try {
+    await openRoute(page, '/');
+    const menu = page.getByRole('button', { name: 'Open menu' });
+    if (await menu.isVisible()) await menu.click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
+    await expect(page).toHaveURL(/#\/settings$/);
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/#\/$/);
+
+    const card = page.locator('.lib-card', { hasText: name });
+    await card.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Manage Chats' }).click();
+    const manage = page.locator('.chat-history-modal');
+    await expect(manage).toContainText('Manage Chats');
+    await page.keyboard.press('Escape');
+    await expect(manage).toHaveCount(0);
+    await expect(page).toHaveURL(/#\/$/);
+  } finally {
+    const gone = await page.request.post(`/api/characters/${id}/delete`);
+    expect(gone.ok(), `deleting the journey character: ${gone.status()}`).toBe(true);
+  }
+});
+
 // A card with its own system prompt asks, on a new chat, which prompt this
 // chat sends (desktop new-chat picker parity); the answer can be changed
 // later in the chat's settings drawer.

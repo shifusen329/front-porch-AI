@@ -33,6 +33,19 @@ The keyboard shortcut is desktop app only — the browser/phone UI has the ⟳ b
 
 ---
 
+## Esc Goes Back
+
+`Esc` is the back key, in the desktop app and the browser UI alike. Each press takes one step, starting with whatever is on top:
+
+1. **In a text box, it lets go of the cursor first.** What you typed stays. Press `Esc` again to go on.
+2. **A menu, dialog, sheet or drawer that's open closes.** One that can't be closed (one showing progress, say) stays up.
+3. **Otherwise the screen goes back.** A chat goes back to the library. A page you opened from the sidebar (Settings, Manage Models, Worlds…) goes back to the page you were on before it.
+4. **On Home**, it first returns Porch Stories or Waifu Coder to Chats, then leaves select mode, then goes up out of the folder you're in.
+
+If you have unsaved edits, leaving with `Esc` asks first, the same as the back button or a sidebar tap. On the first screen the app opened on, `Esc` does nothing; it never closes the app.
+
+---
+
 ## Editing a Message
 
 Click the pencil (**Edit message**) on any bubble and the editor has its own two keys. They're printed in the bottom-right corner of the dialog so you can't lose them:
@@ -75,7 +88,7 @@ Chat bubbles are the same: drag across the spoken line (and an expanded Thought)
 
 macOS **Edit → Find** (`⌘F`) is not in the menu. It used to be a leftover from the app template and did nothing on the chat canvas. The browser UI may still open the browser’s own Find — that is the browser, not Front Porch.
 
-`Esc` closes most dialogs and `Tab` moves focus between controls — standard behavior on every platform. In the small single-line prompts (renaming a folder, searching for a model, typing a tag), **Enter** confirms instead of adding a line.
+`Esc` goes back (see [Esc Goes Back](#esc-goes-back)) and `Tab` moves focus between controls. In the small single-line prompts (renaming a folder, searching for a model, typing a tag), **Enter** confirms instead of adding a line.
 
 On macOS the usual menu-bar items are there too: `⌘Q` to quit, `⌘H` to hide, `⌘M` to minimize, `⌃⌘F` for full screen. One thing to know: **"Preferences…" (`⌘,`) in the app menu does nothing** — it's a leftover from the standard macOS app template that I never wired up. Settings lives in the left sidebar.
 
@@ -89,7 +102,7 @@ A few extras that only exist in the browser UI:
 
 | Shortcut | Action |
 |---|---|
-| `Esc` | Back out — dismisses the `@` mention or `/` command list while you're typing, and closes the Chat insight and conversation panels |
+| `Esc` | Back out, as above. While you're typing it first dismisses the `@` mention or `/` command list |
 | `←` / `→` | Turn the page in the Porch Stories reader |
 
 ---

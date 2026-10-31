@@ -6,6 +6,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLayout } from '../hooks/useBreakpoint';
+import { useEscapeBack } from '../hooks/useEscapeBack';
 
 const NAV = [
   { to: '/', label: 'Characters', icon: '👤', end: true },
@@ -25,6 +26,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { wide, bp } = useLayout();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  useEscapeBack();
 
   // Single source of truth for form factor: write it to the document root so CSS
   // can scope desktop-first base rules vs `[data-layout="phone"]` overrides that

@@ -236,9 +236,12 @@ class _MyAppState extends State<MyApp>
             font: appearance.font,
             corners: appearance.corners,
           ),
-          builder: PlatformCaps.current.hasWindowManager
-              ? null
-              : (context, child) => PhoneSystemBars(child: child!),
+          builder: (context, child) => EscapeGoesBack(
+            navigatorKey: appNavigatorKey,
+            child: PlatformCaps.current.hasWindowManager
+                ? child!
+                : PhoneSystemBars(child: child!),
+          ),
           home: Builder(
             builder: (context) {
               // Trigger update check once after first build
