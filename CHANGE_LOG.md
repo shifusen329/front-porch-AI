@@ -3,6 +3,77 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-31 14:44:09 -0500 (CDT)
+
+On the `dev` branch. This is 1.1.2: this entry and the two below it
+(Display → None; Esc goes back, markdown formatting and the reopen).
+
+### Added
+
+- **A debug log** (`51611c34`), in Settings → General → Troubleshooting on
+  Windows, Android and the other desktops: **Write a debug log**, off by
+  default.
+  - While it is on, everything the app prints goes to a file on the
+    device, each line with its time: its `debugPrint` and `print` lines,
+    every framework error in full and every error nothing caught. Turning
+    it on also keeps the latest 256 KB of lines from before. It stays on
+    across restarts and opens before the database, so a launch that fails
+    still leaves a log.
+  - **View** shows the newest part, with Copy. **Save a copy…** saves the
+    whole log as a `.txt` to share. **Open folder** (desktops) shows the
+    file. **Clear** empties it.
+  - API keys, bearer tokens, passwords and cookies are blanked out; chat
+    text is not, and the card says so.
+  - The file lives in the app's support folder, not the library, so
+    library sync and backups leave it alone. At 5 MB it becomes
+    `front_porch.1.log` and a new file starts, so it never holds more than
+    about 10 MB.
+  - The phone web app's Settings → Advanced has the same switch, View,
+    **Download a copy** and Clear, for the log on the computer running the
+    app.
+
+### Known gaps
+
+- Checked in the test suites, not yet by hand in a release build on
+  Windows or the Android emulator.
+- Work in background isolates (some image and embedding jobs) prints
+  outside the app's zone and is not in the log.
+- When the end-to-end tests start the app, Flutter is already set up, so
+  the log records nothing there: those tests check that the app starts,
+  not the capture.
+
+## 2026-10-31 10:55:53 -0500 (CDT)
+
+On the `dev` branch, after `de8f2ffe`.
+
+### Added
+
+- **Expression Images → Display → None** (`aaef4de4`), in Settings → Voice
+  & Media on the desktop and Android, and in the phone web app's Voice &
+  Media settings.
+  - Expressions keep changing on the Visual novel stage, which already
+    shows each one, so the sidebar shows the character's plain portrait
+    (its ◀ ▶ looks and ★ default) instead, and nothing is drawn behind the
+    chat.
+  - On Android the **Stats & story** sheet is that sidebar.
+  - In the phone web app, the chat's header picture and insight portrait
+    show the portrait under None. The phone web app had no Display setting
+    before; it now has all four choices.
+
+### Changed
+
+- **Background Only now shows the portrait in the sidebar** (`aaef4de4`).
+  The sidebar used to ignore Display and showed expressions under every
+  choice.
+
+### Known gaps
+
+- Checked in the test suites, not yet by hand in a Visual novel chat on
+  Windows or the Android emulator.
+- In the phone web app, an open chat can take up to a minute to follow a
+  change of Display (the expression picture is cached for 60 seconds), or
+  until the next change of mood.
+
 ## 2026-10-31 01:27:09 -0500 (CDT)
 
 On the `dev` branch, after 1.1.1.
