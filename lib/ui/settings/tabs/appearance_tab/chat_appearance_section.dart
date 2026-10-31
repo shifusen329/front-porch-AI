@@ -100,9 +100,11 @@ class ChatAppearanceSection extends StatelessWidget {
           title: const Text('Paint missing places with the image generator'),
           subtitle: const Text(
             'When the story goes somewhere with no picture, the chat model '
-            'describes it for your image generator (Settings → Image '
-            'Generation) and the picture is saved to the character’s '
-            'Scenes. One for the day, one for the night.',
+            'describes it for your image generator and the picture is '
+            'saved to the character’s Scenes, one for the day and one for '
+            'the night. Needs Image Generation on (Voice & Media) and a '
+            'server set up in the Image Studio, whose Advanced → Prompt '
+            'format picks Danbooru tags or sentences.',
           ),
           value: storageService.expressionSettings.scenePainting,
           activeTrackColor: AppColors.porchAmberOf(context),
