@@ -228,19 +228,23 @@ void main() {
         '*He sets the lantern down.* "The storm is coming," he says. '
         'The lantern swings.';
 
+    // [markdown] off shows the stars, so every character of a hit can light.
     Future<List<TextSpan>> marksFor(
       WidgetTester tester,
       String query, {
       int active = 0,
+      bool markdown = false,
     }) async {
       final hits = scanTranscript([
         msg(body),
       ], compileChatQuery(query, regexMode: true));
       final inBody = hits.where((h) => h.region == findRegionBody).toList();
       final state = FindLeafState.byMessage(hits, inBody[active])[0];
+      final storage = FakeStorageService();
+      await storage.expressionSettings.setChatMarkdown(markdown);
       await tester.pumpWidget(
         ChangeNotifierProvider<StorageService>.value(
-          value: FakeStorageService(),
+          value: storage,
           child: MaterialApp(
             home: Scaffold(
               body: StyledChatMessage(text: body, isUser: false, find: state),
@@ -285,6 +289,15 @@ void main() {
       expect(marks.length, 2);
       expect(marks.map(isActive), [false, true]);
     });
+
+    testWidgets(
+      'with markdown shown, all that shows of a crossing hit is lit',
+      (tester) async {
+        final marks = await marksFor(tester, 'lantern.*storm', markdown: true);
+        expect(marks.map((m) => m.text).join(), 'lantern down. "The storm');
+        expect(marks.every(isActive), isTrue);
+      },
+    );
   });
 
   testWidgets('a narrow find bar wraps its controls instead of crushing the '

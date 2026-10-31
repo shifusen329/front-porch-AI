@@ -44,6 +44,13 @@
       "dartMarker": "Chat Appearance",
       "webMarker": "Chat colors"
     },
+    "chatMarkdown": {
+      "section": "general",
+      "group": "chat-appearance",
+      "dart": "lib/ui/settings/tabs/appearance_tab/chat_appearance_section.dart",
+      "dartMarker": "Show markdown formatting in messages",
+      "webMarker": "Show markdown formatting in messages"
+    },
     "visualNovelMode": {
       "section": "general",
       "group": "chat-appearance",

@@ -138,6 +138,10 @@ class _StyledChatMessageState extends State<StyledChatMessage> {
     List<({int start, int end, String matchText, StyledTokenType type})>
   >
   _tokenCache = {};
+  final Map<String, List<ChatMarkdownRun>> _runCache = {};
+
+  /// Settings → Appearance → Show markdown formatting, as of this build.
+  bool _markdown = true;
 
   // Style caches (invalidated when any styling input changes).
   (String?, Color, Color, Color)? _styleKey;
@@ -145,10 +149,36 @@ class _StyledChatMessageState extends State<StyledChatMessage> {
   TextStyle? _dialogueStyle;
   TextStyle? _actionStyle;
   TextStyle? _rootStyle;
+  final Map<(StyledTokenType?, bool, bool, bool, bool), TextStyle?> _runStyles =
+      {};
 
   List<({int start, int end, String matchText, StyledTokenType type})>
   _tokensFor(String segment) =>
       _tokenCache.putIfAbsent(segment, () => tokenizeChat(segment).toList());
+
+  List<ChatMarkdownRun> _runsFor(String segment) =>
+      _runCache.putIfAbsent(segment, () => chatMarkdownRuns(segment));
+
+  TextStyle? _runStyle(ChatMarkdownRun r) {
+    final base = switch (r.colour) {
+      StyledTokenType.dialogue => _dialogueStyle,
+      StyledTokenType.action => _actionStyle,
+      _ => _plainStyle,
+    };
+    if (!r.bold && !r.italic && !r.strike && !r.code) return base;
+    return _runStyles.putIfAbsent(
+      (r.colour, r.bold, r.italic, r.strike, r.code),
+      () => base?.copyWith(
+        fontWeight: r.bold ? FontWeight.w700 : null,
+        fontStyle: r.italic ? FontStyle.italic : null,
+        decoration: r.strike ? TextDecoration.lineThrough : null,
+        fontFamily: r.code ? 'Consolas' : null,
+        fontFamilyFallback: r.code
+            ? const ['Menlo', 'Courier New', 'monospace']
+            : null,
+      ),
+    );
+  }
 
   void _refreshStyles(StorageService storageService) {
     final character = widget.character;
@@ -200,6 +230,7 @@ class _StyledChatMessageState extends State<StyledChatMessage> {
     );
     if (key == _styleKey) return;
     _styleKey = key;
+    _runStyles.clear();
     final (_, ink, quote, narration) = key;
     // fontSize is the shared reading base. The RichText/Text below get
     // StorageService.textScale as textScaler — do not also bake it here.
@@ -223,6 +254,7 @@ class _StyledChatMessageState extends State<StyledChatMessage> {
     final storageService = Provider.of<StorageService>(context);
     final text = widget.text;
     _refreshStyles(storageService);
+    _markdown = storageService.expressionSettings.chatMarkdown;
     // Reading Size is this pref. Do not trust ambient MediaQuery — chrome
     // may scale from it while the transcript sits at 1.0 (or the reverse).
     final readingScaler = readingTextScaler(
@@ -237,6 +269,7 @@ class _StyledChatMessageState extends State<StyledChatMessage> {
     if (!identical(text, _parseSource)) {
       _parseSource = text;
       _tokenCache.clear();
+      _runCache.clear();
       _imageMatches = _markdownImageRegex.allMatches(text).toList();
     }
     final imageMatches = _imageMatches!;
@@ -304,6 +337,22 @@ class _StyledChatMessageState extends State<StyledChatMessage> {
     TextScaler readingScaler,
     FindLeafSplit findSplit,
   ) {
+    if (_markdown) {
+      return Text.rich(
+        TextSpan(
+          style: _rootStyle,
+          children: [
+            for (final r in _runsFor(segment))
+              ...findSplit.expand(
+                segment.substring(r.start, r.end),
+                _runStyle(r),
+                offset: segmentOffset + r.start,
+              ),
+          ],
+        ),
+        textScaler: readingScaler,
+      );
+    }
     final tokens = _tokensFor(segment);
 
     final spans = <TextSpan>[];

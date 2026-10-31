@@ -16,6 +16,7 @@ import { ModelTransportCard } from '../components/ModelTransportCard';
 import { IdleUnloadSettings } from '../components/IdleUnloadSettings';
 import { KeepRecentChatsSettings } from '../components/KeepRecentChatsSettings';
 import { MemorySearchSettings } from '../components/MemorySearchSettings';
+import { ChatMarkdownSettings } from '../components/ChatMarkdownSettings';
 import { VisualNovelSettings } from '../components/VisualNovelSettings';
 import { SceneBackgroundSettings } from '../components/SceneBackgroundSettings';
 import { applySpellCheckLang } from '../spellCheckLang';
@@ -379,6 +380,7 @@ export function SettingsPage() {
           <AppearanceSettings />
           <ReadingSizeSettings />
           <ChatColorsSettings />
+          <ChatMarkdownSettings />
           <VisualNovelSettings />
           <SceneBackgroundSettings />
         </div>

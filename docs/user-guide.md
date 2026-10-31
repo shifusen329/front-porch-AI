@@ -667,6 +667,7 @@ Make it yours, in Settings and the UI options:
 - **Chat backgrounds** — a built-in set of scenes (cozy library, cyberpunk bedroom, cherry blossoms, beach, coffee shop, rooftop sunset, and more) plus your **own uploaded images**, nameable per chat.
 - **Chat fonts** — pick from a set of quality fonts (Georgia, Roboto, Open Sans, Lato, Merriweather, Playfair Display, Source Code Pro and others), applied live.
 - **Bubble colors and opacity** — per-character message colors, plus separate colors for quoted dialogue and \*actions\*.
+- **Markdown formatting** — **Settings → Appearance → Show markdown formatting in messages** (on by default; the phone web app has it under Settings → General → Chat appearance). Text between \*stars\* shows in italics, \*\*two stars\*\* in bold, \*\*\*three\*\*\* in both, \_underscores\_ and \_\_double underscores\_\_ in italics and bold, \~\~tildes\~\~ struck through and \`backticks\` as code, without the marks. Stars keep the action color. A mark only counts when it hugs its text and closes on the same line, so `2 * 3 * 4` and `snake_case` stay as typed. Off shows messages exactly as written, marks and all, with only the colors.
 - **Chat text size** — bigger or smaller message text.
 - **Expression display** — show the character's live portrait in the **sidebar**, as the chat **background**, or **both**.
 - **Grid zoom** — resize library cards to taste.

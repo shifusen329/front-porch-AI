@@ -46,6 +46,7 @@ export 'folder_character_picker.dart';
 export 'realism_form_section.dart';
 export 'styled_dropdown.dart';
 export 'styled_text_controller.dart';
+export 'chat_markdown.dart';
 export 'sidebar.dart';
 export 'sidebar_width.dart';
 export 'model_selector.dart';

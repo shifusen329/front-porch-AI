@@ -66,6 +66,8 @@ class ExpressionSettings with SettingsBase {
   // A place the story reaches with no picture is painted with the image
   // generator, when one is set up.
   bool _scenePainting = true;
+  // Settings → Appearance: markdown in chat messages is rendered.
+  bool _chatMarkdown = true;
 
   /// Each downloaded classifier model's labels, by model id.
   Map<String, List<String>> _modelLabels = {};
@@ -80,6 +82,10 @@ class ExpressionSettings with SettingsBase {
   bool get visualNovelMode => _visualNovelMode;
   bool get sceneBackgrounds => _sceneBackgrounds;
   bool get scenePainting => _scenePainting;
+
+  /// Chat messages show `*italics*`, `**bold**` and the like as formatting,
+  /// without the marks (chat_markdown.dart). Off shows the text as written.
+  bool get chatMarkdown => _chatMarkdown;
 
   /// The Hugging Face model (`owner/name`) the ONNX classifier runs.
   String get expressionOnnxModel => _expressionOnnxModel;
@@ -115,6 +121,7 @@ class ExpressionSettings with SettingsBase {
     _visualNovelMode = prefs?.getBool(k('visual_novel_mode')) ?? false;
     _sceneBackgrounds = prefs?.getBool(k('scene_backgrounds')) ?? true;
     _scenePainting = prefs?.getBool(k('scene_painting')) ?? true;
+    _chatMarkdown = prefs?.getBool(k('chat_markdown')) ?? true;
     _expressionFallback =
         prefs?.getString(k('expression_fallback')) ?? 'neutral';
     _expressionEmojiBurst =
@@ -176,6 +183,12 @@ class ExpressionSettings with SettingsBase {
   Future<void> setScenePainting(bool value) async {
     _scenePainting = value;
     await prefs?.setBool(k('scene_painting'), value);
+    notify();
+  }
+
+  Future<void> setChatMarkdown(bool value) async {
+    _chatMarkdown = value;
+    await prefs?.setBool(k('chat_markdown'), value);
     notify();
   }
 

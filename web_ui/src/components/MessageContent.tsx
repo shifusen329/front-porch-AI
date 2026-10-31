@@ -5,14 +5,18 @@
 //  - inline markdown images (![alt](https://...)) shown as actual images after
 //    session consent (parity with the desktop ExternalImageWidget), and
 //  - RP text coloring (parity with the desktop AppColors): "quoted dialogue" →
-//    amber, *actions* → italic blue, **emphasis** → bold blue. The coloring
-//    itself lives in the shared renderRpInline (also used by the composer).
+//    amber, *actions* → blue. With Show markdown formatting on (the default)
+//    the marks are hidden and *italics*, **bold** and the rest are rendered
+//    (chatMarkdown.tsx); off, the text shows as written, marks and all, with
+//    only the colours (the shared renderRpInline, also used by the composer).
 // No HTML injection — only https?:// image src/alt are extracted, and the
 // colored spans carry plain text content, never markup. img src is never set
 // until the user consents (session flag).
 
 import { memo, useEffect, useState, type ReactNode } from 'react';
 import { renderRpInline } from './rpText';
+import { renderChatMarkdown } from './chatMarkdown';
+import { useChatMarkdown } from '../hooks/useChatMarkdown';
 import { markRanges, type FindSurface } from './chatSearch';
 
 // Desktop only matches http(s) — data:/javascript:/relative stay as text.
@@ -96,6 +100,12 @@ function MessageContentImpl({
         markRanges(plain, offset, hits.body, activeStart, key)
     : undefined;
 
+  const markdown = useChatMarkdown();
+  const inline = (part: string, key: string, offset: number): ReactNode[] =>
+    markdown
+      ? renderChatMarkdown(part, key, mark, offset)
+      : [<span key={key} className="md-off">{renderRpInline(part, key, false, mark, offset)}</span>];
+
   const parts: ReactNode[] = [];
   let last = 0;
   let seg = 0;
@@ -103,7 +113,7 @@ function MessageContentImpl({
   IMAGE_RE.lastIndex = 0;
   while ((match = IMAGE_RE.exec(text)) !== null) {
     if (match.index > last) {
-      parts.push(...renderRpInline(text.slice(last, match.index), `t${seg++}`, true, mark, last));
+      parts.push(...inline(text.slice(last, match.index), `t${seg++}`, last));
     }
     const alt = match[1] || 'image';
     const url = match[2];
@@ -112,7 +122,7 @@ function MessageContentImpl({
     );
     last = match.index + match[0].length;
   }
-  if (last < text.length) parts.push(...renderRpInline(text.slice(last), `t${seg++}`, true, mark, last));
+  if (last < text.length) parts.push(...inline(text.slice(last), `t${seg++}`, last));
 
   return (
     <>

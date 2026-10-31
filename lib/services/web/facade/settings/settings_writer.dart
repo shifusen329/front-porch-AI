@@ -108,6 +108,10 @@ class SettingsWriter {
     if (painting is bool) {
       await _storage.expressionSettings.setScenePainting(painting);
     }
+    final markdown = body['chatMarkdown'];
+    if (markdown is bool) {
+      await _storage.expressionSettings.setChatMarkdown(markdown);
+    }
 
     final realism = body['realism'];
     if (realism is Map) {

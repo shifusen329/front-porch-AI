@@ -36,6 +36,17 @@
 .bubble .act { color: var(--action); font-style: italic; }
 .bubble.user .act { color: var(--chat-user-action, var(--action)); }
 .bubble .act.bold { font-weight: 700; font-style: normal; }
+/* Show markdown formatting off: the marks stay, and only the colours show. */
+.bubble .md-off .act, .bubble .md-off .act.bold { font-style: normal; font-weight: inherit; }
+/* On (chatMarkdown.tsx): colours and formatting are separate classes. */
+.bubble .md-dlg { color: var(--dialogue); }
+.bubble.user .md-dlg { color: var(--chat-user-dialogue, var(--dialogue)); }
+.bubble .md-act { color: var(--action); }
+.bubble.user .md-act { color: var(--chat-user-action, var(--action)); }
+.bubble .md-b { font-weight: 700; }
+.bubble .md-i { font-style: italic; }
+.bubble .md-s { text-decoration: line-through; }
+.bubble .md-code { font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.92em; }
 .chat-composer-wrap { width: 100%; }
 .composer-photo-chip {
   display: flex; align-items: center; gap: 8px;

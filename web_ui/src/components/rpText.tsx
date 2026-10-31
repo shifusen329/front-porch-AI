@@ -14,8 +14,8 @@ import type { ReactNode } from 'react';
 // guillemets «…» / »…« and CJK 「…」 — kept in sync with the desktop
 // kDialogueQuotePairs (styled_text_controller.dart) so highlighting is
 // identical on both surfaces.
-const INLINE_RE =
-  /(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|("[^"\n]+"|“[^”\n]+”|„[^“”\n]+[“”]|”[^”\n]+”|«[^»\n]+»|»[^«\n]+«|「[^」\n]+」)/g;
+export const DIALOGUE_RE = /"[^"\n]+"|“[^”\n]+”|„[^“”\n]+[“”]|”[^”\n]+”|«[^»\n]+»|»[^«\n]+«|「[^」\n]+」/g;
+const INLINE_RE = new RegExp(String.raw`(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(` + DIALOGUE_RE.source + ')', 'g');
 
 /**
  * Color dialogue / *action* / **emphasis** inside a plain text segment.

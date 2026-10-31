@@ -68,6 +68,19 @@ class ChatAppearanceSection extends StatelessWidget {
         const SectionHeader('Chat Appearance'),
         const SizedBox(height: 8),
         SwitchListTile(
+          key: const ValueKey('chat-markdown'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Show markdown formatting in messages'),
+          subtitle: const Text(
+            'Text between *stars* shows in italics, **two stars** in bold, '
+            '~~tildes~~ struck through and `backticks` as code, without the '
+            'marks. Off shows messages exactly as written.',
+          ),
+          value: storageService.expressionSettings.chatMarkdown,
+          activeTrackColor: AppColors.porchAmberOf(context),
+          onChanged: storageService.expressionSettings.setChatMarkdown,
+        ),
+        SwitchListTile(
           key: const ValueKey('visual-novel-mode'),
           contentPadding: EdgeInsets.zero,
           title: const Text('Visual novel mode'),
