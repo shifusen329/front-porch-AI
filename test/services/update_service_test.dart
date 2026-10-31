@@ -127,4 +127,45 @@ void main() {
       isFalse,
     );
   });
+
+  group('Windows installer command line', () {
+    test('Install now asks the installer to open the app again', () {
+      expect(
+        windowsInstallerArgs(
+          installDir: r'D:\Apps\Front Porch AI',
+          showLicense: false,
+          relaunch: true,
+        ),
+        [
+          '/VERYSILENT',
+          r'/DIR=D:\Apps\Front Porch AI',
+          '/SUPPRESSMSGBOXES',
+          '/NORESTART',
+          '/CLOSEAPPLICATIONS',
+          '/RELAUNCH=1',
+        ],
+      );
+    });
+
+    test('an update on close leaves the app closed', () {
+      expect(
+        windowsInstallerArgs(
+          installDir: r'D:\Apps\Front Porch AI',
+          showLicense: false,
+          relaunch: false,
+        ),
+        isNot(contains('/RELAUNCH=1')),
+      );
+    });
+
+    test('the license step shows, and a trailing backslash is dropped', () {
+      final args = windowsInstallerArgs(
+        installDir: r'D:\Apps\Front Porch AI\\',
+        showLicense: true,
+        relaunch: true,
+      );
+      expect(args.first, '/SILENT');
+      expect(args, contains(r'/DIR=D:\Apps\Front Porch AI'));
+    });
+  });
 }

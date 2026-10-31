@@ -346,7 +346,8 @@ class UpdateDialog extends StatelessWidget {
             Platform.isAndroid
                 ? 'The update has been downloaded. Android will ask you to '
                       'confirm installing it.'
-                : 'The update has been downloaded. Would you like to install it now?',
+                : 'The update has been downloaded. Would you like to install '
+                      'it now? The app closes, installs it and opens again.',
             style: TextStyle(
               color: AppColors.textSecondary(context),
               fontSize: 14,

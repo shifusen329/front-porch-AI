@@ -153,6 +153,13 @@ Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; \
 ; Launch the app after install (user can uncheck this)
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
+; An update started with "Install now" passes /RELAUNCH=1: the app closed for
+; the update and opens again once the files are in. A silent install skips the
+; entry above, and an update installed on close leaves the app closed. Run as
+; the user who started Setup, so the app is never opened elevated.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser; \
+  Check: RelaunchRequested
+
 [Code]
 // ── Channel separation + stable Beta-folder self-heal ────────────────────────
 //
@@ -297,6 +304,13 @@ begin
     if SafeToRemoveBetaFolder() then
       DelTree(BetaDir(), True, True, True);
   end;
+end;
+
+// The app's "Install now" asks for the app back (lib/services/update/
+// windows_installer_args.dart).
+function RelaunchRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
 end;
 
 // Returns true if VC++ 2015-2022 x64 Redistributable is NOT already installed.

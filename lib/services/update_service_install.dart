@@ -42,7 +42,7 @@ extension UpdateServiceInstall on UpdateService {
         await _replaceMacApp(_pendingInstallerPath!);
         await _relaunchMacApp();
       } else {
-        await _launchWindowsInstaller(_pendingInstallerPath!);
+        await _launchWindowsInstaller(_pendingInstallerPath!, relaunch: true);
       }
       // macOS must skip C++ finalizers or the install-and-relaunch gets
       // logged as an "Abort trap: 6" crash (see exitWithoutNativeFinalizers).
@@ -70,18 +70,21 @@ extension UpdateServiceInstall on UpdateService {
       } else if (Platform.isMacOS) {
         await _replaceMacApp(_pendingInstallerPath!);
       } else {
-        await _launchWindowsInstaller(_pendingInstallerPath!);
+        await _launchWindowsInstaller(_pendingInstallerPath!, relaunch: false);
       }
     } catch (e) {
       debugPrint('Install on close failed: $e');
     }
   }
 
-  Future<void> _launchWindowsInstaller(String path) async {
-    // Use /SILENT (shows license page) for 0.8→0.9 upgrades (GPL→AGPL change)
-    // Use /VERYSILENT (fully silent) for same-license upgrades
+  /// [relaunch]: the installer opens the app again once it is done.
+  Future<void> _launchWindowsInstaller(
+    String path, {
+    required bool relaunch,
+  }) async {
+    // /SILENT (shows license page) for 0.8→0.9 upgrades (GPL→AGPL change),
+    // /VERYSILENT (fully silent) for same-license upgrades.
     final needsLicenseAcceptance = _currentVersion.startsWith('0.8');
-    final silentFlag = needsLicenseAcceptance ? '/SILENT' : '/VERYSILENT';
 
     // Install in place, on top of the build that is actually running, by telling
     // the installer the current install directory via /DIR. This is the reliable
@@ -98,21 +101,14 @@ extension UpdateServiceInstall on UpdateService {
     // a second copy into {localappdata} and left the running build (in the user's
     // chosen folder) untouched — the update loop. /DIR makes every channel update
     // exactly where it already lives, ending that whole class of bug.
-    var installDir = File(Platform.resolvedExecutable).parent.path;
-    // Defensive: a trailing backslash would escape the closing quote in the
-    // generated command line. Install dirs never end in a separator in practice,
-    // but strip it so the quoted /DIR value can never be malformed.
-    while (installDir.endsWith('\\')) {
-      installDir = installDir.substring(0, installDir.length - 1);
-    }
-
-    await Process.start(path, [
-      silentFlag,
-      '/DIR=$installDir',
-      '/SUPPRESSMSGBOXES',
-      '/NORESTART',
-      '/CLOSEAPPLICATIONS',
-    ]);
+    await Process.start(
+      path,
+      windowsInstallerArgs(
+        installDir: File(Platform.resolvedExecutable).parent.path,
+        showLicense: needsLicenseAcceptance,
+        relaunch: relaunch,
+      ),
+    );
   }
 
   /// Replace the currently running AppImage with the downloaded update.
