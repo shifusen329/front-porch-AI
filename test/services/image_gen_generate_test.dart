@@ -43,9 +43,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:front_porch_ai/services/capability/capability.dart'
     show StudioIntent;
+import 'package:front_porch_ai/services/image/embedding_listing.dart';
+import 'package:front_porch_ai/services/image/image_gen_embeddings.dart';
 import 'package:front_porch_ai/services/image/model_family.dart'
     show ModelFamily;
 import 'package:front_porch_ai/services/image_gen_service.dart';
@@ -612,6 +615,129 @@ void main() {
         final models = await service.fetchImageModels();
         expect(models, isEmpty);
         await fake.close();
+      }),
+    );
+  });
+
+  group('embeddings', () {
+    late Directory tempDir;
+    late _FakeLocalImageServer fake;
+    late _FakeStorageForGenerate storage;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('imagegen_emb_');
+      fake = await _FakeLocalImageServer.start();
+      storage = _FakeStorageForGenerate(tempDir.path);
+      await storage.imageGenSettings.setImageGenBackend('a1111');
+      await storage.imageGenSettings.setLocalImageGenUrl(fake.baseUrl);
+      fake.genImages = [_fixtureB64];
+    });
+
+    tearDown(() async {
+      await fake.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test(
+      'each goes first on its own side of the txt2img request, and one '
+      'already written there is not added again',
+      () => _withRealHttp(() async {
+        await storage.imageGenSettings.setImageGenEmbeddings(const [
+          ImageGenEmbedding('lazyneg', negative: true),
+          ImageGenEmbedding('lazypos', negative: false),
+          ImageGenEmbedding('badhand', negative: true),
+        ]);
+        await ImageGenService(storage).generateImage(
+          prompt: 'a porch at dusk',
+          negativePrompt: 'grainy, (badhand:1.2)',
+        );
+        final sent = fake.lastTxt2ImgBody!;
+        expect(sent['prompt'], 'lazypos, a porch at dusk');
+        expect(sent['negative_prompt'], 'lazyneg, grainy, (badhand:1.2)');
+      }),
+    );
+
+    test('a new pick goes on the side its name is made for', () {
+      bool negative(String name) => ImageGenEmbedding.picked(name).negative;
+      expect(negative('lazyneg'), isTrue);
+      expect(negative('IllusN3g'), isTrue);
+      expect(negative('badhandv4'), isTrue);
+      expect(negative('lazypos'), isFalse);
+      expect(negative('F4st'), isFalse);
+    });
+
+    test('each backend keeps its own', () async {
+      SharedPreferences.setMockInitialValues({});
+      final s = ImageGenSettings()
+        ..initializeBase(await SharedPreferences.getInstance(), () {});
+      await s.setImageGenBackend('a1111');
+      await s.setImageGenEmbeddings([ImageGenEmbedding.picked('lazyneg')]);
+      await s.setImageGenBackend('comfyui');
+      expect(s.imageGenEmbeddings, isEmpty);
+      await s.setImageGenBackend('a1111');
+      expect(s.imageGenEmbeddings.map((e) => e.toJson()), [
+        {'name': 'lazyneg', 'negative': true},
+      ]);
+    });
+
+    test(
+      'Automatic1111 lists what it loaded and what it skipped, ComfyUI lists '
+      'names, and a silent server says so',
+      () => _withRealHttp(() async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server.listen((request) async {
+          request.response.headers.contentType = ContentType.json;
+          if (request.uri.path == '/sdapi/v1/embeddings') {
+            request.response.write(
+              jsonEncode({
+                'loaded': {
+                  'lazyneg': {'shape': 2048},
+                  'IllusP0s': {'shape': 2048},
+                },
+                'skipped': {
+                  'easynegative': {'shape': 768},
+                },
+              }),
+            );
+          } else if (request.uri.path == '/embeddings') {
+            request.response.write(jsonEncode(['lazyneg', 'sub/lazypos']));
+          } else {
+            request.response.statusCode = HttpStatus.notFound;
+          }
+          await request.response.close();
+        });
+        final url = 'http://127.0.0.1:${server.port}';
+
+        final a1111 = await fetchEmbeddingListing(
+          backend: 'a1111',
+          a1111Url: url,
+          comfyUrl: '',
+        );
+        expect(a1111.fits, ['IllusP0s', 'lazyneg']);
+        expect(a1111.others, ['easynegative']);
+        expect(a1111.problem, isNull);
+
+        final comfy = await fetchEmbeddingListing(
+          backend: 'comfyui',
+          a1111Url: '',
+          comfyUrl: url,
+        );
+        expect(comfy.fits, ['lazyneg', 'sub/lazypos']);
+
+        final remote = await fetchEmbeddingListing(
+          backend: 'remote',
+          a1111Url: url,
+          comfyUrl: url,
+        );
+        expect(remote.problem, 'This image backend does not take embeddings.');
+
+        await server.close(force: true);
+        final silent = await fetchEmbeddingListing(
+          backend: 'a1111',
+          a1111Url: url,
+          comfyUrl: '',
+        );
+        expect(silent.problem, 'The image server did not answer.');
       }),
     );
   });

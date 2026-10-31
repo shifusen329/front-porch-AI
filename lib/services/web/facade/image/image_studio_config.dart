@@ -63,6 +63,8 @@ class ImageStudioConfig {
         for (final slot in img.imageGenLoraSlots)
           {'file': slot.file, 'weight': slot.weight},
       ],
+      'embeddings': [for (final e in img.imageGenEmbeddings) e.toJson()],
+      'promptParadigm': img.imageGenPromptParadigm,
       'surface': surface.toJson(),
       'localUrl': img.localImageGenUrl,
       'comfyUrl': img.comfyUiUrl,
@@ -199,6 +201,17 @@ class ImageStudioConfig {
       }
       _ws.requireIdleImageSettings();
       await img.setImageGenLoraSlots(parsed);
+    }
+    if (f['embeddings'] is List) {
+      _ws.requireIdleImageSettings();
+      await img.setImageGenEmbeddings(
+        ImageGenEmbedding.fromRows(f['embeddings'] as List),
+      );
+    }
+    if (f['promptParadigm'] case final String paradigm
+        when paradigm == 'natural' || paradigm == 'tags') {
+      _ws.requireIdleImageSettings();
+      await img.setImageGenPromptParadigm(paradigm);
     }
     if (f['localUrl'] is String) {
       _ws.requireIdleImageSettings();

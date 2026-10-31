@@ -43,6 +43,8 @@ export 'comfy_workflow_convert.dart';
 export 'draw_things_lora_filter.dart';
 export 'draw_things_samplers.dart';
 export 'edit_profile.dart';
+export 'embedding_listing.dart';
+export 'image_gen_embeddings.dart';
 export 'image_gen_lora_slots.dart';
 export 'image_gen_types.dart';
 export 'image_job.dart';

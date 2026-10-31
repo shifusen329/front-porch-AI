@@ -37,7 +37,8 @@ class ImageGenSettings
         ComfyUiUrlPrefs,
         ComfyShiftPrefs,
         DrawThingsGrpcPrefs,
-        ImageGenEditKnobPrefs {
+        ImageGenEditKnobPrefs,
+        ImageGenEmbeddingPrefs {
   // Default ON since 2026-07: the feature is opt-out. Enabling only shows the
   // ✨ toolbar button and the /image command — nothing generates until a
   // backend is actually configured, so there is no overhead for users who
@@ -143,7 +144,7 @@ class ImageGenSettings
     notify();
   }
 
-  /// Each backend keeps its own model and LoRA picks: a file one backend
+  /// Each backend keeps its own model, LoRA and embedding picks: a file one backend
   /// lists means nothing to another. Switching parks this backend's picks
   /// and brings back the new one's, blank the first time it is chosen.
   Future<void> setImageGenBackend(String value) async {
@@ -161,6 +162,7 @@ class ImageGenSettings
         'model': _imageGenModel,
         'editModel': _imageGenEditModel,
         'loras': ImageGenLoraSlot.encode(_imageGenLoraSlots),
+        'embeddings': parkedEmbeddings,
       }),
     );
     final parked = _decodeStringMap(prefs?.getString(k('image_gen_picks_$to')));
@@ -170,6 +172,7 @@ class ImageGenSettings
     await prefs?.setString(k('image_gen_model'), _imageGenModel);
     await prefs?.setString(k('image_gen_edit_model'), _imageGenEditModel);
     await _writeLoraSlots();
+    await unparkEmbeddings(parked['embeddings']);
   }
 
   Future<void> setLocalImageGenUrl(String value) async {
@@ -407,6 +410,7 @@ class ImageGenSettings
 
     loadDrawThingsGrpcPrefs();
     loadEditKnobPrefs();
+    loadEmbeddingPrefs();
 
     _comfyEditWorkflowId =
         prefs?.getString(k('comfy_edit_workflow_id')) ?? 'qwen_image_edit';

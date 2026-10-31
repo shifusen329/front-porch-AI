@@ -9,11 +9,12 @@ import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/storage/settings/image_gen_settings.dart';
 import 'package:front_porch_ai/ui/theme/app_colors.dart';
 
+import 'studio_embeddings.dart';
 import 'studio_widgets.dart';
 
 /// Every setting a generate reads that the graph and model controls do not
 /// cover, each with a control you can see: seed, negative
-/// prompt, the Draw Things cluster (port, shift, seed mode, TeaCache, CFG
+/// prompt, embeddings, the Draw Things cluster (port, shift, seed mode, TeaCache, CFG
 /// Zero), the prompt-review switch, and the default style and prompt format.
 /// Steps, CFG, sampler and scheduler are the stove's own sliders.
 ///
@@ -76,6 +77,8 @@ class StudioDeskKnobs extends StatelessWidget {
             onSubmit: (value) =>
                 _write(() => settings.setImageGenNegativePrompt(value)),
           ),
+        if (backendTakesEmbeddings(backend, edit: edit))
+          StudioEmbeddings(settings: settings, canWrite: canWrite),
         if (backend == 'comfyui' && comfyShiftGraph != null)
           ..._comfyShift(context, primary, comfyShiftGraph!),
         if (drawThings) ..._drawThings(context, primary),

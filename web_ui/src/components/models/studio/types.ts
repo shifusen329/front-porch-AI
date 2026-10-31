@@ -12,6 +12,19 @@ export interface LoraSlot {
   weight: number;
 }
 
+/** An embedding on the desk: its name goes in the prompt or the negative prompt. */
+export interface Embedding {
+  name: string;
+  negative: boolean;
+}
+
+/** What the image server lists; `others` were made for another kind of model. */
+export interface EmbeddingListing {
+  fits: string[];
+  others: string[];
+  problem?: string | null;
+}
+
 export interface LoraFact {
   file?: string;
   family?: string;
@@ -49,6 +62,8 @@ export interface ImageConfig {
   lora?: string;
   loraWeight?: number;
   loras?: LoraSlot[];
+  embeddings?: Embedding[];
+  promptParadigm?: string;
   localUrl: string;
   comfyUrl: string;
   promptReview: boolean;

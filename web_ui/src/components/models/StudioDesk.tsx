@@ -309,7 +309,7 @@ export function StudioDesk(props: StudioDeskProps) {
             onUseAnyway={(family) => void saveConfig({ loraOverrideFamily: family }).then(refresh)}
           />
           <DeskSize size={cfg.size} onSize={(size) => void saveConfig({ size })} />
-          <DeskAdvanced cfg={cfg} samplers={cfg.drawThingsSamplers ?? []} save={saveConfig} />
+          <DeskAdvanced cfg={cfg} mode={configMode} samplers={cfg.drawThingsSamplers ?? []} save={saveConfig} />
           </fieldset>
           )}
           {props.busy ? (

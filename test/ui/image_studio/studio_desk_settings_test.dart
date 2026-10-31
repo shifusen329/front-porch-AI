@@ -7,6 +7,7 @@
 // can be changed, the size is chosen and saved, and a remote host says whose
 // account it bills (or that there is no key). The settings dialog is the desk.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -20,6 +21,8 @@ import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/ui/dialogs/image_gen_settings_dialog.dart';
 import 'package:front_porch_ai/ui/image_studio/studio_desk.dart';
 import 'package:front_porch_ai/ui/image_studio/studio_desk_knobs.dart';
+
+import '../../helpers/double_tap.dart';
 
 /// A reachable Automatic1111: two checkpoints, two LoRAs. Nothing is dialled.
 class _ReachableA1111 extends ImageGenService {
@@ -305,6 +308,82 @@ void main() {
       await knobs(tester, edit: true);
       expect(find.text('Style'), findsNothing);
       expect(find.text(hint), findsOneWidget);
+    });
+  });
+
+  group('embeddings', () {
+    testWidgets(
+      'one the server lists is added once for a double tap, then moved to '
+      'the prompt and taken off',
+      (tester) async {
+        HttpOverrides.global = null;
+        final server = (await tester.runAsync(
+          () => HttpServer.bind(InternetAddress.loopbackIPv4, 0),
+        ))!;
+        server.listen((request) async {
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'loaded': {'lazyneg': {}, 'lazypos': {}},
+              'skipped': {'easynegative': {}},
+            }),
+          );
+          await request.response.close();
+        });
+        addTearDown(() => tester.runAsync(() => server.close(force: true)));
+        final s = storage.imageGenSettings;
+        await s.setImageGenBackend('a1111');
+        await s.setLocalImageGenUrl('http://127.0.0.1:${server.port}');
+        await pump(tester, StudioDeskKnobs(settings: s));
+
+        await tester.tap(find.text('Add an embedding'));
+        await tester.pump();
+        final lazyneg = find.byKey(const ValueKey('embedding-pick-lazyneg'));
+        for (var i = 0; i < 100 && lazyneg.evaluate().isEmpty; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+        }
+        expect(find.textContaining('skips these'), findsOneWidget);
+        var writes = 0;
+        storage.addListener(() => writes++);
+        await doubleTapNoFrame(tester, lazyneg);
+        await tester.pumpAndSettle();
+
+        expect(writes, 1);
+        expect(s.imageGenEmbeddings.map((e) => e.toJson()), [
+          {'name': 'lazyneg', 'negative': true},
+        ]);
+        expect(find.text('Add an embedding'), findsOneWidget);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(const ValueKey('embedding-lazyneg')),
+            matching: find.text('Prompt'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(s.imageGenEmbeddings.single.negative, isFalse);
+
+        await tester.tap(find.byTooltip('Remove lazyneg'));
+        await tester.pumpAndSettle();
+        expect(s.imageGenEmbeddings, isEmpty);
+      },
+    );
+
+    testWidgets('are only where the backend reads them', (tester) async {
+      final s = storage.imageGenSettings;
+      await s.setImageGenBackend('comfyui');
+      await pump(tester, StudioDeskKnobs(settings: s));
+      expect(find.text('Embeddings'), findsOneWidget);
+
+      await pump(tester, StudioDeskKnobs(settings: s, edit: true));
+      expect(find.text('Embeddings'), findsNothing);
+
+      await s.setImageGenBackend('drawthings');
+      await pump(tester, StudioDeskKnobs(settings: s));
+      expect(find.text('Embeddings'), findsNothing);
     });
   });
 }

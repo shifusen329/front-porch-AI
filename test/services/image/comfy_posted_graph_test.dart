@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:front_porch_ai/services/comfy_ui_service.dart';
 import 'package:front_porch_ai/services/image/comfy_gguf_city96_gate.dart';
+import 'package:front_porch_ai/services/image/image_gen_embeddings.dart';
 import 'package:front_porch_ai/services/image_gen_service.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 
@@ -440,6 +441,39 @@ void main() {
         expect(loader.readAsStringSync(), kStockCity96Loader);
       },
     );
+  });
+
+  test('a create post leads its prompt with embedding:name', () async {
+    Map<String, dynamic>? posted;
+    final server = await _comfy((graph) => posted = graph);
+    addTearDown(server.close);
+    final dir = realTempDir('comfy-post-embeddings');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final storage = StorageService.sandbox(dir.path);
+    final settings = storage.imageGenSettings;
+    await settings.setImageGenBackend('comfyui');
+    await settings.setComfyUiUrl('http://127.0.0.1:${server.port}');
+    await settings.setComfyCreateWorkflowId('z_image_turbo');
+    for (final (token, file) in [
+      ('%MODEL_DIFFUSION%', 'z_image_turbo_bf16.safetensors'),
+      ('%MODEL_CLIP%', 'qwen_3_4b.safetensors'),
+      ('%MODEL_VAE%', 'ae.safetensors'),
+    ]) {
+      await settings.setComfyCreateModelChoice('z_image_turbo', token, file);
+    }
+    await settings.setImageGenEmbeddings(const [
+      ImageGenEmbedding('lazypos', negative: false),
+    ]);
+    final image = ImageGenService(storage);
+    await image.generateImage(prompt: 'a porch at dusk');
+
+    expect(posted, isNotNull, reason: image.statusMessage);
+    final texts = [
+      for (final node in posted!.values)
+        if (node is Map && node['class_type'] == 'CLIPTextEncode')
+          (node['inputs'] as Map)['text'],
+    ];
+    expect(texts, contains('embedding:lazypos, a porch at dusk'));
   });
 }
 

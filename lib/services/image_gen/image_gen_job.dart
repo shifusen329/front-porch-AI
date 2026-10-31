@@ -313,13 +313,18 @@ class ImageGenJob {
           }
           final imageSize = size ?? _storage.imageGenSettings.imageGenSize;
           final modelCheckpoint = refModelName;
+          final prompts = promptsWithEmbeddings(
+            prompt,
+            negativePrompt,
+            _storage.imageGenSettings.imageGenEmbeddings,
+          );
           imageBytes = await generateViaA1111(
             status: _status,
             lastLoadedCheckpoint: _admin.lastLoadedCheckpoint,
             switchLocalModel: _switchLocalModel,
             baseUrl: localUrl,
-            prompt: prompt,
-            negativePrompt: negativePrompt,
+            prompt: prompts.prompt,
+            negativePrompt: prompts.negative,
             size: imageSize,
             modelCheckpoint: modelCheckpoint,
             switchModelFirst: modelCheckpoint.isNotEmpty,

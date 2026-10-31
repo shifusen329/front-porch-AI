@@ -114,12 +114,18 @@ Future<Uint8List> generateViaComfy({
     settings.comfyCreateWorkflowId,
   );
   final objectInfo = await comfy.objectInfoForRun();
+  final prompts = promptsWithEmbeddings(
+    prompt,
+    negativePrompt,
+    settings.imageGenEmbeddings,
+    comfy: true,
+  );
   final req = resolveComfyCreateRequest(
     workflowId: settings.comfyCreateWorkflowId,
     uploadedWorkflowJson: settings.comfyCreateUploadedWorkflow,
     modelChoices: settings.comfyCreateModelChoices,
-    prompt: prompt,
-    negative: negativePrompt,
+    prompt: prompts.prompt,
+    negative: prompts.negative,
     seed: effectiveSeed == -1 ? Random().nextInt(1 << 31) : effectiveSeed,
     steps: settings.imageGenSteps,
     cfg: settings.imageGenCfgScale,

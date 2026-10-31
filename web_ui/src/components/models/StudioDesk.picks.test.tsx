@@ -8,7 +8,7 @@
 import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  baseConfig, blur, button, calls, click, container, createElement, field, gets, mount, posts, sheetText,
+  baseConfig, blur, button, calls, click, container, createElement, field, gets, mount, pickOption, posts, sheetText,
   readyFacts, refuse, reset, serve, settle, text, type, unmount,
 } from './studio/deskTestKit';
 
@@ -434,5 +434,55 @@ describe('Refresh list on Draw Things', () => {
     await settle();
 
     expect(sheetText()).toContain('flux_dev.ckpt');
+  });
+});
+
+describe('Embeddings', () => {
+  const listing = { fits: ['lazyneg', 'lazypos'], others: ['easynegative'], problem: null };
+
+  it('adds one the server lists, once for a double tap, by name for the app to place', async () => {
+    const p = await boot({ cfg: { ...baseConfig, backend: 'a1111', embeddings: [] } }, { 'GET /api/image/embeddings': listing });
+    click(/^Advanced ▸/);
+    click('Add an embedding');
+    await settle();
+
+    expect(sheetText()).toContain('lazypos');
+    expect(sheetText()).toContain('skips these');
+    expect(button('easynegative')).toBeUndefined();
+    const lazyneg = button('lazyneg')!;
+    act(() => {
+      lazyneg.click();
+      lazyneg.click();
+    });
+    await settle();
+
+    expect(p.save).toHaveBeenCalledTimes(1);
+    expect(p.save).toHaveBeenCalledWith({ embeddings: [{ name: 'lazyneg' }] });
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('moves one to the prompt and takes one off', async () => {
+    const picked = [{ name: 'lazyneg', negative: true }, { name: 'lazypos', negative: false }];
+    const p = await boot({ cfg: { ...baseConfig, backend: 'a1111', embeddings: picked } });
+    click(/^Advanced ▸/);
+
+    pickOption('[aria-label="Where lazyneg goes"]', 'prompt');
+    expect(p.save).toHaveBeenLastCalledWith({
+      embeddings: [{ name: 'lazyneg', negative: false }, { name: 'lazypos', negative: false }],
+    });
+    click('×');
+    expect(p.save).toHaveBeenLastCalledWith({ embeddings: [picked[1]] });
+  });
+
+  it('shows on ComfyUI Create but not Edit, and Prompt format is saved', async () => {
+    const p = await boot();
+    click(/^Advanced ▸/);
+    expect(container.querySelector('[data-testid="desk-embeddings"]')).not.toBeNull();
+    pickOption('[aria-label="Prompt format"]', 'tags');
+    expect(p.save).toHaveBeenLastCalledWith({ promptParadigm: 'tags' });
+
+    click('Edit');
+    await settle();
+    expect(container.querySelector('[data-testid="desk-embeddings"]')).toBeNull();
   });
 });

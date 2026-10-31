@@ -48,9 +48,11 @@ Two tabs at the top.
 - **Character** — close-up from appearance + current expression. Personality text is **not** stuffed in. In a group, pick one member. A group shot is allowed; diffusion is bad at several specific faces, and the UI says so.
 - **Your persona** — from persona appearance.
 
-**Prompt style:** natural language (FLUX / SD3) or Danbooru tags (SD 1.5 / anime). Match the checkpoint.
+**Prompt style:** **Advanced ▸ → Prompt format**: natural language (FLUX / SD3) or Danbooru tags (SD 1.5 / anime). Match the checkpoint.
 
 **LoRAs:** compatible ones show. Confirmed mismatches hide behind **Show N incompatible**. Weight slider is there.
+
+**Embeddings** (Automatic1111 / Forge / reForge, and ComfyUI in Create): **Advanced ▸**, under the negative prompt. **Add an embedding** lists the ones your image server has. On Automatic1111, embeddings made for another kind of model (an SD 1.5 one under an SDXL checkpoint) are listed underneath but can't be picked. Each embedding goes in the **Prompt** or the **Negative** prompt: names like `lazyneg`, `IllusN3g` or `badhandv4` start on Negative, the rest on Prompt. Every picture from that server uses them, including `/image`, expression packs and painted scenes. Each backend keeps its own.
 
 **Reference image (img2img):** local backends only (hidden on Remote). Attach a picture + denoise. **Not** the same as Edit.
 

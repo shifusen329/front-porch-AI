@@ -242,6 +242,17 @@ class ImageFacade {
   Future<Map<String, dynamic>> localCatalog({String model = ''}) =>
       _ready.localCatalog(model: model);
 
+  /// The embeddings the current backend's server lists.
+  Future<Map<String, Object?>> embeddings() async {
+    final img = _storage.imageGenSettings;
+    final listing = await fetchEmbeddingListing(
+      backend: img.imageGenBackend,
+      a1111Url: img.localImageGenUrl,
+      comfyUrl: img.comfyUiUrl,
+    );
+    return listing.toJson();
+  }
+
   Future<Map<String, dynamic>> studioReady({required bool edit}) =>
       _ready.studioReady(edit: edit);
 

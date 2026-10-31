@@ -5,7 +5,7 @@
 // say what the person chose.
 
 import { api } from '../../../api/client';
-import type { Catalog, GraphUpload, ImageConfig, Mode, ReadyFacts } from './types';
+import type { Catalog, EmbeddingListing, GraphUpload, ImageConfig, Mode, ReadyFacts } from './types';
 
 export const fetchReady = (mode: Mode) =>
   api.get<ReadyFacts>(`/api/image/studio/ready?mode=${mode}`);
@@ -29,6 +29,8 @@ export const fetchLocalCatalog = (model: string) =>
       ? `/api/image/local-catalog?model=${encodeURIComponent(model)}`
       : '/api/image/local-catalog',
   );
+
+export const fetchEmbeddings = () => api.get<EmbeddingListing>('/api/image/embeddings');
 
 /** Picks the primary model, a graph, or one slot of the graph on the desk. */
 export const pick = (body: {
