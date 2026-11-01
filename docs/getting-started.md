@@ -226,7 +226,7 @@ Front Porch AI speaks the same character-card language as the rest of the commun
 - Use **Bulk Import** to point at a whole folder — it scans everything inside, subfolders included.
 - Use **Import BYAF** for Backyard archives.
 - Once your library has characters in it, those same options live behind the download icon in the library toolbar: **Import Cards**, **Import Folder**, and **Import Backyard AI (.byaf)**.
-- Or open **The Stoop** from the left sidebar and download characters, whole group casts, and places straight into your library — no files to handle at all.
+- Or, on a phone, open **Characters → New → Browse The Stoop** (or **The Stoop** in the phone web app's menu) and download characters, whole group casts, and places straight into your library — no files to handle at all.
 
 Downloading from a character site like Chub.ai or aicharactercards.com works the same way: grab the PNG or JSON in your normal web browser, then **Import Card** it. (Those two sites used to be browsable inside the app; that built-in browser was removed because it was unmoderated and unreliable on some Linux machines. The Stoop is the in-app place to discover characters now.)
 

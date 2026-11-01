@@ -62,7 +62,7 @@ On the desktop home screen you can also **drag PNG cards and `.byaf` archives** 
 
 ### The Stoop — the built-in community hub
 
-The Stoop is Front Porch AI's own community hub, and it's in the sidebar of every build — no nightly required.
+The Stoop is Front Porch AI's own community hub. Open it from **Characters → New → Browse The Stoop** in the Android app, or **The Stoop** in the phone web app's menu. The desktop app has no Stoop button.
 
 - **Browse** with filter chips for **All / Singles / Groups / Worlds**, sorted by **Newest**, **Top**, or **Downloads** — plus **Mod's Picks**, **From Creators You Follow**, and **Groups** rows on the front page.
 - **Smart search** — type a name, `@creator` to see one person's cards, or `#tag` to browse by tag.

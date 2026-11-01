@@ -298,7 +298,7 @@ Day-to-day changes (username, password, two-factor) are made from the web UI's o
 
 ## The Stoop
 
-The Stoop is the built-in community hub for sharing character, group, and Place cards. It's part of the normal app — sidebar → **The Stoop** — and it's opt-in and 18+.
+The Stoop is the built-in community hub for sharing character, group, and Place cards. It's in the Android app (**Characters → New → Browse The Stoop**) and the phone web app (**The Stoop** in its menu), not the desktop app, and it's opt-in and 18+.
 
 ### Uploads and profile pictures are blocked
 

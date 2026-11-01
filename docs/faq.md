@@ -297,7 +297,7 @@ Full walkthrough: [Image Studio](image-studio.md).
 
 ### What is The Stoop?
 
-A character shop built into the app (sidebar → **The Stoop**) and the web ([hub.frontporchai.app](https://hub.frontporchai.app)).
+A character shop built into the Android app (**Characters → New → Browse The Stoop**), the phone web app (**The Stoop** in its menu) and the web ([hub.frontporchai.app](https://hub.frontporchai.app)). The desktop app has no Stoop button.
 
 Download a single, a whole group, or a Place. Uploads wait for a moderator. Strictly 18+. Suggestive cards stay hidden until you tap 🔞.
 

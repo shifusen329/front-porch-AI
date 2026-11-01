@@ -109,7 +109,7 @@ A few extras that only exist in the browser UI:
 
 ## Everything Else Is a Click
 
-Actions like flipping between alternate greetings, Director Mode, forking a chat from a message, and voice input are buttons in the chat interface rather than hotkeys. Navigation (Home, The Stoop, Manage Models, Settings, User Persona, Worlds, Backups & Restore, and so on) lives in the left sidebar.
+Actions like flipping between alternate greetings, Director Mode, forking a chat from a message, and voice input are buttons in the chat interface rather than hotkeys. Navigation (Home, Manage Models, Settings, User Persona, Worlds, Backups & Restore, and so on) lives in the left sidebar.
 
 The app doesn't register any system-wide hotkeys — nothing triggers while Front Porch AI is in the background.
 

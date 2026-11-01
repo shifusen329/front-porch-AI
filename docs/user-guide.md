@@ -531,7 +531,7 @@ Finished stories open in a page-flip book reader with optional read-along narrat
 
 ## The Stoop (Community Hub)
 
-The Stoop is a community hub built into the app — browse, share, and download characters, whole group casts and places. Open it from **The Stoop** in the left sidebar, or in a browser at [hub.frontporchai.app](https://hub.frontporchai.app) (guests can browse and download there).
+The Stoop is a community hub built into the app — browse, share, and download characters, whole group casts and places. Open it from **Characters → New → Browse The Stoop** in the Android app, **The Stoop** in the phone web app's menu, or in a browser at [hub.frontporchai.app](https://hub.frontporchai.app) (guests can browse and download there). The desktop app has no Stoop button.
 
 - **Browse & discover** — **Mod's Picks** on the front page, new cards from creators you follow, and browse-all with sorting by **Newest**, **Top** or **Downloads**. Filter by **Singles**, **Groups** or **Worlds**.
 - **Search** — one box that understands a name, an `@creator` or a `#tag`.

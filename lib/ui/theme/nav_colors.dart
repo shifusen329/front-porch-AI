@@ -18,14 +18,9 @@ import 'app_colors.dart';
 class NavColors {
   NavColors._();
 
-  /// The Stoop.
+  /// The Stoop, on the phone's New sheet.
   static Color stoopOf(BuildContext context) =>
       AppColors.resolve(context, Colors.tealAccent, const Color(0xFF00695C));
-  static Color stoopWashOf(BuildContext context) => AppColors.resolve(
-    context,
-    Colors.tealAccent.withValues(alpha: 0.08),
-    Colors.teal.withValues(alpha: 0.10),
-  );
 
   /// The AI Character Creator, and its randomize dice.
   static Color creatorOf(BuildContext context) =>

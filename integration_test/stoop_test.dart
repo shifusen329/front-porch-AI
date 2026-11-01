@@ -30,6 +30,7 @@ import 'package:front_porch_ai/main.dart' as app;
 import 'package:front_porch_ai/services/backporch/backporch.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/layout/main_layout.dart';
+import 'package:front_porch_ai/ui/pages/pages.dart' show RepositoryPage;
 import 'package:front_porch_ai/ui/pages/repository/repository_auth_view.dart';
 import 'package:front_porch_ai/ui/pages/repository/stoop_glass.dart';
 import 'package:front_porch_ai/ui/pages/repository/stoop_pick_step.dart';
@@ -98,14 +99,20 @@ void main() {
       backend,
     );
 
-    // ── Enter The Stoop from the sidebar ────────────────────────────────
-    // Every tap here is delivery-confirmed: this page is panels and dialogs
+    // ── Open The Stoop ──────────────────────────────────────────────────
+    // The desktop sidebar has no Stoop button; a phone opens this page from
+    // Characters → New, by pushing it as here.
+    Navigator.of(
+      ctx,
+    ).push(MaterialPageRoute<void>(builder: (_) => const RepositoryPage()));
+    await pumpUntilFound(
+      tester,
+      find.text('Pull up a chair — sign in to browse and share.'),
+    );
+    // Every tap below is delivery-confirmed: this page is panels and dialogs
     // inside scrollables, where a plain tap lands on a barrier or a stale
     // position and fails SILENTLY (round 3 died four minutes later at the
     // download snackbar, with a hit-test warning as the only clue).
-    await d.tapUntil([
-      find.text('The Stoop'),
-    ], find.text('Pull up a chair — sign in to browse and share.'));
 
     // ── Sign in through the REAL form ───────────────────────────────────
     // The labels are standalone Texts above bare TextFields (the lorebook
@@ -308,7 +315,9 @@ void main() {
     // waiting cannot build a widget that is off-screen. This is the same trap
     // climate_editor_test hit; if a third suite hits it, the scroll belongs in
     // ChatDriver rather than copied a third time.
-    final standardsRow = find.text('This card meets the Stoop content standards');
+    final standardsRow = find.text(
+      'This card meets the Stoop content standards',
+    );
     await tester.scrollUntilVisible(
       standardsRow,
       120,

@@ -36,7 +36,6 @@ class Sidebar extends StatelessWidget {
   static const labels = [
     'Home',
     'Image Studio',
-    'The Stoop',
     'AI Character Creator',
     'Create Character',
     'Create Group Chat',
@@ -102,48 +101,6 @@ class Sidebar extends StatelessWidget {
                     label: 'Image Studio',
                     isSelected: false,
                     onTap: () => showHomeImageStudio(context),
-                  ),
-                  // The Stoop (community character hub) — a flagship destination, so it
-                  // sits right under Home.
-                  InkWell(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const RepositoryPage()),
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: NavColors.stoopWashOf(context),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12.0,
-                        horizontal: 12.0,
-                      ),
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12.0,
-                        vertical: 4.0,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.travel_explore,
-                            color: NavColors.stoopOf(context),
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Text(
-                              'The Stoop',
-                              style: TextStyle(
-                                color: NavColors.stoopOf(context),
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   InkWell(
                     onTap: () => Navigator.of(context).push(

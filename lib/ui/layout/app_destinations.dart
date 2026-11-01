@@ -150,12 +150,12 @@ const appDestinations = <AppDestination>[
     PhonePlacement.createSheet,
     desktopLabel: 'Create Group Chat',
   ),
+  // Phone only: the desktop sidebar has no Stoop button.
   AppDestination(
     kStoopDestination,
     'Browse The Stoop',
     Icons.travel_explore,
     PhonePlacement.createSheet,
-    desktopLabel: 'The Stoop',
   ),
   AppDestination(
     'backups',

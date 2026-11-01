@@ -141,4 +141,24 @@ void main() {
       );
     }
   });
+
+  testWidgets('no The Stoop button', (tester) async {
+    await _pumpSidebar(
+      tester,
+      window: const Size(1440, 900),
+      scale: _appScale(1440, 1.0),
+    );
+    final inSidebar = find.byType(Sidebar);
+    expect(
+      find.descendant(of: inSidebar, matching: find.textContaining('Stoop')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: inSidebar,
+        matching: find.byIcon(Icons.travel_explore),
+      ),
+      findsNothing,
+    );
+  });
 }
