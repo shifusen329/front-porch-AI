@@ -3,6 +3,42 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-10-31 19:16:32 -0500 (CDT)
+
+On the `dev` branch. This is 1.1.3.
+
+### Fixed
+
+- **The image generator failed with a bare "Generation failed: Exception:"**
+  (`a6dc6d57`). The message now gives the image server's own reason.
+- **The first picture after a launch broke reForge until it was restarted**
+  (`a6dc6d57`). The app unloaded the checkpoint and asked for the same one
+  back. reForge never reloads a checkpoint it already has, so its model
+  stayed half in memory and every picture failed with "Expected all tensors
+  to be on the same device". The app now leaves a checkpoint the server
+  already has alone. If a server is already stuck that way, the message
+  says to restart it.
+- **Esc closes the Image Studio** (`58a94ff2`), as its ✕ does, including
+  the question asked while an expression pack is being made. A click
+  outside still leaves it up.
+
+### Changed
+
+- **Source code and Report a license violation open this fork**
+  (`69f2c21a`), in Settings → General → About & License and in the phone
+  web app's Settings.
+- **The desktop sidebar no longer has Join the Discord or Buy Me a Coffee**
+  (`69f2c21a`).
+
+### Known gaps
+
+- 1.1.1 and 1.1.2 still have the reForge bug. A server they broke needs one
+  restart after updating.
+- The six sidebar golden images still show a sliver of the Discord row.
+  They need Docker to be redrawn.
+- The phone web app's menu still has Join the Discord, and the desktop
+  update dialog still has a Ko-fi button.
+
 ## 2026-10-31 14:44:09 -0500 (CDT)
 
 On the `dev` branch. This is 1.1.2: this entry and the two below it
