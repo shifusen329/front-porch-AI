@@ -3,6 +3,42 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-11-01 01:00:10 -0500 (CDT)
+
+On the `dev` branch. This is 1.1.4.
+
+### Changed
+
+- **The model names the place for scene backgrounds** (`0732eb85`). After
+  each reply, the helper model (or the chat model) reads where the
+  character is and what the reply says, and names the place: *stairwell*,
+  *school rooftop*, *gazebo*. Any place the story reaches is painted and
+  switched to. It is told which places already have pictures, so *the
+  veranda swing* shows the porch picture instead of painting a new one.
+  - Before, a place counted only when the Realism Engine's position
+    contained a word from a fixed list, so a chat in a school stairwell
+    painted nothing.
+  - Each reply's place is remembered, so reopening a chat shows the same
+    place without asking again, and a regenerated, swiped or edited reply
+    is asked about again.
+  - The word list is the fallback when the model can't answer, and it
+    gained about 75 everyday places. An answer in character ("Mm, this
+    way") is ignored, not taken as a place.
+  - A position that names no place now says so in the debug log.
+
+### Fixed
+
+- **An uncaught error in the debug log on every chat on Windows**
+  (`12e09b9c`): the expression classifier wrote to a console a release
+  build doesn't have.
+
+### Known gaps
+
+- Checked in the test suites, in the scene end-to-end test on Windows and
+  against a real vLLM model, not yet by hand in a chat that paints.
+- One more small model call after each reply while scene backgrounds can
+  show or paint something.
+
 ## 2026-10-31 19:16:32 -0500 (CDT)
 
 On the `dev` branch. This is 1.1.3.
