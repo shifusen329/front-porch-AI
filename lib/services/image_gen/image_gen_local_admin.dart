@@ -213,6 +213,14 @@ class ImageGenLocalAdmin {
       lastLoadedCheckpoint = modelName;
       return true;
     }
+    // Already the server's model, as on the first generation after every
+    // launch. Unloading it would break reForge: it never reloads the
+    // checkpoint it already has, so the model stays half in memory and every
+    // generation fails with "Expected all tensors to be on the same device".
+    if (await _activeCheckpoint(baseUrl) == modelName) {
+      lastLoadedCheckpoint = modelName;
+      return true;
+    }
     // Step 1: unload current model (best-effort — Draw Things may ignore this)
     await unloadViaService(baseUrl);
     // Step 2: request the new checkpoint
@@ -253,6 +261,25 @@ class ImageGenLocalAdmin {
       return false;
     } finally {
       client.close();
+    }
+  }
+
+  /// The checkpoint the server has selected, or null when it cannot say.
+  Future<String?> _activeCheckpoint(String baseUrl) async {
+    try {
+      final resp = await http
+          .get(
+            Uri.parse(
+              '${ComfyUiService.ensureHttpScheme(baseUrl)}/sdapi/v1/options',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (resp.statusCode != 200) return null;
+      final body = jsonDecode(resp.body);
+      return body is Map ? body['sd_model_checkpoint']?.toString() : null;
+    } catch (e) {
+      debugPrint('ImageGen: could not read the active checkpoint: $e');
+      return null;
     }
   }
 

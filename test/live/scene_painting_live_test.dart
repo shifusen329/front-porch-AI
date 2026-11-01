@@ -16,10 +16,12 @@
 @Tags(['live'])
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:front_porch_ai/database/database.dart';
@@ -125,6 +127,40 @@ void main() {
       print('painted: ${painted.single.file.path} (${bytes.length} bytes)');
     },
     skip: skip,
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  // reForge never reloads the checkpoint it already has, so an unload before
+  // the first picture left every picture failing with "Expected all tensors
+  // to be on the same device" until it was restarted.
+  test(
+    'the first picture after a launch, on the checkpoint the server already '
+    'has, paints, and so does the next',
+    () async {
+      SharedPreferences.setMockInitialValues({'update_auto_check': false});
+      final storage = StorageService();
+      await storage.initialized;
+      final options = await http.get(Uri.parse('$sdapi/sdapi/v1/options'));
+      final loaded = (jsonDecode(options.body) as Map)['sd_model_checkpoint'];
+      final s = storage.imageGenSettings;
+      await s.setImageGenBackend('a1111');
+      await s.setLocalImageGenUrl(sdapi);
+      await s.setImageGenModel('$loaded');
+      await s.setImageGenSize('512x512');
+      await s.setImageGenSteps(4);
+      // A new service has no checkpoint of its own yet, as after a launch.
+      final images = ImageGenService(storage);
+
+      for (final picture in ['first', 'next']) {
+        final bytes = await images.generateImage(prompt: 'scenery, porch');
+        expect(
+          bytes,
+          isNotNull,
+          reason: '$picture picture: ${images.statusMessage}',
+        );
+      }
+    },
+    skip: sdapi.isEmpty ? 'set SCENE_LIVE_SDAPI_URL to run' : false,
     timeout: const Timeout(Duration(minutes: 5)),
   );
 }

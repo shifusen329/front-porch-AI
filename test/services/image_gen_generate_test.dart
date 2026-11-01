@@ -301,6 +301,61 @@ void main() {
       }),
     );
 
+    // reForge's own answer when the generation itself throws: the reason is
+    // in "errors", and "detail" is empty.
+    Map<String, dynamic> reForgeFailure(String errors) => {
+      'error': 'RuntimeError',
+      'detail': '',
+      'body': '',
+      'errors': errors,
+    };
+
+    test(
+      'a failure inside the generation shows the server reason, not a bare '
+      'Exception:',
+      () => _withRealHttp(() async {
+        fake.genStatusCode = 500;
+        fake.genErrorBody = reForgeFailure('CUDA out of memory');
+        final bytes = await service.generateImage(prompt: 'p');
+        expect(bytes, isNull);
+        expect(service.statusMessage, 'Generation failed: CUDA out of memory');
+      }),
+    );
+
+    test(
+      'a model split between the graphics card and memory says to restart '
+      'the image server',
+      () => _withRealHttp(() async {
+        fake.genStatusCode = 500;
+        fake.genErrorBody = reForgeFailure(
+          'Expected all tensors to be on the same device, but got tensors is '
+          'on cuda:0, different from other tensors on cpu (when checking '
+          'argument in method wrapper_CUDA_cat)',
+        );
+        await service.generateImage(prompt: 'p');
+        expect(service.statusMessage, startsWith('Generation failed: '));
+        expect(
+          service.statusMessage,
+          contains('Restart Automatic1111 or Forge'),
+        );
+      }),
+    );
+
+    test(
+      'the first generation after a launch leaves a checkpoint the server '
+      'already has loaded alone',
+      () => _withRealHttp(() async {
+        fake.currentCheckpoint = 'checkpointA';
+        await storage.imageGenSettings.setImageGenModel('checkpointA');
+
+        final bytes = await service.generateImage(prompt: 'p');
+        expect(bytes, isNotNull);
+        expect(fake.unloadCount, 0, reason: 'an unload reForge never undoes');
+        expect(fake.optionsPostCount, 0);
+        expect(fake.txt2imgCount, 1);
+      }),
+    );
+
     test(
       'a missing local URL fails fast with no request and no crash',
       () => _withRealHttp(() async {
@@ -795,6 +850,7 @@ class _FakeLocalImageServer {
   int genStatusCode = 200;
   List<String> genImages = const [];
   String? genErrorDetail;
+  Map<String, dynamic>? genErrorBody;
 
   // ── checkpoint switch ───────────────────────────────────────────────
   int unloadCount = 0;
@@ -920,7 +976,9 @@ class _FakeLocalImageServer {
     if (genStatusCode == 200) {
       req.response.write(jsonEncode({'images': genImages}));
     } else {
-      req.response.write(jsonEncode({'detail': genErrorDetail ?? 'error'}));
+      req.response.write(
+        jsonEncode(genErrorBody ?? {'detail': genErrorDetail ?? 'error'}),
+      );
     }
   }
 }

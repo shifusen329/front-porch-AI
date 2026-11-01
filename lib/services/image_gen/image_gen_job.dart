@@ -452,10 +452,11 @@ class ImageGenJob {
       _status.notify();
       return imageBytes;
     } catch (e) {
+      debugPrint('ImageGen: generation failed: $e');
       final msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       _status.statusMessage = msg.startsWith('Remote image timed out')
           ? msg
-          : 'Generation failed: $e';
+          : 'Generation failed: $msg';
       _status.notify();
       return null;
     } finally {

@@ -134,13 +134,13 @@ Future<Uint8List> generateViaA1111({
         .timeout(const Duration(seconds: 600)); // allow time for model load
 
     if (response.statusCode != 200) {
-      String errorMsg = 'HTTP ${response.statusCode}';
-      try {
-        final errBody = jsonDecode(response.body);
-        final detail = errBody['detail'];
-        if (detail is String) errorMsg = detail;
-      } catch (_) {}
-      throw Exception(errorMsg);
+      final reason = a1111FailureReason(response.statusCode, response.body);
+      debugPrint(
+        'ImageGen: $endpoint answered ${response.statusCode}: $reason',
+      );
+      throw Exception(
+        reason.contains(_deviceSplit) ? _deviceSplitAdvice : reason,
+      );
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -156,6 +156,32 @@ Future<Uint8List> generateViaA1111({
     client.close();
   }
 }
+
+/// What an Automatic1111 / Forge error answer says went wrong. A refused
+/// request puts the reason in `detail`; a failure inside the generation
+/// sends `"detail": ""` with the reason in `errors`.
+String a1111FailureReason(int statusCode, String body) {
+  try {
+    final json = jsonDecode(body);
+    if (json is Map) {
+      for (final key in const ['detail', 'errors', 'error']) {
+        final value = json[key];
+        if (value is String && value.trim().isNotEmpty) return value.trim();
+      }
+    }
+  } on FormatException {
+    // Not JSON: the status code is all there is.
+  }
+  return 'HTTP $statusCode';
+}
+
+// The server holds its model partly on the graphics card and partly in
+// memory. Every request fails the same way until it loads the model again.
+const _deviceSplit = 'Expected all tensors to be on the same device';
+const _deviceSplitAdvice =
+    'The image server has part of its model on the graphics card and part '
+    'in memory, so it cannot draw. Restart Automatic1111 or Forge, then try '
+    'again.';
 
 /// Generate via Draw Things gRPC service (Python client bridge).
 /// Extended with DT-native params, LoRAs, + optional reference image (passed through to CLI).
