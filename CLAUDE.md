@@ -13,6 +13,103 @@ will rot, point at the live source instead of pinning it here.
 
 ---
 
+## This fork (read before everything else)
+
+This checkout is a separate fork: `origin` is
+`https://github.com/shifusen329/front-porch-AI`. Where this section and the
+rest of the file disagree, this section wins.
+
+- **Branch `dev`, pushed to `origin dev`.** No pull requests, labels or
+  merge queue. The `Rawhide` / `main` table, the PR rules and
+  `approved-test-change` under Branches and CI describe the project this
+  fork came from. Their reasons still hold: a changed or deleted test needs
+  its rationale in the commit message.
+- **Commit only when asked; push only when asked.**
+- **History:** `CHANGE_LOG.md`, newest first. Each entry is headed by its
+  date and time, says which release it is, and names each item's commit.
+  It has Added / Changed / Fixed / Known gaps. **Plan:** `TODO.md`, which
+  is untracked and never pushed.
+- **Talking to the maintainer:** plain words. Say "phone web app", not
+  "PWA", and spell out acronyms.
+- **Never print secrets:** `tools/publish_update.env`,
+  `android/key.properties`, and the password in
+  `web_ui/e2e/.auth/server.json`.
+- **The upstream project's community links are coming out of the UI.** The
+  desktop sidebar's Discord, Buy Me a Coffee and Stoop buttons are gone;
+  the update dialog's Ko-fi button and the phone web app's Discord link
+  are still there. Don't add any back. The Community line at the end of
+  this file is upstream's.
+
+### Where work runs
+
+Builds, test suites and anything that opens a window run on the **dev
+server**, not on the maintainer's desktop, so they never interrupt what is
+open there. On the desktop, ask before any run that opens a window
+(`flutter run`, an `integration_test/` suite, the browser suite's hold mode,
+the Android emulator) or loads the machine (a whole `flutter test`, a
+release build).
+
+**A Linux dev server, headless:**
+
+- Flutter **3.47.7** (CI's); Node **24** (Node 26's own `localStorage`
+  breaks about 60 vitest tests); Docker for the goldens; a JDK and the
+  Android SDK for APKs.
+- Linux desktop packages, as CI installs them: `ninja-build libgtk-3-dev
+  libsecret-1-dev xvfb libgstreamer1.0-dev
+  libgstreamer-plugins-base1.0-dev`, plus clang, cmake and pkg-config from
+  Flutter's Linux setup.
+- After a clone: `flutter pub get`, then `cd web_ui && npm ci && npm run
+  build` (the desktop app serves nothing without that bundle).
+- End-to-end with no screen, one file per run: `xvfb-run -a -s "-screen 0
+  1600x1000x24" flutter test integration_test/<suite>_test.dart -d linux`.
+- Goldens: `./scripts/ci-local.sh`; they only render right in its image.
+- The Android emulator needs KVM (`/dev/kvm`). Without it, install test
+  APKs on a phone.
+- Live tests (tags `live`, `stoop_live`) take their servers from
+  environment variables. `grep -rn "Platform.environment\[" test
+  integration_test` lists them. Set them on the server; never write
+  addresses or keys into the repo.
+
+**Still needs Windows:** `tools/publish_update.dart` builds the Windows
+installer (`flutter build windows` and Inno Setup 6) and stops on any other
+system, and Windows-only bugs (paths, file locks, the installer, the
+reopen) show only there. Give the server a Windows machine or VM for
+releases and Windows suites, or use the desktop when the maintainer says
+so.
+
+**Copy by hand to the machine that publishes** (gitignored or outside the
+repo; never commit them):
+
+- `tools/publish_update.env` (the `FPAI_UPDATE_*` keys) and the ssh key it
+  names.
+- **The Android debug keystore**, `~/.android/debug.keystore`
+  (`%USERPROFILE%\.android\debug.keystore` on Windows). Published APKs are
+  debug-signed, and Android only updates an app signed with the same key:
+  an APK signed with a new machine's keystore cannot update any installed
+  phone.
+- `android/key.properties` and the release keystore it names.
+- `TODO.md`.
+
+Before blaming a change for a red test, run that test at `HEAD` in a
+worktree: some already fail on Windows or on a given clock (see `TODO.md`).
+
+### Releasing
+
+1. Commit the work, then a `docs(changelog)` commit for its
+   `CHANGE_LOG.md` entry.
+2. Write the update dialog's notes in a scratch file: what changed, for
+   users. No commit messages, no personal names.
+3. On Windows: `dart run tools/publish_update.dart X.Y.Z --notes
+   <file>`. It stamps `lib/app_version.dart`, builds both, uploads them,
+   writes the feed last and checks what the server serves.
+4. Commit the stamp: `chore(release): stamp X.Y.Z`. Push when asked.
+
+Versions are plain `MAJOR.MINOR.PATCH`. The updater sorts `1.1.2-hotfix`
+**older** than `1.1.2`, and `-alpha` / `-beta` / `-rc` / `-dev` /
+`-nightly` builds open the separate beta library.
+
+---
+
 ## Definition of done (read this first)
 
 A PR is done when a machine has checked it. People only judge looks.

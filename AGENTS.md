@@ -10,6 +10,10 @@ Dart: [docs/maintainer-agent-playbook.md](docs/maintainer-agent-playbook.md).
 
 ## What you must believe
 
+- **This is a fork.** CLAUDE.md's **This fork** section comes first: work
+  on `dev`, no pull requests, builds and window-opening runs on the dev
+  server rather than the maintainer's desktop, and how a release is
+  published.
 - **No sidecars.** TTS, STT, embeddings, expression, Draw Things run
   in-process. Do not spawn helper processes. Waifu Coder may manage an
   OpenCode binary the way the app manages Kobold — that is not a chat sidecar
