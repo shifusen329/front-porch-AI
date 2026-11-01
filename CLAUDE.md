@@ -27,8 +27,8 @@ rest of the file disagree, this section wins.
 - **Commit only when asked; push only when asked.**
 - **History:** `CHANGE_LOG.md`, newest first. Each entry is headed by its
   date and time, says which release it is, and names each item's commit.
-  It has Added / Changed / Fixed / Known gaps. **Plan:** `TODO.md`, which
-  is untracked and never pushed.
+  It has Added / Changed / Fixed / Known gaps. **Plan:** `TODO.md`, ordered
+  by value for the effort.
 - **Talking to the maintainer:** plain words. Say "phone web app", not
   "PWA", and spell out acronyms.
 - **Never print secrets:** `tools/publish_update.env`,
@@ -88,7 +88,6 @@ repo; never commit them):
   an APK signed with a new machine's keystore cannot update any installed
   phone.
 - `android/key.properties` and the release keystore it names.
-- `TODO.md`.
 
 Before blaming a change for a red test, run that test at `HEAD` in a
 worktree: some already fail on Windows or on a given clock (see `TODO.md`).

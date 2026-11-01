@@ -228,7 +228,6 @@ installers/**/*.exe
 
 # Reference material kept beside the code, not shipped: the icon pack the
 # Android launcher icon was copied from (its res/ lives in android/ now),
-# the icon candidates, and local to-do notes.
+# and the icon candidates.
 assets/front_porch_android_icon_pack/
 assets/side-patio-gemini.jpg
-/TODO.md
