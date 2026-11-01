@@ -17,7 +17,6 @@
 // along with Front Porch AI. If not, see <https://www.gnu.org/licenses/>.
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -128,9 +127,11 @@ class OnnxExpressionClassifier {
     _lastMessageText = getMessages().isNotEmpty && !getMessages().last.isUser
         ? getMessages().last.text
         : '';
-    stdout.writeln(
-      '>>> [CHAT:ONNX] Starting classification for message count: $_lastMessageCount',
-    ); // verbatim from original (for >>> marker visibility in logs; dart:io import for this only; no change for mechanical fidelity)
+    // Not stdout: a Windows release build has no console, and the write
+    // fails as an uncaught error.
+    debugPrint(
+      '[Expression:ONNX] Classifying at message count $_lastMessageCount',
+    );
     try {
       // Initialize classifier with current mode
       await _service!.ensureInitialized(
