@@ -21,6 +21,8 @@ On the `dev` branch. This is 1.1.5.
   Windows, the files to copy over by hand (above all the Android debug
   keystore that published APKs are signed with), and how a release is
   published. AGENTS.md points at it.
+- **`TODO.md` is in the repository** (`5bd15896`), so a clone on the dev
+  server has the plan. It was ignored by git before.
 
 ### Known gaps
 
