@@ -672,7 +672,7 @@ export function SettingsPage() {
           <div className="about-links">
             <a
               className="btn-link"
-              href="https://github.com/linux4life1/front-porch-ai"
+              href="https://github.com/shifusen329/front-porch-AI"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -680,7 +680,7 @@ export function SettingsPage() {
             </a>
             <a
               className="btn-link"
-              href="https://github.com/linux4life1/front-porch-ai/issues"
+              href="https://github.com/shifusen329/front-porch-AI/issues"
               target="_blank"
               rel="noopener noreferrer"
             >

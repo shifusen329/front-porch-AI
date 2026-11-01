@@ -65,10 +65,6 @@ class AppDestination {
   final String? hiddenBecause;
 }
 
-/// The desktop sidebar's community links.
-const kDiscordInviteUrl = 'https://discord.gg/e4tET6rpdv';
-const kKofiUrl = 'https://ko-fi.com/sosukeaizen37411';
-
 const kChatsDestination = 'chats';
 const kPorchDestination = 'porch';
 const kSettingsDestination = 'settings';
@@ -77,11 +73,6 @@ const kPersonasDestination = 'personas';
 const kWorldsDestination = 'worlds';
 const kStoriesDestination = 'stories';
 const kStoopDestination = 'stoop';
-
-/// The phone leaves out the sidebar's community links.
-const _noCommunityLinks =
-    'The phone app leaves out the community links; the desktop sidebar '
-    'keeps them.';
 
 /// In bottom-bar order for tabs and bar buttons, then Porch and sheet order.
 const appDestinations = <AppDestination>[
@@ -173,22 +164,6 @@ const appDestinations = <AppDestination>[
     PhonePlacement.hidden,
     desktopLabel: 'Backups & Restore',
     hiddenBecause: 'A phone opens it as the Backups tab in Settings.',
-  ),
-  AppDestination(
-    'discord',
-    'Join the Discord',
-    Icons.discord,
-    PhonePlacement.hidden,
-    desktopLabel: 'Join the Discord',
-    hiddenBecause: _noCommunityLinks,
-  ),
-  AppDestination(
-    'coffee',
-    'Buy Me a Coffee',
-    Icons.coffee_outlined,
-    PhonePlacement.hidden,
-    desktopLabel: 'Buy Me a Coffee ☕',
-    hiddenBecause: _noCommunityLinks,
   ),
   AppDestination(
     'manage_models',

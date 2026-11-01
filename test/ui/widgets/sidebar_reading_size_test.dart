@@ -122,4 +122,23 @@ void main() {
       );
     });
   }
+
+  // This fork shows no community links of the project it came from.
+  testWidgets('no Join the Discord or Buy Me a Coffee row', (tester) async {
+    await _pumpSidebar(
+      tester,
+      window: const Size(1440, 900),
+      scale: _appScale(1440, 1.0),
+    );
+    for (final word in ['Discord', 'Coffee']) {
+      expect(
+        find.descendant(
+          of: find.byType(Sidebar),
+          matching: find.textContaining(word),
+        ),
+        findsNothing,
+        reason: word,
+      );
+    }
+  });
 }

@@ -18,14 +18,12 @@
 
 import 'package:flutter/material.dart';
 import 'sidebar_navigation_item.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 import 'package:front_porch_ai/providers/app_state.dart';
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/ui/dialogs/update_dialog.dart';
 import 'package:front_porch_ai/ui/image_studio/home_image_studio.dart';
-import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/pages/pages.dart';
 import 'package:front_porch_ai/ui/widgets/sidebar_width.dart';
 import 'package:front_porch_ai/ui/widgets/unsaved_changes_guard.dart';
@@ -47,8 +45,6 @@ class Sidebar extends StatelessWidget {
     'User Persona',
     'Worlds',
     'Backups & Restore',
-    'Join the Discord',
-    'Buy Me a Coffee ☕',
   ];
 
   /// A tab switch throws the current page away, so unsaved edits are asked
@@ -289,76 +285,6 @@ class Sidebar extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 'Backups & Restore',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary(context),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0,
-                      vertical: 4.0,
-                    ),
-                    child: InkWell(
-                      onTap: () => launchUrl(Uri.parse(kDiscordInviteUrl)),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12.0,
-                          horizontal: 12.0,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.discord,
-                              color: NavColors.discord,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'Join the Discord',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary(context),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0,
-                      vertical: 4.0,
-                    ),
-                    child: InkWell(
-                      onTap: () => launchUrl(Uri.parse(kKofiUrl)),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12.0,
-                          horizontal: 12.0,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.coffee_outlined,
-                              color: NavColors.kofi,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'Buy Me a Coffee ☕',
                                 style: TextStyle(
                                   color: AppColors.textSecondary(context),
                                 ),

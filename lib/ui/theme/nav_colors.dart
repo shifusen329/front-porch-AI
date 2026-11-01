@@ -35,8 +35,4 @@ class NavColors {
   /// Create Group Chat.
   static const Color groupChat = Color(0xFF7C3AED);
   static final Color groupChatWash = groupChat.withValues(alpha: 0.08);
-
-  /// Brand marks on the community links.
-  static const Color discord = Color(0xFF5865F2);
-  static const Color kofi = Color(0xFFFF5E5B);
 }

@@ -29,7 +29,7 @@ class AboutLicenseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const repoUrl = 'https://github.com/linux4life1/front-porch-ai';
+    const repoUrl = 'https://github.com/shifusen329/front-porch-AI';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
