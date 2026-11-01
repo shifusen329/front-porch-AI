@@ -14,8 +14,10 @@ import 'package:front_porch_ai/services/image/studio_desk_logic.dart';
 import 'package:front_porch_ai/services/image_gen_service.dart';
 import 'package:front_porch_ai/services/storage_service.dart';
 import 'package:front_porch_ai/services/image/draw_things_samplers.dart';
+import 'package:front_porch_ai/ui/image_studio/home_image_studio.dart';
 import 'package:front_porch_ai/ui/image_studio/image_studio.dart';
 import 'package:front_porch_ai/ui/image_studio/studio_desk_copy.dart';
+import 'package:front_porch_ai/ui/layout/layout.dart';
 
 /// Draw Things is a gRPC server on this machine. A test never dials it: the
 /// listings are answered as "nothing found" on the spot, so no client, socket
@@ -471,5 +473,63 @@ void main() {
       find.widgetWithText(FilledButton, 'Generate'),
     );
     expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets('Escape closes the Studio; a click outside leaves it up', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final dir = Directory.systemTemp.createTempSync('desk-escape');
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    final storage = StorageService.sandbox(dir.path);
+    final prefs = await SharedPreferences.getInstance();
+    storage.imageGenSettings.initializeBase(prefs, storage.notifyListeners);
+    storage.imageGenSettings.load();
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<StorageService>.value(value: storage),
+          ChangeNotifierProvider<ImageGenService>.value(
+            value: _NoGrpcImageGen(storage),
+          ),
+        ],
+        child: MaterialApp(
+          navigatorKey: navigator,
+          builder: (_, child) =>
+              EscapeGoesBack(navigatorKey: navigator, child: child!),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => showHomeImageStudio(context),
+                child: const Text('open studio'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    // The Studio pops a frame after its close, then animates out.
+    Future<void> settle() async {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    await tester.tap(find.text('open studio'));
+    await settle();
+    expect(find.byType(ImageStudio), findsOneWidget);
+
+    await tester.tapAt(const Offset(4, 4));
+    await settle();
+    expect(find.byType(ImageStudio), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle();
+    expect(find.byType(ImageStudio), findsNothing);
+    expect(find.text('open studio'), findsOneWidget);
   });
 }

@@ -23,6 +23,7 @@ import 'package:provider/provider.dart';
 
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/capability/capability.dart';
+import 'package:front_porch_ai/ui/layout/layout.dart';
 import 'package:front_porch_ai/ui/theme/theme.dart';
 
 import 'studio_widgets.dart';
@@ -135,8 +136,12 @@ class StudioView extends StatelessWidget {
   final Widget? batchBody;
   final bool draftBusy;
 
+  // Escape does what the ✕ does; a click outside leaves the Studio up.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      EscapeCloses(onEscape: onClose, child: _dialog(context));
+
+  Widget _dialog(BuildContext context) {
     return Dialog(
       backgroundColor: AppColors.surfaceOf(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

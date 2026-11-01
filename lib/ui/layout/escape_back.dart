@@ -15,8 +15,8 @@ import 'package:front_porch_ai/ui/widgets/widgets.dart';
 ///
 /// * a text box with the cursor lets go of it, so a stray Escape never
 ///   throws away what was being typed, even in a dialog;
-/// * a menu or dialog the focus is not in closes if it can be dismissed,
-///   and one that cannot stays up;
+/// * a menu or dialog the focus is not in closes if it can be dismissed;
+///   one that cannot stays up, unless [EscapeCloses] gives it a close;
 /// * a page over the main screen goes back through `maybePop`, so unsaved
 ///   edits are asked about as with the back button;
 /// * the main screen takes one step back: the open page's own step, then
@@ -83,7 +83,11 @@ class _EscapeGoesBackState extends State<EscapeGoesBack> {
     });
     final shown = top;
     if (shown is PopupRoute) {
-      if (shown.barrierDismissible) navigator.maybePop();
+      if (shown.barrierDismissible) {
+        navigator.maybePop();
+      } else {
+        EscapeCloses._closers[shown]?.call();
+      }
       return KeyEventResult.handled;
     }
     if (shown is! PageRoute) return KeyEventResult.ignored;
@@ -111,4 +115,44 @@ class _EscapeGoesBackState extends State<EscapeGoesBack> {
     onKeyEvent: _onKey,
     child: widget.child,
   );
+}
+
+/// Lets Escape close a dialog that a click outside leaves up, by running
+/// [onEscape], the dialog's own close: a stray click must not throw the work
+/// away, but Escape is meant. The Image Studio is one.
+class EscapeCloses extends StatefulWidget {
+  const EscapeCloses({super.key, required this.onEscape, required this.child});
+
+  final VoidCallback onEscape;
+  final Widget child;
+
+  static final Map<Route<dynamic>, VoidCallback> _closers = {};
+
+  @override
+  State<EscapeCloses> createState() => _EscapeClosesState();
+}
+
+class _EscapeClosesState extends State<EscapeCloses> {
+  Route<dynamic>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == _route) return;
+    EscapeCloses._closers.remove(_route);
+    _route = route;
+    if (route != null) {
+      EscapeCloses._closers[route] = () => widget.onEscape();
+    }
+  }
+
+  @override
+  void dispose() {
+    EscapeCloses._closers.remove(_route);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

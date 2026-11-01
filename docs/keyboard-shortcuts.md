@@ -38,7 +38,7 @@ The keyboard shortcut is desktop app only — the browser/phone UI has the ⟳ b
 `Esc` is the back key, in the desktop app and the browser UI alike. Each press takes one step, starting with whatever is on top:
 
 1. **In a text box, it lets go of the cursor first.** What you typed stays. Press `Esc` again to go on.
-2. **A menu, dialog, sheet or drawer that's open closes.** One that can't be closed (one showing progress, say) stays up.
+2. **A menu, dialog, sheet or drawer that's open closes.** One that can't be closed (one showing progress, say) stays up. The Image Studio ignores a click outside it, so a stray click doesn't lose your work, but `Esc` closes it like its ✕ does.
 3. **Otherwise the screen goes back.** A chat goes back to the library. A page you opened from the sidebar (Settings, Manage Models, Worlds…) goes back to the page you were on before it.
 4. **On Home**, it first returns Porch Stories or Waifu Coder to Chats, then leaves select mode, then goes up out of the folder you're in.
 
