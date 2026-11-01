@@ -3,6 +3,32 @@
 Changes on the `dev` branch, newest first. Each entry names the commit that
 carries it; `git log` has the full detail.
 
+## 2026-11-01 13:43:51 -0600 (CST)
+
+On the `dev` branch. This is 1.1.5.
+
+### Changed
+
+- **The desktop sidebar no longer has The Stoop** (`3d3f714f`). It was the
+  desktop's only way into The Stoop. The Android app still opens it from
+  Characters → **New** → **Browse The Stoop**, and the phone web app from
+  **The Stoop** in its menu. The user guide, characters, frequently asked
+  questions, getting started, troubleshooting and keyboard shortcuts pages
+  now point there.
+- **CLAUDE.md has the fork's own rules first** (`b65ea8b0`): work on `dev`
+  with no pull requests, builds and window-opening test runs on a dev
+  server instead of the desktop, what that server needs, what still needs
+  Windows, the files to copy over by hand (above all the Android debug
+  keystore that published APKs are signed with), and how a release is
+  published. AGENTS.md points at it.
+
+### Known gaps
+
+- The six sidebar golden images still show the old sidebar. They need
+  Docker to be redrawn.
+- No dev server is set up yet. Releases still need Windows, for the
+  installer.
+
 ## 2026-11-01 01:00:10 -0500 (CDT)
 
 On the `dev` branch. This is 1.1.4.
