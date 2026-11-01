@@ -30,6 +30,7 @@ import 'package:front_porch_ai/services/storage_service.dart';
 
 import 'group_speaker_resolution.dart';
 import 'scene_painter.dart';
+import 'scene_place_reader.dart';
 import 'stream_tick_notify.dart';
 
 /// The scene picture a chat shows, and whose library it came from.
@@ -54,13 +55,20 @@ final Expando<SceneBackdrop> _backdrops = Expando('scene backdrop');
 /// is read from where the Realism Engine says the character is (the live
 /// stance, then the stance stamped on each reply, newest first), so
 /// regenerate, swipe, delete, edit and Continue move it by rewinding or
-/// restamping that stance. A phrase that names no place keeps looking back
-/// (the scene holds); one that names a place with no picture ends the
-/// search (the normal background returns), and that place is painted with
-/// the image generator when one is set up ([ScenePainter]).
+/// restamping that stance. The model names the place from the newest
+/// stance and its reply ([ScenePlaceReader]), whatever place the story
+/// reaches; the word list reads a stance it never answered. A phrase that
+/// names no place keeps looking back (the scene holds); one that names a
+/// place with no picture ends the search (the normal background returns),
+/// and that place is painted with the image generator when one is set up
+/// ([ScenePainter]).
 class SceneBackdrop extends ChangeNotifier {
   SceneBackdrop._(this._chat, this._storage)
-    : _library = SceneLibrary(() => _storage.charactersDir) {
+    : _library = SceneLibrary(() => _storage.charactersDir),
+      _places = ScenePlaceReader(
+        ask: (instruction) => _chat.nameScenePlace(instruction),
+        cacheFile: () => _storage.directories.scenePlaceCacheFile,
+      ) {
     _painter = ScenePainter(
       generator: _generator,
       writePrompt: (instruction) => _chat.writeScenePrompt(instruction),
@@ -87,11 +95,15 @@ class SceneBackdrop extends ChangeNotifier {
   final ChatService _chat;
   final StorageService _storage;
   final SceneLibrary _library;
+  final ScenePlaceReader _places;
   late final ScenePainter _painter;
 
   SceneShot? _current;
   String? _cue;
   bool _reportedBroken = false;
+
+  /// The stance last logged for naming no place, so it is logged once.
+  String? _unplaced;
   int _run = 0;
   Future<void>? _pending;
 
@@ -250,6 +262,7 @@ class SceneBackdrop extends ChangeNotifier {
       for (final m in replies)
         (text: _stampedStance(m), who: _speaker(cast, m), story: m.displayText),
     ];
+    var asked = false;
     for (final (:text, :who, :story) in phrases) {
       if (text.trim().isEmpty) continue;
       final own = who == null ? null : owners[who]?.name;
@@ -276,7 +289,15 @@ class SceneBackdrop extends ChangeNotifier {
         for (final f in order)
           for (final s in pictures[f]!) s.place,
       ];
-      switch (SceneMatcher.read(text, places)) {
+      final reading = await _reading(
+        text,
+        story,
+        places,
+        who: (who ?? cast.firstOrNull)?.name ?? 'the character',
+        ask: !asked,
+      );
+      asked = true;
+      switch (reading) {
         case AtPicturedPlace(:final place):
           for (final f in order) {
             final ofPlace = [
@@ -305,7 +326,43 @@ class SceneBackdrop extends ChangeNotifier {
           continue;
       }
     }
+    final newest = phrases
+        .map((p) => p.text.trim())
+        .firstWhere((t) => t.isNotEmpty, orElse: () => '');
+    if (newest.isNotEmpty && newest != _unplaced) {
+      _unplaced = newest;
+      debugPrint(
+        '[SceneBackdrop] No place named in "$newest" or the replies before '
+        'it: no scene to show or paint',
+      );
+    }
     return none;
+  }
+
+  /// Where [stance] puts [who]: the model's answer, asked for the newest
+  /// stance only (older ones use what it said before), else the word list.
+  Future<PlaceReading> _reading(
+    String stance,
+    String story,
+    List<String> places, {
+    required String who,
+    required bool ask,
+  }) async {
+    final named = ask
+        ? await _places.read(
+            who: who,
+            stance: stance,
+            story: story,
+            pictured: places,
+            previous: _current?.scene.place,
+          )
+        : await _places.remembered(stance, story);
+    if (named == null) return SceneMatcher.read(stance, places);
+    if (named.isEmpty) return const NoPlace();
+    for (final place in places) {
+      if (placeWords(place).join(' ') == named) return AtPicturedPlace(place);
+    }
+    return AtOtherPlace(named);
   }
 
   CharacterCard? _speaker(List<CharacterCard> cast, ChatMessage m) =>

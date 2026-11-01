@@ -28,7 +28,13 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:front_porch_ai/database/database.dart';
 import 'package:front_porch_ai/models/models.dart';
 import 'package:front_porch_ai/services/chat/chat.dart'
-    show SceneBackdrop, ScenePainter, SceneWant;
+    show
+        SceneBackdrop,
+        ScenePainter,
+        ScenePlaceReader,
+        SceneWant,
+        scenePlaceFromAnswer,
+        scenePlaceFromReply;
 import 'package:front_porch_ai/services/services.dart';
 import 'package:front_porch_ai/services/web/facade/facades.dart';
 import 'package:front_porch_ai/services/web/routes/routes.dart';
@@ -80,6 +86,28 @@ class _SilentLlm extends LLMService {
 
   @override
   String get backendName => 'SilentScenes';
+}
+
+/// The side lane answering "Where is …?" from [answers], keyed by a phrase
+/// of the position; silent to every other question. The model's own naming
+/// is pinned against a real model in test/live/scene_painting_live_test.dart.
+class _PlaceLlm extends _SilentLlm {
+  _PlaceLlm(this.answers);
+
+  final Map<String, String> answers;
+  final asked = <String>[];
+
+  @override
+  Stream<String> generateStream(GenerationParams params) async* {
+    if (!params.prompt.contains('at the end of this reply?')) return;
+    asked.add(params.prompt);
+    for (final e in answers.entries) {
+      if (params.prompt.contains('Position: ${e.key}')) {
+        yield e.value;
+        return;
+      }
+    }
+  }
 }
 
 void main() {
@@ -159,6 +187,45 @@ void main() {
       expect(placeOf('walks into the hallway', ['porch']), '(elsewhere)');
       expect(placeOf('leaning back, eyes closed', ['porch']), isNull);
       expect(placeOf('', ['porch']), isNull);
+    });
+
+    test('the places a school, a town or a trip goes', () {
+      for (final (phrase, place) in [
+        ('on the top step of the stairwell', 'stairwell'),
+        ('leaning on a locker in the corridor', 'corridor'),
+        ('changing in the locker room', 'locker room'),
+        ('in line at the cafeteria', 'cafeteria'),
+        ('sprawled on her dorm room bed', 'dorm room'),
+        ('pacing her apartment', 'apartment'),
+        ('unpacking in the hotel', 'hotel'),
+        ('soaking in the hot springs', 'hot spring'),
+      ]) {
+        expect(
+          SceneMatcher.read(phrase, const []),
+          isA<AtOtherPlace>().having((r) => r.place, 'place', place),
+          reason: phrase,
+        );
+      }
+    });
+
+    test("the model's answer as a place name", () {
+      for (final (answer, place) in [
+        ('"The school rooftop."', 'school rooftop'),
+        ('Place: kitchen at night', 'kitchen'),
+        ('gazebo\nbecause she is by the lake', 'gazebo'),
+        ('none', ''),
+        ('Unknown.', ''),
+        ('', null),
+        ('She is sitting on the old wooden bench beside the lake', null),
+        ('CON', null),
+      ]) {
+        expect(scenePlaceFromAnswer(answer), place, reason: answer);
+      }
+      // Only the JSON asked for: a model talking in character is no place.
+      expect(scenePlaceFromReply('{"place": "The gazebo."}'), 'gazebo');
+      expect(scenePlaceFromReply('<think>hm</think>{"place":"none"}'), '');
+      expect(scenePlaceFromReply('mm this way'), isNull);
+      expect(scenePlaceFromReply('{"where": "kitchen"}'), isNull);
     });
 
     test('the picture for the time of day', () {
@@ -748,6 +815,93 @@ void main() {
         await painted();
         expect(sent, hasLength(3), reason: 'a deleted painting comes back');
         expect(await shown(), 'hallway-morning.png');
+      });
+
+      // The stance is word for word from a chat that painted nothing and
+      // logged nothing: "stairwell" was not a place.
+      test('says when no place is named, and paints the stairwell', () async {
+        await boot();
+        await generator();
+        final logs = <String>[];
+        final print = debugPrint;
+        debugPrint = (m, {wrapWidth}) => logs.add(m ?? '');
+        addTearDown(() => debugPrint = print);
+
+        await plant(['leaning back, eyes closed'], hour: 8);
+        await painted();
+        expect(sent, isEmpty);
+        expect(
+          logs,
+          contains(contains('No place named in "leaning back, eyes closed"')),
+        );
+
+        await plant([
+          'Standing upright on the top step of the stairwell, clutching her '
+              'phone under crossed arms',
+        ], hour: 8);
+        await painted();
+        expect(sent, hasLength(1));
+        expect(prompt(0), contains('stairwell'));
+        expect(await shown(), 'stairwell-morning.png');
+      });
+
+      test('the model names a place no list has, a stance with none holds '
+          'it, and a picture is reused by its name', () async {
+        await boot();
+        await generator();
+        final cache = storage!.directories.scenePlaceCacheFile;
+        if (await cache.exists()) await cache.delete();
+        final llm = _PlaceLlm({
+          // "lake" is on the word list: the model's answer wins.
+          'leaning on the rail, watching the lake': '{"place": "The gazebo."}',
+          'eyes closed, breathing slowly': '{"place": "none"}',
+          'stirring the stew pot': '{"place": "kitchen"}',
+        });
+        chat!.testWorkerLlmServiceOverride = llm;
+        int asks(String stance) =>
+            llm.asked.where((q) => q.contains('Position: $stance')).length;
+
+        await plant(['leaning on the rail, watching the lake']);
+        await painted();
+        expect(sent, hasLength(1));
+        expect(prompt(0), contains('gazebo'));
+        expect(await shown(), 'gazebo-day.png');
+        expect(llm.asked.first, contains('Where is Mabel'));
+        expect(llm.asked.first, contains('exactly: kitchen, porch.'));
+
+        await plant([
+          'leaning on the rail, watching the lake',
+          'eyes closed, breathing slowly',
+        ]);
+        await painted();
+        expect(await shown(), 'gazebo-day.png', reason: 'the scene holds');
+        expect(sent, hasLength(1));
+        expect(
+          asks('leaning on the rail, watching the lake'),
+          1,
+          reason: 'each text is asked once',
+        );
+
+        await plant(['stirring the stew pot']);
+        await painted();
+        expect(await shown(), 'kitchen.png');
+        expect(sent, hasLength(1), reason: 'the kitchen has its picture');
+
+        // A reload reads the answers kept on disk, without the model.
+        final story = chat!.messages.lastWhere((m) => !m.isUser).displayText;
+        final again = ScenePlaceReader(
+          ask: (_) => throw StateError('asked again'),
+          cacheFile: () => storage!.directories.scenePlaceCacheFile,
+        );
+        expect(
+          await again.read(
+            who: 'Mabel',
+            stance: 'stirring the stew pot',
+            story: story,
+            pictured: const [],
+          ),
+          'kitchen',
+        );
       });
 
       test('shows the other light while it paints, and says so', () async {

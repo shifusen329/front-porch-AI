@@ -50,4 +50,16 @@ const kKnownScenePlaces = <String>[
   'forest', 'river', 'lake', 'field', 'meadow', 'mountain', 'cave', 'camp',
   'tent', 'castle', 'throne room', 'dungeon', 'barn', 'stable', 'farm',
   'kitchen', 'bedroom', 'bathroom', 'living room', 'porch',
+  'stairwell', 'stairway', 'corridor', 'lobby', 'foyer', 'entryway', //
+  'elevator', 'pantry', 'laundry room', 'nursery', 'sunroom', 'loft',
+  'workshop', 'studio', 'locker room', 'changing room', 'dressing room',
+  'waiting room', 'break room', 'cafeteria', 'auditorium', 'gymnasium',
+  'courtyard', 'dorm', 'dorm room', 'dormitory', 'apartment', 'hotel',
+  'motel', 'cabin', 'cottage', 'mansion', 'palace', 'hut', 'mall', 'arcade',
+  'theater', 'theatre', 'cinema', 'museum', 'chapel', 'cathedral', 'shrine',
+  'cemetery', 'graveyard', 'crypt', 'warehouse', 'factory', 'laboratory',
+  'clinic', 'bakery', 'diner', 'bookstore', 'parking lot', 'plaza',
+  'airport', 'subway', 'pier', 'dock', 'harbor', 'harbour', 'marina',
+  'desert', 'jungle', 'swamp', 'waterfall', 'hot spring', 'orchard',
+  'vineyard', 'pond', 'creek', 'armory',
 ];

@@ -268,4 +268,19 @@ extension ChatServiceImages on ChatService {
     );
     return (text == null || text.trim().isEmpty) ? null : text;
   }
+
+  /// Names the place a reply leaves a character in, for the scene
+  /// background, on the side lane. Null when that model is not ready or
+  /// says nothing.
+  Future<String?> nameScenePlace(String instruction) async {
+    if (!_sideLaneLlm.isReady) return null;
+    final text = await _fireLLMEval(
+      instruction,
+      label: 'scene-place',
+      maxLength: 48,
+      salvageReasoning: false,
+      wallClockTimeout: const Duration(seconds: 60),
+    );
+    return (text == null || text.trim().isEmpty) ? null : text;
+  }
 }

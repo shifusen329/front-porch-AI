@@ -68,6 +68,11 @@ class AppDirectories {
   Directory get webThumbnailCacheDir =>
       Directory(path.join(rootPath ?? '', 'cache', 'web_thumbs'));
 
+  /// The places the model named for scene backgrounds, by the text it read.
+  /// Derived data — safe to delete; the model is asked again.
+  File get scenePlaceCacheFile =>
+      File(path.join(rootPath ?? '', 'cache', 'scene_places.json'));
+
   /// Cache for Stoop card art pulled from the hub (thumbs + originals).
   /// Derived data — safe to delete; refetched on demand.
   Directory get stoopAssetCacheDir =>

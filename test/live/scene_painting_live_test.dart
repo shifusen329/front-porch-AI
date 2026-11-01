@@ -26,7 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:front_porch_ai/database/database.dart';
 import 'package:front_porch_ai/services/chat/chat.dart'
-    show ScenePainter, SceneWant;
+    show ScenePainter, ScenePlaceReader, SceneWant;
 import 'package:front_porch_ai/services/services.dart';
 
 import '../helpers/chat_db_teardown.dart';
@@ -161,6 +161,90 @@ void main() {
       }
     },
     skip: sdapi.isEmpty ? 'set SCENE_LIVE_SDAPI_URL to run' : false,
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  // The place comes from the model, not a word list: a stairwell (the
+  // stance, word for word, from a chat that painted nothing), a gazebo only
+  // the reply names, a pictured place under another word, and a stance
+  // that names none.
+  test(
+    'a real model names the place a reply leaves the character in',
+    () async {
+      SharedPreferences.setMockInitialValues({'update_auto_check': false});
+      final db = AppDatabase.forTesting();
+      final storage = StorageService();
+      await storage.initialized;
+      final chat =
+          ChatService(
+              KoboldService(storage),
+              UserPersonaService(db),
+              storage,
+              WorldRepository(storage, db),
+            )
+            ..testLlmServiceOverride = OpenRouterService(
+              apiUrl: llmUrl,
+              modelName: model,
+            );
+      addTearDown(() => disposeChatThenCloseDb(chat, db));
+      final reader = ScenePlaceReader(
+        ask: chat.nameScenePlace,
+        cacheFile: () => File(
+          '${Directory.systemTemp.createTempSync('fpai_place_').path}'
+          '/scene_places.json',
+        ),
+      );
+
+      final cases = [
+        (
+          'Standing upright on the top step of the stairwell, clutching her '
+              'phone under crossed arms',
+          'Becky stands so fast her knee knocks the railing. "Nothing! I '
+              'was just— nobody comes down these stairs," she says.',
+          const <String>[],
+          ['stair'],
+        ),
+        (
+          'leaning on the white railing, looking out over the water',
+          'Mabel walked down the garden path to the old gazebo by the lake '
+              'and leaned on its railing while the sun went down.',
+          const ['kitchen', 'porch'],
+          ['gazebo'],
+        ),
+        (
+          'curled up on the veranda swing with a blanket',
+          'Mabel pushed the swing with one foot and listened to the crickets '
+              'in the yard.',
+          const ['kitchen', 'porch'],
+          ['porch'],
+        ),
+        (
+          'leaning back, eyes closed',
+          'Mabel let out a long breath and said nothing for a while.',
+          const <String>[],
+          [''],
+        ),
+      ];
+      for (final (stance, story, pictured, want) in cases) {
+        final place = await reader.read(
+          who: stance.startsWith('Standing') ? 'Becky' : 'Mabel',
+          stance: stance,
+          story: story,
+          pictured: pictured,
+        );
+        // ignore: avoid_print
+        print('"$stance" -> "$place"');
+        expect(place, isNotNull, reason: 'no answer for "$stance"');
+        expect(
+          want.any((w) => w.isEmpty ? place!.isEmpty : place!.contains(w)),
+          isTrue,
+          reason: '"$stance" read as "$place"',
+        );
+      }
+    },
+    skip: llmUrl.isEmpty || model.isEmpty
+        ? 'set SCENE_LIVE_LLM_URL and SCENE_LIVE_LLM_MODEL to run'
+        : false,
     timeout: const Timeout(Duration(minutes: 5)),
   );
 }
